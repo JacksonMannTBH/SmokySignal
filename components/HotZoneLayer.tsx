@@ -183,31 +183,49 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
                 2,
                 1,
               ],
-              // Pull intensity DOWN at low zoom so the regional view
-              // reads as a heatmap, not a region-wide alert.
+              // Intensity ramps from regional-overview (low) to
+              // city-zoom (high). Carrying it past z11 means cells stay
+              // bright when the rider zooms in to a corridor.
               "heatmap-intensity": [
                 "interpolate",
                 ["linear"],
                 ["zoom"],
-                7,
-                0.6,
-                11,
-                1,
+                6,
+                0.5,
+                9,
+                0.8,
+                12,
+                1.0,
+                15,
+                1.1,
+                18,
+                1.2,
               ],
-              // Smaller radius at low zoom so cells don't merge into
-              // a continuous blob across all of Puget Sound.
+              // Radius scales aggressively with zoom so adjacent cells
+              // overlap and blend at every level — at z13+ this turns
+              // sequences of patrol pings into continuous corridors
+              // instead of a string of discrete circles. Previous stops
+              // (28px at z11) flatlined at city zoom; the new ramp goes
+              // up to 240px at z18.
               "heatmap-radius": [
                 "interpolate",
                 ["linear"],
                 ["zoom"],
-                7,
-                14,
-                11,
-                28,
+                6,
+                10,
+                9,
+                22,
+                12,
+                50,
+                15,
+                110,
+                18,
+                240,
               ],
-              // Dialed-back opacity stops — same hue progression as before
-              // but the top stop is 0.65 instead of 0.78, so dense areas
-              // remain readable instead of going solid red.
+              // Same hue progression — amber at low density, deep red
+              // at peak — with the top stop dialed back to 0.65 so even
+              // dense corridors remain map-readable rather than going
+              // fully solid.
               "heatmap-color": [
                 "interpolate",
                 ["linear"],
@@ -223,7 +241,20 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
                 1.0,
                 "rgba(220,38,38,0.65)",
               ],
-              "heatmap-opacity": 0.7,
+              // Drop opacity slightly at high zoom so the corridor
+              // contour stays visible against street-level basemap
+              // detail (signs, road names) instead of obscuring it.
+              "heatmap-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                6,
+                0.7,
+                12,
+                0.7,
+                16,
+                0.55,
+              ],
             },
           },
           beforeId,
