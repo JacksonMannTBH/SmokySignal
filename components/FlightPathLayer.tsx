@@ -1,0 +1,255 @@
+"use client";
+
+// Flight-path polyline overlay. Threads each tail-day's track samples
+// as a thin amber line beneath the hot-zone heatmap layer — corridors
+// (I-5 transit, lake-patrol orbits) read as actual lines instead of
+// blob density. Pairs with HotZoneLayer.tsx; visibility tracks the
+// same `ss_hotzones_visible` localStorage key for now (one toggle
+// controls both — if rider feedback wants separation, a follow-up
+// adds a sub-toggle).
+//
+// Source: /api/flight-paths returns one GeoJSON LineString per tail-day
+// with ≥ 5 points, filtered by region bbox + operator/role allow-list.
+// Edge-cached for 5 min so flipping filters is cheap.
+
+import { useEffect, useRef, useState } from "react";
+import type { Map as MaplibreMap, GeoJSONSource } from "maplibre-gl";
+import { SS_TOKENS } from "@/lib/tokens";
+import {
+  DEFAULT_RADAR_FILTER,
+  RADAR_FILTER_CHANGE_EVENT,
+  SMOKY_FILTER_ROLES,
+  bucketsToRoles,
+  readRadarFilter,
+  type RadarFilter as Filter,
+} from "@/lib/radar-filter";
+import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
+import type { RegionId } from "@/lib/regions";
+
+const VISIBLE_KEY = "ss_hotzones_visible";
+const SOURCE_ID = "flight-paths";
+const LAYER_ID = "flight-paths-line";
+const HEATMAP_LAYER_ID = "hotzones-heat";
+const AIRCRAFT_LAYER_ID = "aircraft";
+
+function buildQueryString(f: Filter, regionId: RegionId): string {
+  const p = new URLSearchParams();
+  p.set("region_id", regionId);
+  if (f.showMode === "smoky") p.set("roles", SMOKY_FILTER_ROLES.join(","));
+  if (f.showMode === "operator" && f.operator) p.set("operator", f.operator);
+  if (f.buckets.length > 0) {
+    p.set("roles", bucketsToRoles(f.buckets).join(","));
+  }
+  return p.toString();
+}
+
+type Props = {
+  map: MaplibreMap | null;
+};
+
+export function FlightPathLayer({ map }: Props) {
+  const [enabled, setEnabled] = useState<boolean>(true);
+  const [filter, setFilter] = useState<Filter>(DEFAULT_RADAR_FILTER);
+  const [regionId, setRegionId] = useState<RegionId>("puget_sound");
+  const [features, setFeatures] = useState<GeoJSON.Feature[] | null>(null);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
+  // Mirror persisted state + cross-component change events same as
+  // HotZoneLayer — both layers respond identically to filter / region
+  // / visibility changes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const v = window.localStorage.getItem(VISIBLE_KEY);
+    if (v === "0") setEnabled(false);
+    else if (v === "1") setEnabled(true);
+    setFilter(readRadarFilter());
+    setRegionId(getRegion());
+    const onFilterChange = (e: Event) => {
+      const detail = (e as CustomEvent<Filter>).detail;
+      if (detail) setFilter(detail);
+    };
+    const onRegionChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ id: RegionId }>).detail;
+      setRegionId(detail?.id ?? getRegion());
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === VISIBLE_KEY) {
+        setEnabled(e.newValue !== "0");
+      }
+    };
+    window.addEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
+    window.addEventListener(REGION_CHANGE_EVENT, onRegionChange);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
+      window.removeEventListener(REGION_CHANGE_EVENT, onRegionChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  // Same-tab visibility sync: HotZoneLayer writes ss_hotzones_visible
+  // but the storage event only fires for cross-tab changes. Poll the
+  // localStorage value cheaply on a slow interval so toggling the heat
+  // button updates the polylines too.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = setInterval(() => {
+      const v = window.localStorage.getItem(VISIBLE_KEY);
+      const next = v !== "0";
+      setEnabled((prev) => (prev === next ? prev : next));
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  // Fetch the polyline FeatureCollection on filter / region change.
+  useEffect(() => {
+    let cancelled = false;
+    const qs = buildQueryString(filter, regionId);
+    (async () => {
+      try {
+        const r = await fetch(`/api/flight-paths?${qs}`, {
+          cache: "no-store",
+        });
+        if (!r.ok) return;
+        const d = (await r.json()) as { features?: GeoJSON.Feature[] };
+        if (cancelled) return;
+        setFeatures(Array.isArray(d.features) ? d.features : []);
+      } catch {
+        // best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filter, regionId]);
+
+  // Add the source + layer once the map is ready. Same retry-on-data
+  // pattern as HotZoneLayer because MapLibre's isStyleLoaded() is
+  // unreliable post-mount under Next.js dynamic-import.
+  useEffect(() => {
+    if (!map) return;
+
+    const addLayerOnce = () => {
+      if (map.getSource(SOURCE_ID)) return;
+      try {
+        map.addSource(SOURCE_ID, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        // Z-order: insert below the hot-zone heatmap so heat sits on
+        // top of the threads. If the heatmap hasn't attached yet
+        // (race), fall back to insert-before-aircraft so the polyline
+        // still lands beneath the chevrons; when heatmap attaches
+        // later it'll auto-insert above the polyline (its own
+        // beforeId targets the aircraft layer).
+        const beforeId = map.getLayer(HEATMAP_LAYER_ID)
+          ? HEATMAP_LAYER_ID
+          : map.getLayer(AIRCRAFT_LAYER_ID)
+            ? AIRCRAFT_LAYER_ID
+            : undefined;
+        map.addLayer(
+          {
+            id: LAYER_ID,
+            type: "line",
+            source: SOURCE_ID,
+            layout: {
+              visibility: enabledRef.current ? "visible" : "none",
+              "line-cap": "round",
+              "line-join": "round",
+            },
+            paint: {
+              "line-color": SS_TOKENS.alert,
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                8,
+                0.5,
+                12,
+                1.2,
+                15,
+                1.8,
+                18,
+                2.5,
+              ],
+              "line-opacity": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                8,
+                0.1,
+                12,
+                0.14,
+                15,
+                0.18,
+                18,
+                0.2,
+              ],
+            },
+          },
+          beforeId,
+        );
+      } catch {
+        // style not ready; the data event will retry
+      }
+    };
+
+    let cancelled = false;
+    const ensure = () => {
+      if (cancelled || !map) return;
+      if (map.getSource(SOURCE_ID)) return;
+      addLayerOnce();
+    };
+    ensure();
+    map.on("data", ensure);
+
+    return () => {
+      cancelled = true;
+      try {
+        map.off("data", ensure);
+        if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+        if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+      } catch {
+        /* map already torn down */
+      }
+    };
+  }, [map]);
+
+  // Push features into the source whenever they change.
+  useEffect(() => {
+    if (!map || !features) return;
+    const src = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+    if (!src) {
+      const onSourceReady = () => {
+        const s = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+        if (s && features) {
+          s.setData({ type: "FeatureCollection", features });
+          map.off("sourcedata", onSourceReady);
+        }
+      };
+      map.on("sourcedata", onSourceReady);
+      return () => {
+        map.off("sourcedata", onSourceReady);
+      };
+    }
+    src.setData({ type: "FeatureCollection", features });
+  }, [map, features]);
+
+  // Mirror enabled to the layer's visibility.
+  useEffect(() => {
+    if (!map) return;
+    try {
+      if (!map.getLayer(LAYER_ID)) return;
+      map.setLayoutProperty(
+        LAYER_ID,
+        "visibility",
+        enabled ? "visible" : "none",
+      );
+    } catch {
+      /* layer not yet attached */
+    }
+  }, [map, enabled]);
+
+  return null;
+}

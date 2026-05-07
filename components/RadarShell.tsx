@@ -10,6 +10,7 @@ import { computeStatus } from "@/lib/status";
 import { StatusPill } from "./StatusPill";
 import { SpottedButton } from "./SpottedButton";
 import { HotZoneLayer } from "./HotZoneLayer";
+import { FlightPathLayer } from "./FlightPathLayer";
 import { UserZoneLayer } from "./UserZoneLayer";
 import { AircraftTrailLayer } from "./AircraftTrailLayer";
 import { addUserZone } from "@/lib/user-zones";
@@ -217,6 +218,7 @@ export function RadarShell({
         bottomBoost={airborne.length > 0 ? 130 : 0}
         learning={learning}
       />
+      <FlightPathLayer map={map} />
       <UserZoneLayer map={map} />
       <AircraftTrailLayer map={map} airborne={airborne} />
       <AddZoneButton

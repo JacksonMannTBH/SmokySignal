@@ -194,9 +194,9 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
                 ["linear"],
                 ["zoom"],
                 6,
-                0.5,
+                0.4,
                 9,
-                0.8,
+                0.7,
                 12,
                 1.0,
                 15,
@@ -204,26 +204,29 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
                 18,
                 1.2,
               ],
-              // Radius scales aggressively with zoom so adjacent cells
-              // overlap and blend at every level — at z13+ this turns
-              // sequences of patrol pings into continuous corridors
-              // instead of a string of discrete circles. Previous stops
-              // (28px at z11) flatlined at city zoom; the new ramp goes
-              // up to 240px at z18.
+              // Radius must exceed cell spacing at every zoom for cells
+              // to overlap and blur smoothly. Cell spacing at 47°N is
+              // ~97 px at z14, ~195 px at z15 — the prior ramp (110 px
+              // at z15, 240 px at z18) undershot, leaving discrete
+              // grid pattern visible exactly where riders zoom in to
+              // study corridors. New stops are aggressive past z12 so
+              // adjacent cells blur at every level.
               "heatmap-radius": [
                 "interpolate",
                 ["linear"],
                 ["zoom"],
                 6,
-                10,
-                9,
-                22,
                 12,
-                50,
+                9,
+                30,
+                12,
+                70,
+                14,
+                140,
                 15,
-                110,
+                200,
                 18,
-                240,
+                400,
               ],
               // Same hue progression — amber at low density, deep red
               // at peak — with the top stop dialed back to 0.65 so even
@@ -244,9 +247,10 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
                 1.0,
                 "rgba(220,38,38,0.65)",
               ],
-              // Drop opacity slightly at high zoom so the corridor
-              // contour stays visible against street-level basemap
-              // detail (signs, road names) instead of obscuring it.
+              // Drop opacity at deep zoom so dense corridors don't go
+              // opaque — the polyline overlay (FlightPathLayer.tsx)
+              // sits beneath the heat and stays visible through the
+              // softened density.
               "heatmap-opacity": [
                 "interpolate",
                 ["linear"],
@@ -254,9 +258,9 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
                 6,
                 0.7,
                 12,
-                0.7,
+                0.65,
                 16,
-                0.55,
+                0.5,
               ],
             },
           },
