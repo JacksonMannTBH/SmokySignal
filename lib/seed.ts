@@ -90,8 +90,68 @@ export const FLEET: FleetEntry[] = [
  * entries (N1977G, N2108J, N741C, N128J) and 1 USCG Air Station Port
  * Angeles entry (CGNR6594, MH-65E). Pierce One confidence promoted to
  * confirmed. WSP King Air operator note clarified.
+ *
+ * Round-2 research (2026-05-07, no version bump): see the notes block
+ * below documenting which agencies were investigated and why they
+ * couldn't be added in this pass. The FLEET array did not change.
  */
 export const SEED_VERSION = 3;
+
+// Round-2 registry research notes (2026-05-07).
+//
+// Captures candidates that surface in public reporting but are blocked
+// from inclusion because the FleetEntry schema requires either an
+// FAA-derivable tail (matches the ^N\d pattern) or a directly supplied
+// mode-S hex. Without one of those, the entry can't match live ADS-B
+// and would either collide on the empty-hex key or silently fabricate
+// a hex that risks a false-positive on an unrelated airframe.
+//
+// Researched and confirmed to operate aircraft, not yet addable:
+//
+//   Chelan County Sheriff Air Support Unit (Wenatchee)
+//     Two Bell OH-58 helicopters, primarily SAR + counter-drug + patrol.
+//     Source: co.chelan.wa.us/sheriff/pages/air-support-unit. No public
+//     N-numbers — needs FOIA / direct ops contact.
+//
+//   Pierce County Sheriff "Pierce Two" backup
+//     Older Cessna 206 from 1980s drug-seizure asset, FLIR-equipped.
+//     Source: piercecountywa.gov/2156/Air-Operations. No public tail.
+//
+//   USCG Air Station Port Angeles — MH-65Es beyond CGNR6594
+//     Three MH-65Es total per Jan 2021 delivery; helis.com lists 6517
+//     and 6603 as candidates but mode-S hexes not publicly documented.
+//     Best confirmed via direct USCG pubaffairs request.
+//
+//   Spokane County Sheriff — legacy OH-58s + UH-1H "Rescue 3"
+//     Two Bell OH-58s (Air 1 / Air 2 pre-2024) + UH-1H Super Huey.
+//     Source: spokanecounty.gov/1392/Air-Support-Unit. No public tails.
+//     The Bell 505 (N509DV) added in 2024 is already in the registry.
+//
+// Researched and confirmed NOT to operate own aircraft (rely on
+// partners or regional consortium):
+//
+//   - Whatcom County Sheriff (uses CBP/AMO Bellingham)
+//   - Clark County Sheriff (uses Portland Air Support)
+//   - Kitsap County Sheriff (regional consortium member)
+//   - Yakima County Sheriff (no aviation unit found)
+//   - Skagit / Cowlitz / Lewis / Mason / Grays Harbor / Clallam SOs
+//   - Benton / Franklin / Walla Walla / Asotin / Stevens / Okanogan SOs
+//   - Seattle / Tacoma / Bellevue / Vancouver / Spokane PDs
+//   - Klickitat County Sheriff Air Wing — volunteer civilian aircraft,
+//     pilots fly their own; no agency-owned airframes to register.
+//   - WA Department of Fish & Wildlife — no documented aviation
+//     enforcement program. WA DNR is firefighting only (out of scope).
+//
+// Researched but excluded by scope or data quality:
+//
+//   - Thurston County Sheriff (recently acquired surplus OH-58 but
+//     ~6-12 months from operational status; revisit when in service)
+//   - FBI Seattle field office — Cessna fleet registered to FBI front
+//     companies (KQM Aviation, PXW Services). No Seattle-specific
+//     attribution available; tails rotate by op.
+//   - DEA / ATF — same pattern, no publicly attributable WA-based tails.
+//   - USCG Air Station Astoria (OR) MH-60Ts — operate over the WA
+//     southern coast but stationed in OR; out of WA-airspace scope.
 
 export const SMOKY_TAIL = "N305DK";
 
