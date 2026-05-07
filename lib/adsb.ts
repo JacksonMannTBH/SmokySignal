@@ -12,10 +12,14 @@ import type {
   Snapshot,
 } from "./types";
 
+// State-centroid query covers all four corners of Washington within
+// ~190 nm. adsb.fi v2 caps the radius at 250 nm (501+ returns HTTP 400),
+// so this is the largest single-circle query the API allows. Registry-tail
+// filtering downstream drops any non-fleet leakage from BC / OR / ID.
 const REGION = {
-  lat: Number(process.env.SS_REGION_LAT ?? 47.6),
-  lon: Number(process.env.SS_REGION_LON ?? -122.3),
-  nm: Number(process.env.SS_REGION_NM ?? 80),
+  lat: Number(process.env.SS_REGION_LAT ?? 47.4),
+  lon: Number(process.env.SS_REGION_LON ?? -120.8),
+  nm: Number(process.env.SS_REGION_NM ?? 250),
 };
 
 // In-memory state across requests — tracks first-seen timestamps so we can
