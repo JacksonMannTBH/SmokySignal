@@ -22,6 +22,7 @@ import type { Aircraft } from "@/lib/types";
 
 const SOURCE_ID = "aircraft-trails";
 const ENDPOINTS_SOURCE_ID = "aircraft-trail-endpoints";
+const HALO_LAYER_ID = "aircraft-trail-halo";
 const LAYER_ID = "aircraft-trail";
 const START_DOT_LAYER_ID = "aircraft-trail-start-dot";
 const END_DOT_LAYER_ID = "aircraft-trail-end-dot";
@@ -86,7 +87,12 @@ function reorderTrailLayers(map: MaplibreMap): void {
   const beforeId = map.getLayer(AIRCRAFT_LAYER_ID)
     ? AIRCRAFT_LAYER_ID
     : undefined;
-  for (const id of [LAYER_ID, START_DOT_LAYER_ID, END_DOT_LAYER_ID]) {
+  // Order matters: halo first → it ends up at the bottom of the
+  // cluster after the loop because each subsequent moveLayer call
+  // inserts the named layer just before beforeId, pushing the prior
+  // entries down. Final visual stack from bottom: halo → line →
+  // start dot → end dot → chevron.
+  for (const id of [HALO_LAYER_ID, LAYER_ID, START_DOT_LAYER_ID, END_DOT_LAYER_ID]) {
     try {
       if (map.getLayer(id)) map.moveLayer(id, beforeId);
     } catch {
@@ -144,6 +150,37 @@ export function AircraftTrailLayer({
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
+      // Halo first so it lands beneath the line. Page-background near-
+      // black at 0.5 opacity gives the cyan trail a confident outline
+      // that survives heat density, water, road labels, anything.
+      // 4 px wider than the line at every zoom stop — the halo reads
+      // as an outline rather than a competing line.
+      map.addLayer(
+        {
+          id: HALO_LAYER_ID,
+          type: "line",
+          source: SOURCE_ID,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": SS_TOKENS.bg0,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              8,
+              8,
+              11,
+              11,
+              14,
+              14,
+              18,
+              18,
+            ],
+            "line-opacity": 0.5,
+          },
+        },
+        beforeId,
+      );
       map.addLayer(
         {
           id: LAYER_ID,
@@ -161,15 +198,15 @@ export function AircraftTrailLayer({
               ["linear"],
               ["zoom"],
               8,
-              2,
-              11,
-              3,
-              14,
-              3.5,
-              18,
               4,
+              11,
+              7,
+              14,
+              10,
+              18,
+              14,
             ],
-            "line-opacity": 0.95,
+            "line-opacity": 1.0,
           },
         },
         beforeId,
@@ -181,10 +218,10 @@ export function AircraftTrailLayer({
           source: ENDPOINTS_SOURCE_ID,
           filter: ["==", ["get", "kind"], "start"],
           paint: {
-            "circle-radius": 5,
+            "circle-radius": 7,
             "circle-color": SS_TOKENS.clear,
             "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-width": 1.5,
+            "circle-stroke-width": 2,
           },
         },
         beforeId,
@@ -196,10 +233,10 @@ export function AircraftTrailLayer({
           source: ENDPOINTS_SOURCE_ID,
           filter: ["==", ["get", "kind"], "end"],
           paint: {
-            "circle-radius": 6,
+            "circle-radius": 8,
             "circle-color": SS_TOKENS.alert,
             "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-width": 1.5,
+            "circle-stroke-width": 2,
           },
         },
         beforeId,
@@ -223,7 +260,7 @@ export function AircraftTrailLayer({
         return;
       }
       const phase = ((Date.now() - startedAt) % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
-      const radius = 6 + 4 * Math.sin(phase * Math.PI * 2);
+      const radius = 8 + 5 * Math.sin(phase * Math.PI * 2);
       try {
         map.setPaintProperty(END_DOT_LAYER_ID, "circle-radius", radius);
       } catch {
@@ -242,6 +279,7 @@ export function AircraftTrailLayer({
         if (map.getLayer(END_DOT_LAYER_ID)) map.removeLayer(END_DOT_LAYER_ID);
         if (map.getLayer(START_DOT_LAYER_ID)) map.removeLayer(START_DOT_LAYER_ID);
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+        if (map.getLayer(HALO_LAYER_ID)) map.removeLayer(HALO_LAYER_ID);
         if (map.getSource(ENDPOINTS_SOURCE_ID)) map.removeSource(ENDPOINTS_SOURCE_ID);
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
       } catch {
