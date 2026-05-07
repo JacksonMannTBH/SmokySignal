@@ -94,7 +94,15 @@ export function Glanceable({
     [snap.aircraft],
   );
   const status = useMemo(() => computeStatus(snap, fleetMap), [snap, fleetMap]);
-  const others = snap.aircraft.filter((a) => a.airborne);
+  // Drop the headline plane from the also-up list. Without this filter
+  // the lead appears twice — once as the hero, once at the top of the
+  // also-up card — and the count in the also-up header disagrees with
+  // the "X other watchers up." footnote in lib/status.ts which already
+  // excludes the lead.
+  const leadTail = status.lead?.aircraft.tail ?? null;
+  const others = snap.aircraft.filter(
+    (a) => a.airborne && a.tail !== leadTail,
+  );
   const latestActivity =
     activity.length > 0 &&
     Date.now() - activity[0]!.ts < ACTIVITY_STRIP_MAX_AGE_MS
@@ -366,22 +374,65 @@ function Hero({ status }: { status: StatusState }) {
         </p>
       )}
       {status.lead && status.kind === "alert" && (
-        <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {status.lead.aircraft.time_aloft_min != null && (
-            <StatusPill
-              kind="alert"
-              label={fmtAloft(status.lead.aircraft.time_aloft_min)}
-            />
-          )}
-          {status.lead.aircraft.ground_speed_kt != null && (
-            <StatusPill
-              kind="alert"
-              label={`${status.lead.aircraft.ground_speed_kt} kt`}
-            />
-          )}
-        </div>
+        <>
+          <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {status.lead.aircraft.time_aloft_min != null && (
+              <StatusPill
+                kind="alert"
+                label={fmtAloft(status.lead.aircraft.time_aloft_min)}
+              />
+            )}
+            {status.lead.aircraft.ground_speed_kt != null && (
+              <StatusPill
+                kind="alert"
+                label={`${status.lead.aircraft.ground_speed_kt} kt`}
+              />
+            )}
+          </div>
+          <LeadIdentity
+            tail={status.lead.aircraft.tail}
+            nickname={status.lead.entry.nickname}
+            operator={status.lead.entry.operator}
+          />
+        </>
       )}
     </section>
+  );
+}
+
+function LeadIdentity({
+  tail,
+  nickname,
+  operator,
+}: {
+  tail: string;
+  nickname: string | null;
+  operator: string;
+}) {
+  // Lead-identity line under the stat chips so a rider knows whether
+  // the smokey at 4m aloft is the WSP Cessna near Olympia or the CBP
+  // B300C at FL190. Tappable — drills into /plane/[tail] for live
+  // map + history.
+  const middle = nickname ? ` · "${nickname}" · ` : " · ";
+  return (
+    <Link
+      href={`/plane/${tail}`}
+      prefetch={false}
+      aria-label={`View ${nickname ?? tail} details`}
+      className="ss-mono"
+      style={{
+        display: "inline-block",
+        marginTop: 6,
+        fontSize: 11.5,
+        color: SS_TOKENS.fg2,
+        letterSpacing: ".04em",
+        textDecoration: "none",
+      }}
+    >
+      {tail}
+      {middle}
+      {operator}
+    </Link>
   );
 }
 
