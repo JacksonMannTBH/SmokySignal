@@ -20,37 +20,30 @@ import { hotzonesCurrentKey, hotzonesLastRefreshKey } from "./storage-keys";
 // individual position pings.
 export const GRID_CELL_DEG = 0.0083;
 export const HOTZONE_DAYS_BACK = 30;
-// Defensive Pacific-NW envelope. Anything outside is data-quality
-// noise — old ADS-B records under a recycled N-number, hex collision
-// from a different aircraft using the same Mode-S code, etc. Live
-// Bounding box around the configured region centroid. WSP fixed-wing
-// fleet operates statewide — without this filter, a Smokey 3 deployment
-// to Tri-Cities (46.3°N, -119.4°W) lands ~1000 samples in the Puget
-// Sound heatmap. (Audit 2026-05-02 found exactly this pattern.)
+// Aggregation envelope: a generous Washington-state bounding box. Anything
+// outside is data-quality noise — old ADS-B records under a recycled
+// N-number, hex collision from a different aircraft using the same Mode-S
+// code, etc. Per-region client-side slicing happens downstream in
+// app/api/hotzones/route.ts via REGIONS[id].bbox; this filter is the
+// outer envelope only.
 //
-// Envvar-overridable so the operator can re-aim without a deploy.
-// Defaults: 47.6°N / -122.3°W / 80nm — Puget Sound.
+// Intentionally NOT shared with the SS_REGION_* envvars used by the
+// upstream snapshot query in lib/adsb.ts — those gate which aircraft we
+// pull from adsb.fi (a 250 nm radius); this gates which historical track
+// points enter the heatmap aggregate. Different concepts.
 //
-// The bounds were previously the whole-state box (45–49.5°N, -125 to
-// -116°W) which let Tri-Cities through. The tighter default + envvar
-// hatch is the right shape for a region-selector future (Phase 3).
-const REGION_LAT = Number(process.env.SS_REGION_LAT ?? 47.6);
-const REGION_LON = Number(process.env.SS_REGION_LON ?? -122.3);
-const REGION_NM = Number(process.env.SS_REGION_NM ?? 80);
-// 1° latitude ≈ 60nm everywhere; 1° longitude ≈ 41nm at 47°N.
-const LAT_DEG = REGION_NM / 60;
-const LON_DEG = REGION_NM / 41;
-const REGION_LAT_MIN = REGION_LAT - LAT_DEG;
-const REGION_LAT_MAX = REGION_LAT + LAT_DEG;
-const REGION_LON_MIN = REGION_LON - LON_DEG;
-const REGION_LON_MAX = REGION_LON + LON_DEG;
+// Widen this if we ever expand to OR / ID coverage.
+const WA_LAT_MIN = 45.4;
+const WA_LAT_MAX = 49.1;
+const WA_LON_MIN = -125.0;
+const WA_LON_MAX = -116.8;
 
 function inRegion(lat: number, lon: number): boolean {
   return (
-    lat >= REGION_LAT_MIN &&
-    lat <= REGION_LAT_MAX &&
-    lon >= REGION_LON_MIN &&
-    lon <= REGION_LON_MAX
+    lat >= WA_LAT_MIN &&
+    lat <= WA_LAT_MAX &&
+    lon >= WA_LON_MIN &&
+    lon <= WA_LON_MAX
   );
 }
 
