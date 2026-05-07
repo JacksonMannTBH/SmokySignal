@@ -33,10 +33,17 @@ test("invalid inputs return null", () => {
 
 // FAA-verified seed: every entry's hex must match what the FAA algorithm
 // produces. Catches transcription typos in lib/seed.ts.
-test("seed hexes match FAA algorithm", () => {
+//
+// Federal military airframes (USCG, etc.) aren't in the civilian FAA
+// registry — they have military serials (CGNR####) instead of N-numbers,
+// so the FAA N-number algorithm doesn't apply. For those entries the
+// supplied hex is authoritative and the algorithm check is skipped.
+// Recognized by the absence of an `^N\d` prefix.
+test("seed hexes match FAA algorithm (FAA-registered tails only)", () => {
   const mismatches: string[] = [];
   for (const f of FLEET) {
     if (!f.hex) continue; // skip the omitted ones
+    if (!/^N\d/.test(f.tail)) continue; // skip non-FAA tails
     const computed = nNumberToIcao(f.tail);
     if (computed?.toLowerCase() !== f.hex.toLowerCase()) {
       mismatches.push(
