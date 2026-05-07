@@ -531,7 +531,7 @@ function PlaneCard({ p }: { p: Aircraft }) {
         )}
       </div>
       <div style={{ fontSize: 11, color: SS_TOKENS.fg2, marginTop: 5 }}>
-        Puget Sound
+        {p.operator}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
         <Stat

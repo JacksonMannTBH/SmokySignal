@@ -76,8 +76,8 @@ export default async function AboutPage() {
         <p style={{ fontSize: 14, lineHeight: 1.55, color: SS_TOKENS.fg1, margin: 0 }}>
           SmokySignal tells motorcyclists, drivers, and curious locals — in
           one glance — whether the bird is up, where it is, and what it&rsquo;s
-          watching. Coverage: King County, Pierce County, and the I-5 / I-405 /
-          SR-512 corridors.
+          watching. Coverage: Washington state — every WSP, county sheriff,
+          and federal agency airframe we can confirm is broadcasting.
         </p>
       </Section>
 

@@ -22,9 +22,9 @@ const mono = JetBrains_Mono({
 
 const TITLE = "SmokySignal — Is the bird up?";
 const DESCRIPTION =
-  "Live WSP & sheriff aircraft tracker for King & Pierce County riders. Know when Smokey's watching.";
+  "Live WSP and sheriff aircraft tracker for Washington state riders. Know when Smokey's watching.";
 const SOCIAL_DESCRIPTION =
-  "Live aircraft tracker for King & Pierce County riders.";
+  "Live aircraft tracker for Washington state riders.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
