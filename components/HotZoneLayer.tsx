@@ -38,21 +38,18 @@ const DEFAULT_FILTER = DEFAULT_RADAR_FILTER;
 
 function buildQueryString(f: Filter, regionId: RegionId): string {
   const p = new URLSearchParams();
-  // region_id (rider's selector pref) takes precedence over the legacy
-  // chevron region toggle. The chevron toggle still informs the API via
-  // the `region` param for back-compat, but region_id wins server-side
-  // when both are present.
+  // The rider's region selector is the only region signal — the
+  // FilterPanel's redundant Region group retired in P16.3.
   p.set("region_id", regionId);
-  p.set("region", f.region);
-  // "Smokey" filter is role-based now (smokey + patrol). Server resolves
+  // "Smokey" filter is role-based (smokey + patrol). Server resolves
   // the role list to the matching tail set via the registry, so adding
   // a new fixed-wing smokey to the registry automatically widens the
   // filter without a config change.
   if (f.showMode === "smoky") p.set("roles", SMOKY_FILTER_ROLES.join(","));
   if (f.showMode === "operator" && f.operator) p.set("operator", f.operator);
-  // Multi-select role allow-list overrides the legacy showMode role
-  // shortcut when present. Server-side /api/hotzones already accepts
-  // a comma-separated `roles` value.
+  // Multi-select role allow-list overrides the showMode role shortcut
+  // when present. Server-side /api/hotzones already accepts a
+  // comma-separated `roles` value.
   if (f.roles.length > 0) p.set("roles", f.roles.join(","));
   return p.toString();
 }

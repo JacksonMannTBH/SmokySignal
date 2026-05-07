@@ -196,10 +196,10 @@ test.describe("p14 live-prod audit", () => {
     }
     // 1st screenshot: default (Puget Sound)
     await shot(page, "05a-region-pugetsound-initial");
-    // → Spokane
-    await sel.selectOption("spokane");
+    // → East WA (Spokane folded into this preset in P16.3)
+    await sel.selectOption("east_wa");
     await page.waitForTimeout(2000);
-    await shot(page, "05b-region-spokane");
+    await shot(page, "05b-region-east-wa");
     // → back to Puget Sound
     await sel.selectOption("puget_sound");
     await page.waitForTimeout(2000);
@@ -207,13 +207,13 @@ test.describe("p14 live-prod audit", () => {
     // We can't programmatically inspect map center without the map ref
     // exposed, so this is visual evidence — Alex reviews the screenshots.
     record({
-      claim: "Region selector recenter (PS → Spokane → PS)",
+      claim: "Region selector recenter (PS → East WA → PS)",
       category: "indeterminate",
       pass: true,
       evidence:
         "screenshots captured at 05a/05b/05c — manual visual inspection " +
         "needed to confirm 05c shows Puget Sound (47.6, -122.3) and not " +
-        "Spokane or Tacoma rider position",
+        "East WA or Tacoma rider position",
       screenshot: finalShot,
     });
   });

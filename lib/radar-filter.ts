@@ -1,16 +1,14 @@
-// Shared radar filter state — operator / tail-set / region. Lives in
+// Shared radar filter state — operator / tail-set / roles. Lives in
 // localStorage under "ss_hotzones_filter" (legacy key kept so existing
 // user state survives this refactor) and broadcasts changes via a
 // CustomEvent so the heatmap chevron panel and the aircraft marker
 // layer stay in sync without a context provider.
 //
-// Region filtering is applied server-side only (lib/hotzones.ts) — the
-// passesAircraftFilter predicate intentionally ignores it because the
-// rider's airborne marker view should not hide planes based on the
-// fleet-aggregation envelope.
+// Region selection is owned by lib/region-pref.ts — the rider's region
+// pref drives /api/hotzones via the region_id param. This filter only
+// concerns operator / role / tail filtering inside the chosen region.
 
 export type RadarFilterShowMode = "all" | "smoky" | "operator";
-export type RadarFilterRegion = "puget_sound" | "all";
 
 /** Role IDs the rider can multi-select. Mirrors lib/types.ts FleetRole. */
 export const FILTERABLE_ROLES = [
@@ -25,7 +23,6 @@ export type FilterableRole = (typeof FILTERABLE_ROLES)[number];
 export type RadarFilter = {
   showMode: RadarFilterShowMode;
   operator: string | null;
-  region: RadarFilterRegion;
   /** Multi-select role allow-list. Empty = show all roles. */
   roles: FilterableRole[];
 };
@@ -60,7 +57,6 @@ export const OPERATORS = [
 export const DEFAULT_RADAR_FILTER: RadarFilter = {
   showMode: "all",
   operator: "WSP",
-  region: "puget_sound",
   roles: [],
 };
 
@@ -80,7 +76,6 @@ export function readRadarFilter(): RadarFilter {
         OPERATORS.includes(parsed.operator as (typeof OPERATORS)[number])
           ? parsed.operator
           : "WSP",
-      region: parsed.region === "all" ? "all" : "puget_sound",
       // roles is new in this shape; missing on prior persisted state →
       // empty array (which means "show all", same behavior as before).
       roles: Array.isArray(parsed.roles)

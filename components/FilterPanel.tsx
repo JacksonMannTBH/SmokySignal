@@ -141,21 +141,6 @@ export function FilterPanel({ bottom, filter, onChange, onClose }: Props) {
           </Pill>
         ))}
       </Group>
-
-      <Group label="Region">
-        <Pill
-          active={filter.region === "puget_sound"}
-          onClick={() => onChange({ ...filter, region: "puget_sound" })}
-        >
-          Puget Sound
-        </Pill>
-        <Pill
-          active={filter.region === "all"}
-          onClick={() => onChange({ ...filter, region: "all" })}
-        >
-          Statewide
-        </Pill>
-      </Group>
     </div>
   );
 }

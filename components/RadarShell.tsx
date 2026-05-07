@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import nextDynamic from "next/dynamic";
 import Link from "next/link";
 import type { Map as MaplibreMap } from "maplibre-gl";
@@ -23,8 +23,13 @@ import { HelpIcon } from "./HelpIcon";
 import { Tooltip } from "./Tooltip";
 import { FreshnessLabel } from "./FreshnessLabel";
 import { RegionSelector } from "./RegionSelector";
-import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
-import type { RegionId } from "@/lib/regions";
+import {
+  REGION_CHANGE_EVENT,
+  getRegion,
+  hasExplicitRegion,
+  setRegion,
+} from "@/lib/region-pref";
+import { regionForPoint, type RegionId } from "@/lib/regions";
 import {
   DEFAULT_RADAR_FILTER,
   RADAR_FILTER_CHANGE_EVENT,
@@ -170,6 +175,27 @@ export function RadarShell({
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
+
+  // First-resolve geolocation auto-pick: if the rider has never picked a
+  // region explicitly, auto-pick the bbox-containing region from their
+  // position. Returning riders with an explicit pick keep their choice
+  // even if a different bbox would otherwise match.
+  const didAutoPickRegionRef = useRef(false);
+  useEffect(() => {
+    if (didAutoPickRegionRef.current) return;
+    if (!rider) return;
+    if (hasExplicitRegion()) {
+      didAutoPickRegionRef.current = true;
+      return;
+    }
+    const picked = regionForPoint(rider.lat, rider.lon);
+    if (picked && picked !== regionId) {
+      didAutoPickRegionRef.current = true;
+      setRegion(picked);
+    } else {
+      didAutoPickRegionRef.current = true;
+    }
+  }, [rider, regionId]);
 
   return (
     <main
