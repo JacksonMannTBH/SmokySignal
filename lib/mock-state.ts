@@ -100,12 +100,27 @@ export function applyMockState(snap: Snapshot, state: MockState | null): Snapsho
     case "up":
       // At least one smokey-class up. The original mock=up behavior.
       return liftAirborne(snap, (r) => r === "smokey");
-    case "eyes-up":
+    case "eyes-up": {
       // Patrol or unknown airborne, no smokey. Drives the alert-tier
       // pill (which reads SMOKEY UP under the umbrella relabel) with
       // patrol/unknown body copy. State name kept for back-compat with
       // existing QA flows.
-      return liftAirborne(snap, (r) => r === "patrol" || r === "unknown");
+      //
+      // First ground every smokey-class so a live smokey doesn't bleed
+      // through and contaminate the assertion that this state should
+      // produce only patrol/unknown airborne.
+      const grounded: Snapshot = {
+        ...snap,
+        source: "mock",
+        aircraft: snap.aircraft.map((a) =>
+          a.role === "smokey" ? { ...a, airborne: false } : a,
+        ),
+      };
+      return liftAirborne(
+        grounded,
+        (r) => r === "patrol" || r === "unknown",
+      );
+    }
     case "multiple":
       // 3 smokey-class + 1 patrol. Drives the "X up" pill sub and the
       // others-also-up list.

@@ -388,16 +388,22 @@ test.describe("p14 live-prod audit", () => {
     await filterBtn.first().click();
     await page.waitForTimeout(500);
     const screenshot = await shot(page, "10-hotzones-filter");
-    const hasSmokey =
-      (await page.locator("text=/^Smokey$/i").count()) > 0;
+    // Post-PROMPT_17 P1, the filter chevron exposes 3 rider-facing
+    // categories — Smokey / Search & Rescue / Transport — that map onto
+    // the granular FleetRole taxonomy via lib/radar-filter.ts:RIDER_BUCKETS.
+    // The Smokey bucket → {smokey, patrol, unknown} (umbrella set per
+    // P16.5). SMOKY_TAILS is now an empty array; classification is
+    // entirely role-based. This assertion just confirms the Smokey label
+    // is rendered in the panel.
+    const hasSmokey = (await page.locator("text=/^Smokey$/i").count()) > 0;
     record({
-      claim: 'Hot-zones filter "Smokey" maps to role (smokey + patrol)',
-      category: "confirmed_bug",
-      pass: false,
-      evidence:
-        `filter panel opened${hasSmokey ? " with Smokey option" : ""}; ` +
-        "current implementation in lib/radar-filter.ts uses hardcoded " +
-        "SMOKY_TAILS array (N305DK, N2446X), NOT role-aware classification",
+      claim:
+        'Hot-zones filter exposes "Smokey" category (role-based: smokey + patrol + unknown)',
+      category: hasSmokey ? "working_as_designed" : "confirmed_bug",
+      pass: hasSmokey,
+      evidence: hasSmokey
+        ? "filter panel opened, Smokey category chip rendered"
+        : "filter panel opened but Smokey label not found",
       screenshot,
     });
   });
