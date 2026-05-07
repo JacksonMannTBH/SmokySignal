@@ -3,8 +3,13 @@
 // (Glanceable), the radar status pill, the PWA app-icon badge, and the
 // embeddable /api/badge.svg all derive their copy from computeStatus().
 //
-// Alert classes (amber pill): smokey, patrol, unknown
-// Clear classes (green pill): sar, transport, nothing
+// Alert classes (amber pill, all read SMOKEY UP): smokey, patrol, unknown
+// Clear classes (green pill, ALL CLEAR): sar, transport, nothing
+//
+// Smokey-as-umbrella: every law-enforcement aircraft surfaces as SMOKEY UP
+// on the rider-facing pill. The granular role taxonomy still drives body
+// copy (a fixed-wing smokey vs a patrol helicopter read differently
+// underneath the pill), but the headline is uniform.
 //
 // When something clear-class is up alone, we still show ALL CLEAR but
 // surface a small footnote ("SnoHawk 10 on a rescue run.") so riders
@@ -16,7 +21,7 @@ export type StatusKind = "alert" | "clear";
 
 export type StatusState = {
   kind: StatusKind;
-  /** Top-line label inside the pill: SMOKEY UP / EYES UP / ALL CLEAR. */
+  /** Top-line label inside the pill: SMOKEY UP / ALL CLEAR. */
   pill: string;
   /** Optional sub-label inside the pill (e.g. "2 watching"). */
   pillSub?: string;
@@ -92,14 +97,17 @@ export function computeStatus(
     };
   }
 
-  // Alert tier 2 — patrol or unknown up (no smokey). EYES UP, amber.
+  // Alert tier 2 — patrol or unknown up (no smokey). Per the Smokey
+  // umbrella, the pill reads SMOKEY UP just like tier 1 — body copy
+  // still distinguishes a patrol helicopter from a fixed-wing smokey
+  // for context, but the headline is uniform.
   if (upByRole.patrol.length > 0 || upByRole.unknown.length > 0) {
     const lead = upByRole.patrol[0] ?? upByRole.unknown[0]!;
     return {
       kind: "alert",
-      pill: "EYES UP",
+      pill: "SMOKEY UP",
       pillSub: alertCount > 1 ? `${alertCount} up` : undefined,
-      headline: "Eyes up.",
+      headline: "Smokey's up.",
       body: lead.entry.nickname
         ? `${lead.entry.nickname} in the air. Could be patrol.`
         : "Patrol helicopter in the air. Mind the throttle.",

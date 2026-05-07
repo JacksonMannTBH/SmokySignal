@@ -31,12 +31,14 @@ export const RADAR_FILTER_KEY = "ss_hotzones_filter";
 export const RADAR_FILTER_CHANGE_EVENT = "ss-radar-filter-change";
 
 /**
- * Roles that count as "Smokey" — speed-enforcement birds. The filter
- * UI labels this "Smokey" because that's the rider mental model; the
- * implementation matches by classified role, NOT a hardcoded tail list,
- * so a new WSP smokey added to the registry is automatically included.
+ * Roles that count as "Smokey" — every law-enforcement aircraft. Mirrors
+ * the alert-tier set in lib/status.ts: smokey + patrol + unknown all
+ * surface to riders under the single Smokey umbrella, so the filter
+ * widens to match. The implementation matches by classified role,
+ * NOT a hardcoded tail list, so a new fixed-wing smokey added to the
+ * registry is automatically included.
  */
-export const SMOKY_FILTER_ROLES = ["smokey", "patrol"] as const;
+export const SMOKY_FILTER_ROLES = ["smokey", "patrol", "unknown"] as const;
 
 /**
  * @deprecated Use SMOKY_FILTER_ROLES instead. Retained as an empty

@@ -10,11 +10,11 @@ We track 16 fixed-wing planes and helicopters across WSP, KCSO, Pierce SO, Snoho
 
 ## What's a Smokey?
 
-SmokySignal tracks 16 aircraft across four roles. Only some of them mean you should ease off the throttle.
+SmokySignal tracks the law-enforcement aircraft over Washington. Anything in the air with an enforcement mission reads as "Smokey" — that's the umbrella. Underneath, we keep four backend roles so plane-detail pages can tell you exactly what airframe is up.
 
-**SMOKEY** (speed enforcement) — fixed-wing planes, usually Cessnas with FLIR cameras, used for clocking speed from the air. WSP runs five of these. Pierce SO runs one. If any of these are up, the status pill goes amber and the headline says "Smokey's up."
+**SMOKEY (speed enforcement)** — fixed-wing planes, usually Cessnas with FLIR cameras, used for clocking speed from the air. WSP runs five of these. Pierce SO runs one. Pill: SMOKEY UP. Headline: "Smokey's up."
 
-**PATROL** (multi-role helicopter) — county sheriff helicopters that may be doing traffic, pursuit, or SAR. Status goes amber as a precaution, with the pill reading "Eyes up."
+**SMOKEY (patrol helicopter)** — county sheriff helicopters that may be doing traffic, pursuit, or SAR. Same SMOKEY UP pill. Body copy still says "patrol helicopter" so you know the airframe.
 
 **SAR** (search and rescue) — Hueys and similar. Almost always responding to a rescue, not enforcement. Status stays green; we just note the rescue in a footnote.
 
@@ -34,8 +34,7 @@ If a friend tells you the app secretly snitches when you cross 80, they're worki
 
 The hero panel is the headline. It always reads as one of three states:
 
-- **SMOKEY UP / Smokey's up.** — A speed-enforcement plane is in the air. Mind the throttle.
-- **EYES UP / Eyes up.** — No Smokey, but a patrol helicopter is up. Could be traffic or SAR; we err on alert.
+- **SMOKEY UP / Smokey's up.** — A law-enforcement plane is in the air — fixed-wing FLIR or patrol helicopter. Mind the throttle.
 - **ALL CLEAR / Smokey's down.** — Nothing alert-class is up. If a SAR or transport aircraft happens to be in the air, you'll see a small footnote.
 
 Below the hero, the **activity strip** shows the most recent state-change event — a takeoff, landing, or emergency squawk. It auto-hides if there's nothing recent (older than 6 hours).
@@ -50,8 +49,7 @@ In the top-right, the small **moon icon** toggles a screen wake lock — handy o
 
 The map is a live view centered on Puget Sound. The status pill at the top mirrors the home screen's state:
 
-- **SMOKEY UP** (amber) — a speed-enforcement plane is up
-- **EYES UP** (amber) — a patrol helicopter is up (no Smokey)
+- **SMOKEY UP** (amber) — a law-enforcement plane is up (fixed-wing FLIR, patrol helicopter, or unconfirmed alert-class)
 - **ALL CLEAR** (green) — nothing alert-class is up
 
 Top-right shows `0/16 UP` — how many of our 16 tracked tails are up right now. The number turns amber any time it's nonzero.
@@ -84,7 +82,7 @@ Tap a row to open the plane detail page. The feed polls every 30 seconds while t
 
 Each tail has its own page at `/plane/{TAIL}`. It shows:
 
-- **Status pill**: `AIRBORNE · WATCHING` (amber) or `GROUNDED` (green) with last-seen relative time, plus a small role badge ("SPEED ENFORCEMENT", "MULTI-ROLE PATROL", etc.)
+- **Status pill**: `AIRBORNE · WATCHING` (amber) or `GROUNDED` (green) with last-seen relative time, plus a small role badge ("SMOKEY" for any law-enforcement plane, "SEARCH & RESCUE", or "TRANSPORT")
 - **Live data block** (when up): altitude, ground speed, heading, squawk code
 - **Recent track**: a real interactive map of the most recent flight session, with a polyline of the path. Pinch to zoom, drag to pan.
 - **Session metadata**: first/last seen, duration, sample count, max altitude

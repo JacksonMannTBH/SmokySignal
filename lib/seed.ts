@@ -6,12 +6,14 @@ import { nNumberToIcao } from "./icao";
 // algorithm. lib/icao.test.ts asserts that every seeded hex matches what
 // the algorithm produces — typos surface as test failures.
 //
-// `role` drives the home + radar status pill via lib/status.ts:
-//   smokey  → SMOKEY UP   (alert / amber)
-//   patrol  → EYES UP      (alert / amber)
-//   sar     → ALL CLEAR + footnote (clear / green)
-//   transport → ALL CLEAR + footnote (clear / green)
-//   unknown → SMOKEY UP    (alert / amber, conservative)
+// `role` drives the home + radar status pill via lib/status.ts. All three
+// alert-tier roles surface as SMOKEY UP under the rider-facing umbrella;
+// the granular role taxonomy still drives body copy and badge tooltips.
+//   smokey    → SMOKEY UP                  (alert / amber)
+//   patrol    → SMOKEY UP                  (alert / amber)
+//   unknown   → SMOKEY UP                  (alert / amber, conservative)
+//   sar       → ALL CLEAR + footnote       (clear / green)
+//   transport → ALL CLEAR + footnote       (clear / green)
 // `roleConfidence` ('confirmed' | 'tentative' | 'unknown') is surfaced in
 // the admin editor and as a small badge suffix on /plane/[tail] when not
 // confirmed. `roleNote` is operator-facing free text.

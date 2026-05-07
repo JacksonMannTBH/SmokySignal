@@ -104,11 +104,12 @@ test("coherence: home pill tier matches /api/aircraft", async ({ page }, testInf
   } else if (
     !anySmokeyUp &&
     anyAlertUp &&
-    !/EYES|UP/i.test(heroText)
+    !/SMOKEY/i.test(heroText)
   ) {
+    // Smokey umbrella: patrol/unknown alert-tier also reads SMOKEY UP.
     violations.push({
       bug: `patrol/unknown is airborne but home headline reads "${heroText}"`,
-      expected: "EYES UP",
+      expected: "SMOKEY UP",
     });
   } else if (
     !anySmokeyUp &&
@@ -228,8 +229,6 @@ test("coherence: /api/badge.svg matches home pill", async ({ request, page }, te
   const violations: unknown[] = [];
   if (/SMOKEY/i.test(heroText) && !/SMOKEY/i.test(svg)) {
     violations.push({ bug: "home shows SMOKEY but badge.svg does not" });
-  } else if (/EYES UP/i.test(heroText) && !/EYES UP/i.test(svg)) {
-    violations.push({ bug: "home shows EYES UP but badge.svg does not" });
   } else if (
     /CLEAR|DOWN/i.test(heroText) &&
     !/(CLEAR|DOWN|QUIET|UP)/i.test(svg)

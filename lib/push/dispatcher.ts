@@ -221,17 +221,20 @@ function composePayload(args: DispatchTakeoffArgs): PushPayload {
   const altStr = args.alt_ft != null ? `${args.alt_ft.toLocaleString()}'` : "alt unk";
   let title: string;
   let body: string;
+  // Title carries the Smokey umbrella for every law-enforcement role —
+  // speed-enforcement fixed-wing, patrol helicopter, or unconfirmed
+  // alert-class all read "Smokey's up." Body still distinguishes airframe.
   switch (args.role) {
     case "smokey":
       title = "Smokey's up.";
       body = trimBody(`${name} watching. ${altStr}.`);
       break;
     case "patrol":
-      title = "Eyes up.";
+      title = "Smokey's up.";
       body = trimBody(`${name} airborne. ${altStr}.`);
       break;
     case "unknown":
-      title = "Eyes up.";
+      title = "Smokey's up.";
       body = trimBody(`Unidentified bird airborne. ${altStr}.`);
       break;
     case "sar":

@@ -121,7 +121,14 @@ export async function fireProximityNotifications(
     const dist = h.distanceNm.toFixed(1);
     try {
       const title = `${name} nearby`;
-      const body = `${dist} nm out. ${h.role === "smokey" ? "Watching." : "Eyes up."}`;
+      // Smokey umbrella: every alert-class proximity hit reads as
+      // Smokey. The smokey-class FLIR detail (Watching.) is preserved
+      // for fixed-wing speed enforcement; the rest collapse to a plain
+      // distance-only body since the title already names the plane.
+      const body =
+        h.role === "smokey"
+          ? `${dist} nm out. Watching.`
+          : `${dist} nm out.`;
       await reg.showNotification(title, {
         body,
         icon: "/icons/icon-192.png",

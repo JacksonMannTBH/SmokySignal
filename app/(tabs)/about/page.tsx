@@ -413,7 +413,6 @@ function EmbedBadgeCallout() {
         }}
       >
         Live <span className="ss-mono">SMOKEY UP</span> /{" "}
-        <span className="ss-mono">EYES UP</span> /{" "}
         <span className="ss-mono">ALL CLEAR</span> badge. SVG, no JS,
         edge-cached for ~30 seconds. Works in any HTML.
       </p>

@@ -1,5 +1,11 @@
 // Shared role-badge display helpers. Used by /about and /plane/[tail]
 // so the role taxonomy reads consistently across the app.
+//
+// Rider mental model: any law-enforcement aircraft is "Smokey". The
+// backend role taxonomy stays granular (smokey vs patrol vs unknown)
+// for plane-detail accuracy, but every rider-visible badge collapses
+// LE-tier roles to the single "SMOKEY" label. Tooltip body preserves
+// the airframe-specific detail for curious riders who hover.
 
 import type { FleetRole } from "./types";
 import { SS_TOKENS } from "./tokens";
@@ -7,30 +13,28 @@ import { SS_TOKENS } from "./tokens";
 export function roleBadgeText(role: FleetRole): string {
   switch (role) {
     case "smokey":
-      return "SPEED ENFORCEMENT";
     case "patrol":
-      return "MULTI-ROLE PATROL";
+    case "unknown":
+      return "SMOKEY";
     case "sar":
       return "SEARCH & RESCUE";
     case "transport":
-      return "TRANSPORT / MISC";
-    case "unknown":
-      return "ROLE UNCONFIRMED";
+      return "TRANSPORT";
   }
 }
 
 export function roleTooltip(role: FleetRole): string {
   switch (role) {
     case "smokey":
-      return "Fixed-wing speed enforcement plane. These are the Smokeys. Up = ease off.";
+      return "Smokey. Fixed-wing speed enforcement plane. Up = ease off.";
     case "patrol":
-      return "Multi-role helicopter. Could be traffic enforcement, pursuit, or SAR. We err on alert.";
+      return "Smokey. Multi-role helicopter — traffic enforcement, pursuit, or SAR. We err on alert.";
     case "sar":
       return "Search and rescue helicopter. Almost always responding to a rescue, not enforcement.";
     case "transport":
       return "State transport or photography aircraft. Not enforcement-related.";
     case "unknown":
-      return "Role not yet confirmed. Treated as alert until classified.";
+      return "Smokey. Role not yet confirmed. Treated as alert until classified.";
   }
 }
 

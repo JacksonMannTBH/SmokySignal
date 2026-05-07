@@ -43,8 +43,9 @@ export async function GET() {
     const status = computeStatus(snap, fleetMap);
     const count = status.alertCount;
     if (status.kind === "alert") {
-      const head = status.pill === "SMOKEY UP" ? "SMOKEY UP" : "EYES UP";
-      label = `${head} · ${count} up`;
+      // Smokey umbrella: every alert-tier state reads SMOKEY UP on the
+      // pill, so the badge label tracks status.pill directly.
+      label = `${status.pill} · ${count} up`;
       dot = ALERT;
     } else {
       label = `ALL CLEAR · ${count} up`;

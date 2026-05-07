@@ -559,7 +559,7 @@ test.describe("p14 live-prod audit", () => {
     }
     record({
       claim:
-        "?mock=eyes-up forces a patrol/unknown-class plane airborne with no smokey-class — drives the EYES UP pill variant",
+        "?mock=eyes-up forces a patrol/unknown-class plane airborne with no smokey-class — drives the alert-tier pill (SMOKEY UP under the umbrella relabel)",
       category: pass ? "working_as_designed" : "confirmed_bug",
       pass,
       evidence,
