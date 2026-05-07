@@ -30,7 +30,7 @@ import {
   hasExplicitRegion,
   setRegion,
 } from "@/lib/region-pref";
-import { regionForPoint, type RegionId } from "@/lib/regions";
+import { DEFAULT_REGION, regionForPoint, type RegionId } from "@/lib/regions";
 import {
   DEFAULT_RADAR_FILTER,
   RADAR_FILTER_CHANGE_EVENT,
@@ -118,7 +118,7 @@ export function RadarShell({
   const [toast, setToast] = useState<string | null>(null);
   const [map, setMap] = useState<MaplibreMap | null>(null);
   const [showRings, setShowRings] = useState(false);
-  const [regionId, setRegionId] = useState<RegionId>("puget_sound");
+  const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
   // Hydrate the rings pref + region from localStorage on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;

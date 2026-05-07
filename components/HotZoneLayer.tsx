@@ -24,7 +24,7 @@ import {
   type RadarFilter as Filter,
 } from "@/lib/radar-filter";
 import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
-import { REGIONS, type RegionId } from "@/lib/regions";
+import { DEFAULT_REGION, REGIONS, type RegionId } from "@/lib/regions";
 import { Tooltip } from "./Tooltip";
 import { LearningPanel } from "./LearningPanel";
 import { FilterPanel } from "./FilterPanel";
@@ -78,7 +78,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
   const [enabled, setEnabled] = useState<boolean>(true);
   const [flightPathsEnabled, setFlightPathsEnabled] = useState<boolean>(true);
   const [filter, setFilter] = useState<Filter>(DEFAULT_FILTER);
-  const [regionId, setRegionId] = useState<RegionId>("puget_sound");
+  const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
   const [zones, setZones] = useState<HotZone[] | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   // Stable refs so the addLayerOnce closure (captured at attach time)

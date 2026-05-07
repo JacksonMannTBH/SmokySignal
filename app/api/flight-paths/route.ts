@@ -36,7 +36,9 @@ function resolveBbox(url: URL): { regionId: RegionId; bbox: RegionBbox } {
     const id = idParam as RegionId;
     return { regionId: id, bbox: REGIONS[id].bbox };
   }
-  return { regionId: "puget_sound", bbox: REGIONS.puget_sound.bbox };
+  // Fallback matches lib/regions.ts:DEFAULT_REGION so a malformed query
+  // renders the same scope as a fresh-install client.
+  return { regionId: "all_wa", bbox: REGIONS.all_wa.bbox };
 }
 
 function parseList(raw: string | null): string[] {

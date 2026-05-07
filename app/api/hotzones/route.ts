@@ -10,21 +10,24 @@ import { REGIONS, type RegionBbox, type RegionId } from "@/lib/regions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Resolve the rider-facing region selector → bbox. Accepts either the
-// new `region_id` query param (any RegionId from lib/regions.ts) or the
-// legacy `region` value ("puget_sound" | "all") for backward compat
-// with the chevron filter UI.
+// Resolve the rider-facing region selector → bbox. Accepts the
+// `region_id` query param (any RegionId from lib/regions.ts) and falls
+// back to All Washington — matches lib/regions.ts:DEFAULT_REGION so
+// a malformed query renders the same scope as a fresh-install client.
 function resolveBbox(url: URL): { regionId: RegionId; bbox: RegionBbox } {
   const idParam = url.searchParams.get("region_id");
   if (idParam && idParam in REGIONS) {
     const id = idParam as RegionId;
     return { regionId: id, bbox: REGIONS[id].bbox };
   }
+  // Legacy "?region=all" alias from the pre-P16.3 chevron filter still
+  // resolves to all_wa explicitly for back-compat with anything that
+  // bookmarked the old shape.
   const legacy = url.searchParams.get("region");
   if (legacy === "all") {
     return { regionId: "all_wa", bbox: REGIONS.all_wa.bbox };
   }
-  return { regionId: "puget_sound", bbox: REGIONS.puget_sound.bbox };
+  return { regionId: "all_wa", bbox: REGIONS.all_wa.bbox };
 }
 
 function inBbox(z: HotZone, b: NonNullable<RegionBbox>): boolean {

@@ -102,7 +102,11 @@ export const REGIONS: Record<RegionId, Region> = {
   },
 };
 
-export const DEFAULT_REGION: RegionId = "puget_sound";
+// Default landed on All Washington post-PROMPT_16 statewide expansion —
+// the fleet now spans the state, so a first-time rider sees every WA
+// agency at z6 instead of being scoped to Puget Sound. Geolocation
+// auto-pick still wins when the rider is inside a more-specific bbox.
+export const DEFAULT_REGION: RegionId = "all_wa";
 
 /**
  * Pick the region whose bbox contains (lat, lon). When multiple bboxes

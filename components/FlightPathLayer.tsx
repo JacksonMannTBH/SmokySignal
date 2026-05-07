@@ -25,7 +25,7 @@ import {
   type RadarFilter as Filter,
 } from "@/lib/radar-filter";
 import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
-import type { RegionId } from "@/lib/regions";
+import { DEFAULT_REGION, type RegionId } from "@/lib/regions";
 import {
   FLIGHT_PATHS_VISIBLE_KEY,
   LAYER_VISIBILITY_CHANGE_EVENT,
@@ -61,7 +61,7 @@ type Props = {
 export function FlightPathLayer({ map }: Props) {
   const [enabled, setEnabled] = useState<boolean>(true);
   const [filter, setFilter] = useState<Filter>(DEFAULT_RADAR_FILTER);
-  const [regionId, setRegionId] = useState<RegionId>("puget_sound");
+  const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
   const [features, setFeatures] = useState<GeoJSON.Feature[] | null>(null);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
