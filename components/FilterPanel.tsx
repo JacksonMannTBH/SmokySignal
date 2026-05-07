@@ -5,16 +5,18 @@
 // time-scrubber settings) can mount alongside the existing radar
 // filters without bloating the heatmap layer module.
 //
-// Filter shape: see lib/radar-filter.ts. Multi-select roles are new in
-// P16 — empty array means "show all roles" (back-compat with prior
-// persisted filter state).
+// Filter shape: see lib/radar-filter.ts. The chevron exposes three
+// rider-facing categories (Smokey / Search & Rescue / Transport) that
+// map onto the granular FleetRole taxonomy in lib/types.ts. Empty
+// bucket selection means "show all categories" — same back-compat
+// semantics as the prior empty `roles` array.
 
 import { SS_TOKENS } from "@/lib/tokens";
 import {
-  FILTERABLE_ROLES,
   OPERATORS,
-  type FilterableRole,
+  RIDER_BUCKETS,
   type RadarFilter as Filter,
+  type RiderBucketId,
 } from "@/lib/radar-filter";
 
 type Props = {
@@ -25,13 +27,13 @@ type Props = {
 };
 
 export function FilterPanel({ bottom, filter, onChange, onClose }: Props) {
-  const toggleRole = (role: FilterableRole) => {
-    const set = new Set(filter.roles);
-    if (set.has(role)) set.delete(role);
-    else set.add(role);
+  const toggleBucket = (id: RiderBucketId) => {
+    const set = new Set(filter.buckets);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
     onChange({
       ...filter,
-      roles: [...set] as FilterableRole[],
+      buckets: [...set] as RiderBucketId[],
     });
   };
 
@@ -87,7 +89,7 @@ export function FilterPanel({ bottom, filter, onChange, onClose }: Props) {
         </button>
       </div>
 
-      <Group label="Show">
+      <Group label="Quick filter">
         <Pill
           active={filter.showMode === "all"}
           onClick={() => onChange({ ...filter, showMode: "all" })}
@@ -130,14 +132,14 @@ export function FilterPanel({ bottom, filter, onChange, onClose }: Props) {
         </select>
       )}
 
-      <Group label="Roles">
-        {FILTERABLE_ROLES.map((role) => (
+      <Group label="Categories">
+        {RIDER_BUCKETS.map((b) => (
           <Pill
-            key={role}
-            active={filter.roles.includes(role)}
-            onClick={() => toggleRole(role)}
+            key={b.id}
+            active={filter.buckets.includes(b.id)}
+            onClick={() => toggleBucket(b.id)}
           >
-            {role.toUpperCase()}
+            {b.label}
           </Pill>
         ))}
       </Group>

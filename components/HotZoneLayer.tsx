@@ -18,6 +18,7 @@ import {
   DEFAULT_RADAR_FILTER,
   RADAR_FILTER_CHANGE_EVENT,
   SMOKY_FILTER_ROLES,
+  bucketsToRoles,
   readRadarFilter,
   writeRadarFilter,
   type RadarFilter as Filter,
@@ -41,16 +42,18 @@ function buildQueryString(f: Filter, regionId: RegionId): string {
   // The rider's region selector is the only region signal — the
   // FilterPanel's redundant Region group retired in P16.3.
   p.set("region_id", regionId);
-  // "Smokey" filter is role-based (smokey + patrol). Server resolves
-  // the role list to the matching tail set via the registry, so adding
-  // a new fixed-wing smokey to the registry automatically widens the
-  // filter without a config change.
+  // "Smokey" quick-filter is role-based (smokey + patrol + unknown).
+  // Server resolves the role list to the matching tail set via the
+  // registry, so a new fixed-wing smokey added to the registry is
+  // automatically included.
   if (f.showMode === "smoky") p.set("roles", SMOKY_FILTER_ROLES.join(","));
   if (f.showMode === "operator" && f.operator) p.set("operator", f.operator);
-  // Multi-select role allow-list overrides the showMode role shortcut
-  // when present. Server-side /api/hotzones already accepts a
-  // comma-separated `roles` value.
-  if (f.roles.length > 0) p.set("roles", f.roles.join(","));
+  // Multi-select category buckets override the showMode shortcut when
+  // present. Expand to underlying FleetRoles before sending — the API
+  // route accepts the same comma-separated `roles` shape.
+  if (f.buckets.length > 0) {
+    p.set("roles", bucketsToRoles(f.buckets).join(","));
+  }
   return p.toString();
 }
 
