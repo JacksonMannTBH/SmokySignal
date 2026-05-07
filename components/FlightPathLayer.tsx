@@ -3,10 +3,11 @@
 // Flight-path polyline overlay. Threads each tail-day's track samples
 // as a thin amber line beneath the hot-zone heatmap layer — corridors
 // (I-5 transit, lake-patrol orbits) read as actual lines instead of
-// blob density. Pairs with HotZoneLayer.tsx; visibility tracks the
-// same `ss_hotzones_visible` localStorage key for now (one toggle
-// controls both — if rider feedback wants separation, a follow-up
-// adds a sub-toggle).
+// blob density. Pairs with HotZoneLayer.tsx; visibility tracks its own
+// `ss_flight_paths_visible` localStorage key so riders can dim the
+// heat while keeping live paths or vice versa. Both layers also listen
+// for the LAYER_VISIBILITY_CHANGE_EVENT broadcast from each toggle so
+// in-panel + bottom-left controls stay in sync.
 //
 // Source: /api/flight-paths returns one GeoJSON LineString per tail-day
 // with ≥ 5 points, filtered by region bbox + operator/role allow-list.
@@ -25,8 +26,12 @@ import {
 } from "@/lib/radar-filter";
 import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
 import type { RegionId } from "@/lib/regions";
+import {
+  FLIGHT_PATHS_VISIBLE_KEY,
+  LAYER_VISIBILITY_CHANGE_EVENT,
+} from "./HotZoneLayer";
 
-const VISIBLE_KEY = "ss_hotzones_visible";
+const VISIBLE_KEY = FLIGHT_PATHS_VISIBLE_KEY;
 const SOURCE_ID = "flight-paths";
 const LAYER_ID = "flight-paths-line";
 const HEATMAP_LAYER_ID = "hotzones-heat";
@@ -39,6 +44,12 @@ function buildQueryString(f: Filter, regionId: RegionId): string {
   if (f.showMode === "operator" && f.operator) p.set("operator", f.operator);
   if (f.buckets.length > 0) {
     p.set("roles", bucketsToRoles(f.buckets).join(","));
+  }
+  if (f.operatorSet.length > 0) {
+    p.set("operator", f.operatorSet.join(","));
+  }
+  if (f.tailSet.length > 0) {
+    p.set("tails", f.tailSet.join(","));
   }
   return p.toString();
 }
@@ -73,6 +84,16 @@ export function FlightPathLayer({ map }: Props) {
       const detail = (e as CustomEvent<{ id: RegionId }>).detail;
       setRegionId(detail?.id ?? getRegion());
     };
+    // Same-tab broadcast from HotZoneLayer's toggleFlightPaths — sync
+    // visibility instantly when the rider taps the bottom-left pill or
+    // the in-panel Layers row.
+    const onLayerVisChange = (e: Event) => {
+      const detail = (
+        e as CustomEvent<{ key: string; enabled: boolean }>
+      ).detail;
+      if (detail?.key === VISIBLE_KEY) setEnabled(detail.enabled);
+    };
+    // Cross-tab visibility sync (rider has /radar open in two tabs).
     const onStorage = (e: StorageEvent) => {
       if (e.key === VISIBLE_KEY) {
         setEnabled(e.newValue !== "0");
@@ -80,26 +101,17 @@ export function FlightPathLayer({ map }: Props) {
     };
     window.addEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
     window.addEventListener(REGION_CHANGE_EVENT, onRegionChange);
+    window.addEventListener(LAYER_VISIBILITY_CHANGE_EVENT, onLayerVisChange);
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
       window.removeEventListener(REGION_CHANGE_EVENT, onRegionChange);
+      window.removeEventListener(
+        LAYER_VISIBILITY_CHANGE_EVENT,
+        onLayerVisChange,
+      );
       window.removeEventListener("storage", onStorage);
     };
-  }, []);
-
-  // Same-tab visibility sync: HotZoneLayer writes ss_hotzones_visible
-  // but the storage event only fires for cross-tab changes. Poll the
-  // localStorage value cheaply on a slow interval so toggling the heat
-  // button updates the polylines too.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const id = setInterval(() => {
-      const v = window.localStorage.getItem(VISIBLE_KEY);
-      const next = v !== "0";
-      setEnabled((prev) => (prev === next ? prev : next));
-    }, 500);
-    return () => clearInterval(id);
   }, []);
 
   // Fetch the polyline FeatureCollection on filter / region change.

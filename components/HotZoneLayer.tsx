@@ -30,10 +30,12 @@ import { LearningPanel } from "./LearningPanel";
 import { FilterPanel } from "./FilterPanel";
 
 const VISIBLE_KEY = "ss_hotzones_visible";
+export const FLIGHT_PATHS_VISIBLE_KEY = "ss_flight_paths_visible";
 const SOURCE_ID = "hotzones";
 const LAYER_ID = "hotzones-heat";
 const AIRCRAFT_LAYER_ID = "aircraft";
 const TABBAR_HEIGHT = 66;
+export const LAYER_VISIBILITY_CHANGE_EVENT = "ss-radar-layer-visibility-change";
 
 const DEFAULT_FILTER = DEFAULT_RADAR_FILTER;
 
@@ -54,6 +56,14 @@ function buildQueryString(f: Filter, regionId: RegionId): string {
   if (f.buckets.length > 0) {
     p.set("roles", bucketsToRoles(f.buckets).join(","));
   }
+  // Multi-select operator + tail filters land here as comma-separated
+  // values — server intersects them with the role-derived tail set.
+  if (f.operatorSet.length > 0) {
+    p.set("operator", f.operatorSet.join(","));
+  }
+  if (f.tailSet.length > 0) {
+    p.set("tails", f.tailSet.join(","));
+  }
   return p.toString();
 }
 
@@ -66,6 +76,7 @@ type Props = {
 
 export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
   const [enabled, setEnabled] = useState<boolean>(true);
+  const [flightPathsEnabled, setFlightPathsEnabled] = useState<boolean>(true);
   const [filter, setFilter] = useState<Filter>(DEFAULT_FILTER);
   const [regionId, setRegionId] = useState<RegionId>("puget_sound");
   const [zones, setZones] = useState<HotZone[] | null>(null);
@@ -85,6 +96,9 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
     const v = window.localStorage.getItem(VISIBLE_KEY);
     if (v === "0") setEnabled(false);
     else if (v === "1") setEnabled(true);
+    const fp = window.localStorage.getItem(FLIGHT_PATHS_VISIBLE_KEY);
+    if (fp === "0") setFlightPathsEnabled(false);
+    else if (fp === "1") setFlightPathsEnabled(true);
     setFilter(readRadarFilter());
     setRegionId(getRegion());
     const onFilterChange = (e: Event) => {
@@ -95,11 +109,27 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
       const detail = (e as CustomEvent<{ id: RegionId }>).detail;
       setRegionId(detail?.id ?? getRegion());
     };
+    // Layer-visibility change broadcast lets the in-panel Layers row
+    // reflect changes from the bottom-left buttons (and vice versa).
+    const onLayerVisChange = (e: Event) => {
+      const detail = (
+        e as CustomEvent<{ key: string; enabled: boolean }>
+      ).detail;
+      if (!detail) return;
+      if (detail.key === VISIBLE_KEY) setEnabled(detail.enabled);
+      if (detail.key === FLIGHT_PATHS_VISIBLE_KEY)
+        setFlightPathsEnabled(detail.enabled);
+    };
     window.addEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
     window.addEventListener(REGION_CHANGE_EVENT, onRegionChange);
+    window.addEventListener(LAYER_VISIBILITY_CHANGE_EVENT, onLayerVisChange);
     return () => {
       window.removeEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
       window.removeEventListener(REGION_CHANGE_EVENT, onRegionChange);
+      window.removeEventListener(
+        LAYER_VISIBILITY_CHANGE_EVENT,
+        onLayerVisChange,
+      );
     };
   }, []);
 
@@ -107,6 +137,54 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(VISIBLE_KEY, enabled ? "1" : "0");
   }, [enabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      FLIGHT_PATHS_VISIBLE_KEY,
+      flightPathsEnabled ? "1" : "0",
+    );
+  }, [flightPathsEnabled]);
+
+  // Centralized toggle helpers — both the bottom-left buttons and the
+  // in-panel Layers row call these so layer visibility stays in sync
+  // wherever the user interacts.
+  const toggleHotZones = () => {
+    const next = !enabled;
+    setEnabled(next);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(LAYER_VISIBILITY_CHANGE_EVENT, {
+          detail: { key: VISIBLE_KEY, enabled: next },
+        }),
+      );
+    }
+    if (map) {
+      try {
+        if (map.getLayer(LAYER_ID)) {
+          map.setLayoutProperty(
+            LAYER_ID,
+            "visibility",
+            next ? "visible" : "none",
+          );
+        }
+      } catch {
+        /* layer not yet attached */
+      }
+    }
+  };
+
+  const toggleFlightPaths = () => {
+    const next = !flightPathsEnabled;
+    setFlightPathsEnabled(next);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(LAYER_VISIBILITY_CHANGE_EVENT, {
+          detail: { key: FLIGHT_PATHS_VISIBLE_KEY, enabled: next },
+        }),
+      );
+    }
+  };
 
   // Persist via the shared writer so the change event fires for any
   // other subscriber (RadarShell, etc) listening for filter updates.
@@ -462,6 +540,8 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
           zIndex: 12,
           display: "flex",
           gap: 6,
+          flexWrap: "wrap",
+          maxWidth: "calc(100vw - 24px)",
         }}
       >
         <Tooltip
@@ -471,26 +551,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
         >
           <button
             type="button"
-            onClick={() => {
-              const next = !enabled;
-              setEnabled(next);
-              // Apply visibility directly so the layer flips on the
-              // same frame as the click — don't gate on React's
-              // re-render → effect mirror cycle.
-              if (map) {
-                try {
-                  if (map.getLayer(LAYER_ID)) {
-                    map.setLayoutProperty(
-                      LAYER_ID,
-                      "visibility",
-                      next ? "visible" : "none",
-                    );
-                  }
-                } catch {
-                  /* layer not yet attached */
-                }
-              }
-            }}
+            onClick={toggleHotZones}
             aria-pressed={enabled}
             className="ss-mono"
             style={pillStyle(enabled ? SS_TOKENS.alert : SS_TOKENS.fg1)}
@@ -498,11 +559,28 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             {enabled ? "● HOT ZONES" : "○ HOT ZONES"}
           </button>
         </Tooltip>
-        <Tooltip side="top" content="Filter by tail, operator, or region.">
+        <Tooltip
+          side="top"
+          align="start"
+          content="30-day flight-path threads. Each line is one tail-day."
+        >
+          <button
+            type="button"
+            onClick={toggleFlightPaths}
+            aria-pressed={flightPathsEnabled}
+            className="ss-mono"
+            style={pillStyle(
+              flightPathsEnabled ? SS_TOKENS.alert : SS_TOKENS.fg1,
+            )}
+          >
+            {flightPathsEnabled ? "● FLIGHT PATHS" : "○ FLIGHT PATHS"}
+          </button>
+        </Tooltip>
+        <Tooltip side="top" content="Filter by category, operator, or tail.">
           <button
             type="button"
             onClick={() => setPanelOpen((v) => !v)}
-            aria-label="Hot zone filters"
+            aria-label="Radar filters"
             aria-expanded={panelOpen}
             className="ss-mono"
             style={{
@@ -521,6 +599,10 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
           filter={filter}
           onChange={setFilter}
           onClose={() => setPanelOpen(false)}
+          hotZonesEnabled={enabled}
+          onToggleHotZones={toggleHotZones}
+          flightPathsEnabled={flightPathsEnabled}
+          onToggleFlightPaths={toggleFlightPaths}
         />
       )}
     </>

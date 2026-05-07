@@ -47,6 +47,16 @@ function parseList(raw: string | null): string[] {
     .filter(Boolean);
 }
 
+/** Like parseList but preserves case — operator names like "Pierce SO"
+ *  are case-sensitive in the registry. */
+function parseListCaseSensitive(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function utcDateKey(d: Date): string {
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -81,7 +91,11 @@ function lineIntersectsBbox(
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const { regionId, bbox } = resolveBbox(url);
-  const operator = url.searchParams.get("operator")?.trim() ?? null;
+  // Operator + tails accept comma-separated lists. Either or both can
+  // be empty; intersection with `roles` (via registry lookup) builds the
+  // effective tail allow-list.
+  const operators = parseListCaseSensitive(url.searchParams.get("operator"));
+  const tails = parseList(url.searchParams.get("tails"));
   const roles = parseList(url.searchParams.get("roles")).map((r) =>
     r.toLowerCase(),
   );
@@ -92,15 +106,19 @@ export async function GET(req: Request) {
 
   const registry = await getRegistry();
 
-  // Resolve operator + role filters to a tail allow-list. Empty filter =
-  // every tail in the registry.
+  // Resolve operator + role + tails filters to a tail allow-list. Empty
+  // filter = every tail in the registry.
   let allowedTails: Set<string> | null = null;
-  if (operator || roles.length > 0) {
-    allowedTails = new Set();
-    for (const f of registry) {
-      if (operator && f.operator === operator) allowedTails.add(f.tail);
-      if (roles.length > 0 && roles.includes(String(f.role).toLowerCase())) {
-        allowedTails.add(f.tail);
+  if (operators.length > 0 || roles.length > 0 || tails.length > 0) {
+    allowedTails = new Set(tails);
+    if (operators.length > 0 || roles.length > 0) {
+      for (const f of registry) {
+        if (operators.length > 0 && operators.includes(f.operator)) {
+          allowedTails.add(f.tail);
+        }
+        if (roles.length > 0 && roles.includes(String(f.role).toLowerCase())) {
+          allowedTails.add(f.tail);
+        }
       }
     }
   }
@@ -134,7 +152,8 @@ export async function GET(req: Request) {
       type: "FeatureCollection",
       features,
       region_id: regionId,
-      filter_operator: operator,
+      filter_operators: operators,
+      filter_tails: tails,
       filter_roles: roles,
       window_days: days,
     },

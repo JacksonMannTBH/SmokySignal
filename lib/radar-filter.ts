@@ -86,9 +86,19 @@ function rolesToBuckets(
 
 export type RadarFilter = {
   showMode: RadarFilterShowMode;
+  /** Single-operator selection driven by the "Operator" quick-filter
+   *  shortcut. Coordinates with showMode === "operator" — the dropdown
+   *  inside the panel mutates this. */
   operator: string | null;
   /** Multi-select category allow-list. Empty = show all categories. */
   buckets: RiderBucketId[];
+  /** Multi-select operator allow-list — independent from the showMode
+   *  shortcut. Toggled by the per-operator chips in the filter panel.
+   *  Empty = no operator constraint. */
+  operatorSet: string[];
+  /** Multi-select tail allow-list driven by the typeahead picker.
+   *  Empty = no tail constraint. */
+  tailSet: string[];
 };
 
 export const RADAR_FILTER_KEY = "ss_hotzones_filter";
@@ -126,6 +136,8 @@ export const DEFAULT_RADAR_FILTER: RadarFilter = {
   showMode: "all",
   operator: "WSP",
   buckets: [],
+  operatorSet: [],
+  tailSet: [],
 };
 
 export function readRadarFilter(): RadarFilter {
@@ -135,6 +147,7 @@ export function readRadarFilter(): RadarFilter {
     if (!raw) return DEFAULT_RADAR_FILTER;
     const parsed = JSON.parse(raw) as Partial<RadarFilter> & {
       roles?: unknown;
+      tails?: unknown;
     };
     let buckets: RiderBucketId[];
     if (Array.isArray(parsed.buckets)) {
@@ -153,6 +166,21 @@ export function readRadarFilter(): RadarFilter {
     } else {
       buckets = [];
     }
+    const operatorSet = Array.isArray(parsed.operatorSet)
+      ? (parsed.operatorSet.filter(
+          (o): o is string =>
+            typeof o === "string" &&
+            OPERATORS.includes(o as (typeof OPERATORS)[number]),
+        ) as string[])
+      : [];
+    // Migration: prior `tails` array carries forward as tailSet.
+    const tailSet = Array.isArray(parsed.tailSet)
+      ? (parsed.tailSet.filter((t): t is string => typeof t === "string") as string[])
+      : Array.isArray(parsed.tails)
+        ? ((parsed.tails as unknown[]).filter(
+            (t): t is string => typeof t === "string",
+          ) as string[])
+        : [];
     return {
       showMode:
         parsed.showMode === "smoky" || parsed.showMode === "operator"
@@ -164,6 +192,8 @@ export function readRadarFilter(): RadarFilter {
           ? parsed.operator
           : "WSP",
       buckets,
+      operatorSet,
+      tailSet,
     };
   } catch {
     return DEFAULT_RADAR_FILTER;
@@ -186,6 +216,14 @@ export function passesAircraftFilter(
   aircraft: { tail: string; operator: string; role?: string },
   f: RadarFilter,
 ): boolean {
+  // Tail allow-list (most specific) runs first — short-circuit.
+  if (f.tailSet.length > 0 && !f.tailSet.includes(aircraft.tail)) return false;
+  // Operator allow-list runs alongside the showMode shortcut. The
+  // showMode-based "Operator" still uses filter.operator (single); the
+  // multi-select chip set is independent and always applies.
+  if (f.operatorSet.length > 0 && !f.operatorSet.includes(aircraft.operator)) {
+    return false;
+  }
   // Multi-select bucket filter. Empty array = no category constraint.
   if (f.buckets.length > 0) {
     const allowed = bucketsToRoles(f.buckets);
@@ -209,4 +247,71 @@ export function passesAircraftFilter(
     return aircraft.operator === f.operator;
   }
   return true;
+}
+
+// ─── Registry tail cache (client-only) ──────────────────────────────────────
+//
+// The tail-picker typeahead in FilterPanel needs the list of every
+// registry tail + nickname so it can suggest matches. Fetched once from
+// /api/aircraft on first call, cached in module scope. /api/aircraft
+// already runs to populate the home page so this is usually a cache hit.
+
+export type RegistryTail = {
+  tail: string;
+  nickname: string | null;
+  operator: string;
+  role: string;
+};
+
+let registryTailsCache: RegistryTail[] | null = null;
+let registryTailsPromise: Promise<RegistryTail[]> | null = null;
+
+export async function getRegistryTails(): Promise<RegistryTail[]> {
+  if (registryTailsCache) return registryTailsCache;
+  if (registryTailsPromise) return registryTailsPromise;
+  registryTailsPromise = (async () => {
+    try {
+      const r = await fetch("/api/aircraft", { cache: "no-store" });
+      if (!r.ok) return [];
+      const data = (await r.json()) as {
+        aircraft: Array<{
+          tail: string;
+          nickname?: string | null;
+          operator: string;
+          role: string;
+        }>;
+      };
+      const list: RegistryTail[] = (data.aircraft ?? []).map((a) => ({
+        tail: a.tail,
+        nickname: a.nickname ?? null,
+        operator: a.operator,
+        role: a.role,
+      }));
+      registryTailsCache = list;
+      return list;
+    } catch {
+      return [];
+    } finally {
+      registryTailsPromise = null;
+    }
+  })();
+  return registryTailsPromise;
+}
+
+/** Case-insensitive prefix match across tail + nickname. Returns up to
+ *  `cap` suggestions, alpha-sorted by tail. */
+export function searchRegistryTails(
+  registry: readonly RegistryTail[],
+  query: string,
+  cap = 8,
+): RegistryTail[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const matches = registry.filter((r) => {
+    if (r.tail.toLowerCase().includes(q)) return true;
+    if (r.nickname && r.nickname.toLowerCase().includes(q)) return true;
+    return false;
+  });
+  matches.sort((a, b) => a.tail.localeCompare(b.tail));
+  return matches.slice(0, cap);
 }
