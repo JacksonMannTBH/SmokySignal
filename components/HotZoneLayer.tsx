@@ -24,7 +24,7 @@ import {
   type RadarFilter as Filter,
 } from "@/lib/radar-filter";
 import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
-import type { RegionId } from "@/lib/regions";
+import { REGIONS, type RegionId } from "@/lib/regions";
 import { Tooltip } from "./Tooltip";
 import { LearningPanel } from "./LearningPanel";
 import { FilterPanel } from "./FilterPanel";
@@ -355,10 +355,25 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
   // Empty-state messaging: only show once we know zones returned empty AND
   // the toggle is on (otherwise the user explicitly hid them). Sits just
   // above the toggle row so it doesn't fight the map.
+  //
+  // Three variants:
+  //   "learning"     — global state: not enough days observed yet. Shows
+  //                    the universal LearningPanel.
+  //   "region-empty" — this region's bbox has no track data, but the
+  //                    global window is past learning. Filter is at
+  //                    defaults — the region itself is genuinely quiet.
+  //   "filter"       — rider's filter narrowed the slice to nothing;
+  //                    widening the operator/category brings zones back.
+  const filterAtDefaults =
+    filter.showMode === "all" && filter.buckets.length === 0;
   const showEmptyState = enabled && zones !== null && zones.length === 0;
-  const emptyVariant: "learning" | "filter" = learning?.stillLearning
-    ? "learning"
-    : "filter";
+  const emptyVariant: "learning" | "region-empty" | "filter" =
+    learning?.stillLearning
+      ? "learning"
+      : filterAtDefaults
+        ? "region-empty"
+        : "filter";
+  const regionLabel = REGIONS[regionId]?.label ?? "this region";
 
   return (
     <>
@@ -377,6 +392,42 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             margin: "0 auto",
           }}
         />
+      )}
+      {showEmptyState && emptyVariant === "region-empty" && (
+        <div
+          style={{
+            position: "absolute",
+            left: 12,
+            right: 12,
+            bottom: bottom + 56,
+            zIndex: 11,
+            maxWidth: 380,
+            margin: "0 auto",
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "rgba(11,13,16,0.92)",
+            border: `.5px solid ${SS_TOKENS.hairline2}`,
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            color: SS_TOKENS.fg1,
+          }}
+        >
+          <div
+            className="ss-mono"
+            style={{
+              fontSize: 11,
+              color: SS_TOKENS.fg0,
+              letterSpacing: ".06em",
+              marginBottom: 4,
+            }}
+          >
+            QUIET SKIES IN {regionLabel.toUpperCase()}
+          </div>
+          <div style={{ fontSize: 12, lineHeight: 1.45, color: SS_TOKENS.fg1 }}>
+            Watching for the next 30 days. Hot zones build up here as planes
+            leave tracks across the rolling window.
+          </div>
+        </div>
       )}
       {showEmptyState && emptyVariant === "filter" && (
         <div
