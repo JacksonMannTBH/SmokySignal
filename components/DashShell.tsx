@@ -8,6 +8,7 @@ import { SS_TOKENS } from "@/lib/tokens";
 import { SMOKY_TAIL } from "@/lib/seed";
 import { DEFAULT_SPEED_LIMIT_MPH, haversineNm } from "@/lib/geo";
 import { evaluateWarning } from "@/lib/speed-warning";
+import { fmtAgoTs } from "@/lib/time";
 import type { HotZone } from "@/lib/hotzones";
 import { StatusPill } from "./StatusPill";
 import { Card } from "./Card";
@@ -421,7 +422,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
           marginTop: 2,
         }}
       >
-        {fmtRelative(entry.ts)}
+        {fmtAgoTs(entry.ts)}
       </span>
       <span style={{ flex: 1, fontSize: 12.5, color: SS_TOKENS.fg1, lineHeight: 1.4 }}>
         {entry.description}
@@ -430,13 +431,3 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
   );
 }
 
-function fmtRelative(tsSec: number): string {
-  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - tsSec));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
