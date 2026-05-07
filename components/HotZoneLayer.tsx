@@ -17,7 +17,6 @@ import type { LearningState } from "@/lib/learning";
 import {
   DEFAULT_RADAR_FILTER,
   RADAR_FILTER_CHANGE_EVENT,
-  SMOKY_FILTER_ROLES,
   bucketsToRoles,
   readRadarFilter,
   writeRadarFilter,
@@ -44,20 +43,13 @@ function buildQueryString(f: Filter, regionId: RegionId): string {
   // The rider's region selector is the only region signal — the
   // FilterPanel's redundant Region group retired in P16.3.
   p.set("region_id", regionId);
-  // "Smokey" quick-filter is role-based (smokey + patrol + unknown).
-  // Server resolves the role list to the matching tail set via the
-  // registry, so a new fixed-wing smokey added to the registry is
-  // automatically included.
-  if (f.showMode === "smoky") p.set("roles", SMOKY_FILTER_ROLES.join(","));
-  if (f.showMode === "operator" && f.operator) p.set("operator", f.operator);
-  // Multi-select category buckets override the showMode shortcut when
-  // present. Expand to underlying FleetRoles before sending — the API
-  // route accepts the same comma-separated `roles` shape.
+  // Categories expand to the underlying FleetRole list via
+  // bucketsToRoles. Server-side /api/hotzones takes comma-separated
+  // `roles`, registry-resolves them to the tail set, and intersects
+  // with the explicit operator + tail allow-lists.
   if (f.buckets.length > 0) {
     p.set("roles", bucketsToRoles(f.buckets).join(","));
   }
-  // Multi-select operator + tail filters land here as comma-separated
-  // values — server intersects them with the role-derived tail set.
   if (f.operatorSet.length > 0) {
     p.set("operator", f.operatorSet.join(","));
   }
@@ -443,7 +435,9 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
   //   "filter"       — rider's filter narrowed the slice to nothing;
   //                    widening the operator/category brings zones back.
   const filterAtDefaults =
-    filter.showMode === "all" && filter.buckets.length === 0;
+    filter.buckets.length === 0 &&
+    filter.operatorSet.length === 0 &&
+    filter.tailSet.length === 0;
   const showEmptyState = enabled && zones !== null && zones.length === 0;
   const emptyVariant: "learning" | "region-empty" | "filter" =
     learning?.stillLearning

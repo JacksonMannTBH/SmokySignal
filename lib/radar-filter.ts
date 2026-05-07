@@ -1,4 +1,4 @@
-// Shared radar filter state — operator / category / tail-set. Lives in
+// Shared radar filter state — categories / operators / tails. Lives in
 // localStorage under "ss_hotzones_filter" (legacy key kept so existing
 // user state survives this refactor) and broadcasts changes via a
 // CustomEvent so the heatmap chevron panel and the aircraft marker
@@ -6,16 +6,15 @@
 //
 // Region selection is owned by lib/region-pref.ts — the rider's region
 // pref drives /api/hotzones via the region_id param. This filter only
-// concerns operator / category / tail filtering inside the chosen region.
+// concerns category / operator / tail filtering inside the chosen
+// region.
 //
 // Vocabulary alignment: riders see three categories — Smokey, Search &
 // Rescue, Transport — that mirror what the role badges say. The backend
 // FleetRole taxonomy stays granular (smokey / patrol / unknown all under
 // the Smokey umbrella) but never leaks into the filter UI. Persisted
-// state from the prior FleetRole-chip era migrates forward in
-// readRadarFilter().
-
-export type RadarFilterShowMode = "all" | "smoky" | "operator";
+// state from prior eras (FleetRole-chip pre-P17, showMode shortcut
+// pre-P19) migrates forward in readRadarFilter().
 
 /** Underlying FleetRole IDs. Mirrors lib/types.ts FleetRole. Used by
  *  bucket-to-role expansion when a category set hits the API. */
@@ -85,16 +84,9 @@ function rolesToBuckets(
 }
 
 export type RadarFilter = {
-  showMode: RadarFilterShowMode;
-  /** Single-operator selection driven by the "Operator" quick-filter
-   *  shortcut. Coordinates with showMode === "operator" — the dropdown
-   *  inside the panel mutates this. */
-  operator: string | null;
   /** Multi-select category allow-list. Empty = show all categories. */
   buckets: RiderBucketId[];
-  /** Multi-select operator allow-list — independent from the showMode
-   *  shortcut. Toggled by the per-operator chips in the filter panel.
-   *  Empty = no operator constraint. */
+  /** Multi-select operator allow-list. Empty = no operator constraint. */
   operatorSet: string[];
   /** Multi-select tail allow-list driven by the typeahead picker.
    *  Empty = no tail constraint. */
@@ -105,20 +97,9 @@ export const RADAR_FILTER_KEY = "ss_hotzones_filter";
 export const RADAR_FILTER_CHANGE_EVENT = "ss-radar-filter-change";
 
 /**
- * Roles that count as "Smokey" — every law-enforcement aircraft. Mirrors
- * the alert-tier set in lib/status.ts: smokey + patrol + unknown all
- * surface to riders under the single Smokey umbrella, so the filter
- * widens to match. The implementation matches by classified role,
- * NOT a hardcoded tail list, so a new fixed-wing smokey added to the
- * registry is automatically included.
- */
-export const SMOKY_FILTER_ROLES = ["smokey", "patrol", "unknown"] as const;
-
-/**
- * @deprecated Use SMOKY_FILTER_ROLES instead. Retained as an empty
- * array so any prior import compiles, but no longer drives filtering
- * — role-based classification (lib/types.ts FleetRole) is the source
- * of truth.
+ * @deprecated Use SMOKY_TAILS instead. Retained as an empty array so
+ * any prior import compiles, but no longer drives filtering — role-based
+ * classification (lib/types.ts FleetRole) is the source of truth.
  */
 export const SMOKY_TAILS: readonly string[] = [];
 export const OPERATORS = [
@@ -133,8 +114,6 @@ export const OPERATORS = [
 ] as const;
 
 export const DEFAULT_RADAR_FILTER: RadarFilter = {
-  showMode: "all",
-  operator: "WSP",
   buckets: [],
   operatorSet: [],
   tailSet: [],
@@ -148,6 +127,9 @@ export function readRadarFilter(): RadarFilter {
     const parsed = JSON.parse(raw) as Partial<RadarFilter> & {
       roles?: unknown;
       tails?: unknown;
+      // Pre-P19 fields. Read for migration only.
+      showMode?: unknown;
+      operator?: unknown;
     };
     let buckets: RiderBucketId[];
     if (Array.isArray(parsed.buckets)) {
@@ -166,13 +148,28 @@ export function readRadarFilter(): RadarFilter {
     } else {
       buckets = [];
     }
-    const operatorSet = Array.isArray(parsed.operatorSet)
+    // Migration: pre-P19 showMode === "smoky" widens to the Smokey
+    // bucket; showMode === "operator" + a parsed.operator value seeds
+    // the new operatorSet with the picked operator. Other showMode
+    // values are dropped silently.
+    if (parsed.showMode === "smoky" && !buckets.includes("smokey")) {
+      buckets = [...buckets, "smokey"];
+    }
+    let operatorSet = Array.isArray(parsed.operatorSet)
       ? (parsed.operatorSet.filter(
           (o): o is string =>
             typeof o === "string" &&
             OPERATORS.includes(o as (typeof OPERATORS)[number]),
         ) as string[])
       : [];
+    if (
+      parsed.showMode === "operator" &&
+      typeof parsed.operator === "string" &&
+      OPERATORS.includes(parsed.operator as (typeof OPERATORS)[number]) &&
+      !operatorSet.includes(parsed.operator)
+    ) {
+      operatorSet = [...operatorSet, parsed.operator];
+    }
     // Migration: prior `tails` array carries forward as tailSet.
     const tailSet = Array.isArray(parsed.tailSet)
       ? (parsed.tailSet.filter((t): t is string => typeof t === "string") as string[])
@@ -181,20 +178,7 @@ export function readRadarFilter(): RadarFilter {
             (t): t is string => typeof t === "string",
           ) as string[])
         : [];
-    return {
-      showMode:
-        parsed.showMode === "smoky" || parsed.showMode === "operator"
-          ? parsed.showMode
-          : "all",
-      operator:
-        typeof parsed.operator === "string" &&
-        OPERATORS.includes(parsed.operator as (typeof OPERATORS)[number])
-          ? parsed.operator
-          : "WSP",
-      buckets,
-      operatorSet,
-      tailSet,
-    };
+    return { buckets, operatorSet, tailSet };
   } catch {
     return DEFAULT_RADAR_FILTER;
   }
@@ -218,9 +202,7 @@ export function passesAircraftFilter(
 ): boolean {
   // Tail allow-list (most specific) runs first — short-circuit.
   if (f.tailSet.length > 0 && !f.tailSet.includes(aircraft.tail)) return false;
-  // Operator allow-list runs alongside the showMode shortcut. The
-  // showMode-based "Operator" still uses filter.operator (single); the
-  // multi-select chip set is independent and always applies.
+  // Operator allow-list.
   if (f.operatorSet.length > 0 && !f.operatorSet.includes(aircraft.operator)) {
     return false;
   }
@@ -233,18 +215,6 @@ export function passesAircraftFilter(
     ) {
       return false;
     }
-  }
-  // Existing showMode predicate runs after categories. The two compose:
-  // role ∈ allowed-bucket-roles AND showMode passes.
-  if (f.showMode === "all") return true;
-  if (f.showMode === "smoky") {
-    return (
-      typeof aircraft.role === "string" &&
-      (SMOKY_FILTER_ROLES as readonly string[]).includes(aircraft.role)
-    );
-  }
-  if (f.showMode === "operator" && f.operator) {
-    return aircraft.operator === f.operator;
   }
   return true;
 }

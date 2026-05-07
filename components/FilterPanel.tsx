@@ -5,12 +5,18 @@
 // time-scrubber settings) can mount alongside the existing radar
 // filters without bloating the heatmap layer module.
 //
-// Five rows post-P18.2:
-//   Quick filter — All / Smokey / Operator (one-tap shortcut)
-//   Categories  — Smokey / Search & Rescue / Transport buckets
-//   Operators   — multi-select chips per registry operator
-//   Tails       — typeahead + chip set, follow a single tail
-//   Layers      — Hot zones / Flight paths toggles inside the panel
+// Four rows post-P19.5:
+//   Categories — Smokey / Search & Rescue / Transport buckets
+//   Operators  — multi-select chips per registry operator
+//   Tails      — typeahead + chip set, follow a single tail
+//   Layers     — Hot zones / Flight paths toggles inside the panel
+//
+// The pre-P19 Quick filter row (All / Smokey / Operator) duplicated
+// the rider buckets in Categories and the multi-select chips in
+// Operators, so it retired. Persisted state migrates forward in
+// readRadarFilter() — a saved showMode === "smoky" auto-selects the
+// Smokey bucket; showMode === "operator" + operator value seeds the
+// operator chip set.
 //
 // Filter shape: see lib/radar-filter.ts. The chevron exposes three
 // rider-facing categories (Smokey / Search & Rescue / Transport) that
@@ -131,49 +137,6 @@ export function FilterPanel({
           ×
         </button>
       </div>
-
-      <Group label="Quick filter">
-        <Pill
-          active={filter.showMode === "all"}
-          onClick={() => onChange({ ...filter, showMode: "all" })}
-        >
-          All
-        </Pill>
-        <Pill
-          active={filter.showMode === "smoky"}
-          onClick={() => onChange({ ...filter, showMode: "smoky" })}
-        >
-          Smokey
-        </Pill>
-        <Pill
-          active={filter.showMode === "operator"}
-          onClick={() => onChange({ ...filter, showMode: "operator" })}
-        >
-          Operator
-        </Pill>
-      </Group>
-
-      {filter.showMode === "operator" && (
-        <select
-          value={filter.operator ?? "WSP"}
-          onChange={(e) => onChange({ ...filter, operator: e.target.value })}
-          className="ss-mono"
-          style={{
-            background: SS_TOKENS.bg2,
-            border: `.5px solid ${SS_TOKENS.hairline2}`,
-            color: SS_TOKENS.fg0,
-            fontSize: 12,
-            padding: "6px 8px",
-            borderRadius: 8,
-          }}
-        >
-          {OPERATORS.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      )}
 
       <Group label="Categories">
         {RIDER_BUCKETS.map((b) => (

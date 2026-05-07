@@ -19,7 +19,6 @@ import { SS_TOKENS } from "@/lib/tokens";
 import {
   DEFAULT_RADAR_FILTER,
   RADAR_FILTER_CHANGE_EVENT,
-  SMOKY_FILTER_ROLES,
   bucketsToRoles,
   readRadarFilter,
   type RadarFilter as Filter,
@@ -40,8 +39,6 @@ const AIRCRAFT_LAYER_ID = "aircraft";
 function buildQueryString(f: Filter, regionId: RegionId): string {
   const p = new URLSearchParams();
   p.set("region_id", regionId);
-  if (f.showMode === "smoky") p.set("roles", SMOKY_FILTER_ROLES.join(","));
-  if (f.showMode === "operator" && f.operator) p.set("operator", f.operator);
   if (f.buckets.length > 0) {
     p.set("roles", bucketsToRoles(f.buckets).join(","));
   }
