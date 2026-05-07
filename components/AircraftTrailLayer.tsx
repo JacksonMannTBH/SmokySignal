@@ -93,6 +93,23 @@ function reorderTrailLayers(map: MaplibreMap): void {
       /* layer torn down mid-call */
     }
   }
+  // One-cycle diagnostic — left in production for one release so any
+  // visibility regression is debuggable from the dev-tools console
+  // without round-tripping another diagnostic prompt. Remove in the
+  // follow-up cleanup PR after the visual fix is confirmed in the
+  // wild. console.debug stays at verbose log level so it doesn't spam
+  // the default console view.
+  try {
+    const style = map.getStyle();
+    console.debug("[trail] z-order after reorder", {
+      layers: style?.layers?.map((l) => l.id) ?? [],
+      hasAircraft: !!map.getLayer(AIRCRAFT_LAYER_ID),
+      hasHeat: !!map.getLayer("hotzones-heat"),
+      hasFlightPaths: !!map.getLayer("flight-paths-line"),
+    });
+  } catch {
+    /* getStyle can throw mid-teardown; harmless */
+  }
 }
 
 export function AircraftTrailLayer({
@@ -134,7 +151,11 @@ export function AircraftTrailLayer({
           source: SOURCE_ID,
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": SS_TOKENS.alert,
+            // Sky-blue (info palette, same hex driving the chevron tail
+            // labels) — the heatmap is amber → orange → red, so an
+            // amber line on amber heat had zero contrast and the trail
+            // was rendering invisibly. Cyan over warm density pops.
+            "line-color": SS_TOKENS.sky,
             "line-width": [
               "interpolate",
               ["linear"],
@@ -148,7 +169,7 @@ export function AircraftTrailLayer({
               18,
               4,
             ],
-            "line-opacity": 0.85,
+            "line-opacity": 0.95,
           },
         },
         beforeId,
