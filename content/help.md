@@ -4,9 +4,9 @@ A short tour of what SmokySignal shows you, where the data comes from, and how t
 
 ## What this app is
 
-SmokySignal is a situational-awareness tool for motorcyclists in the Puget Sound region. It tells you, in one glance, whether a known traffic-enforcement aircraft is up and roughly where it's working. The point is to be informed, not to evade — knowing the bird is up is the same as seeing a marked patrol car ahead. Ride within the limit and ride well.
+SmokySignal is a situational-awareness tool for motorcyclists in Washington state. It tells you, in one glance, whether a known traffic-enforcement aircraft is up and roughly where it's working. The point is to be informed, not to evade — knowing the bird is up is the same as seeing a marked patrol car ahead. Ride within the limit and ride well.
 
-We track 16 fixed-wing planes and helicopters across WSP, KCSO, Pierce SO, Snohomish SO, Spokane SO, and other Washington state agencies. The full list is on the **About** page.
+We track {{TAIL_COUNT}} fixed-wing planes and helicopters across WSP, KCSO, Pierce SO, Snohomish SO, Spokane SO, State of WA, CBP, and USCG. The full list is on the **About** page.
 
 ## What's a Smokey?
 
@@ -47,21 +47,20 @@ In the top-right, the small **moon icon** toggles a screen wake lock — handy o
 
 ## The radar screen
 
-The map is a live view centered on Puget Sound. The status pill at the top mirrors the home screen's state:
+The map is a live view of Washington state. The status pill at the top mirrors the home screen's state:
 
 - **SMOKEY UP** (amber) — a law-enforcement plane is up (fixed-wing FLIR, patrol helicopter, or unconfirmed alert-class)
 - **ALL CLEAR** (green) — nothing alert-class is up
 
-Top-right shows `0/16 UP` — how many of our 16 tracked tails are up right now. The number turns amber any time it's nonzero.
+Top-right shows `0/{{TAIL_COUNT}} UP` — how many of our {{TAIL_COUNT}} tracked tails are up right now. The number turns amber any time it's nonzero.
 
 Each up plane appears as an amber chevron pointing along its current heading. Helicopters use a circular rotor icon. Tap a chevron to open the plane detail page.
 
 When something's up, a horizontal carousel slides up from the bottom with one card per plane — quick stats and a tap-target for each.
 
-The **Hot Zones** toggle bottom-left shows a heatmap of where fleet aircraft have spent time over the last 30 days. Brighter = more time. The chevron next to the toggle opens a filter panel:
+The **Hot Zones** and **Flight Paths** toggles bottom-left show 30-day historical density and the live flight-path threads, respectively. Each toggles independently. The chevron next to them opens a filter panel where you can narrow by category (Smokey / Search & Rescue / Transport), operator, or specific tail.
 
-- **Show**: All / Smokey / By operator
-- **Region**: Puget Sound (default) / Statewide
+Region selection lives in the top-right dropdown — pick from Puget Sound, North Sound, Olympic Peninsula, Southwest WA, Central WA, East WA, or All Washington. The map flies to the region centroid. On first load with location granted, the region auto-picks based on where you are.
 
 The **Spotted** button (binoculars icon, bottom-right) lets you log an in-person sighting. Tap it once when you actually see a plane, and it records your GPS location and any airborne fleet members visible at the time. Useful for ground-truthing the live data.
 
@@ -101,7 +100,7 @@ You'll see a "Learning your sky" panel on the home, radar, or forecast screens u
 A month is the floor for these features to mean something:
 
 - **Hot zones** need at least four weekend cycles of patrols before the heatmap settles. Two flights over the same county look like a hot zone after a week and like noise after a month.
-- **The forecast grid** needs roughly one observation per hour-of-week before any cell's probability stops jumping around. That's 168 buckets to fill from a fleet of 16 tails.
+- **The forecast grid** needs roughly one observation per hour-of-week before any cell's probability stops jumping around. That's 168 buckets to fill from a fleet of {{TAIL_COUNT}} tails.
 - **The home prediction card** holds back its "next likely sweep" line until both the day count clears and we've logged enough takeoffs to call a pattern (10+).
 
 The counter on the panel shows where we are in the 30-day window. Past day 30, the panels switch to "30+ days in" and the data-driven cards take over. If a panel still appears past day 30, it means we've crossed the time threshold but the data is still sparse — usually because the sky's been quieter than expected. Give it another week.

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import Link from "next/link";
 import { SS_TOKENS } from "@/lib/tokens";
+import { getRegistry } from "@/lib/registry";
 import { HelpMarkdown, HelpScrollTopButton } from "./HelpView";
 
 export const metadata = {
@@ -11,10 +12,14 @@ export const metadata = {
 };
 
 export default async function HelpPage() {
-  const md = await fs.readFile(
-    path.join(process.cwd(), "content", "help.md"),
-    "utf8",
-  );
+  const [md, registry] = await Promise.all([
+    fs.readFile(path.join(process.cwd(), "content", "help.md"), "utf8"),
+    getRegistry(),
+  ]);
+  // Templating placeholders so the registry size + operator list don't
+  // go stale on every fleet expansion. Replace before passing to the
+  // markdown renderer.
+  const source = md.replace(/\{\{TAIL_COUNT\}\}/g, String(registry.length));
 
   return (
     <main
@@ -84,7 +89,7 @@ export default async function HelpPage() {
           padding: "24px 18px 80px",
         }}
       >
-        <HelpMarkdown source={md} />
+        <HelpMarkdown source={source} />
       </article>
 
       <HelpScrollTopButton />
