@@ -13,6 +13,7 @@ import { HotZoneLayer } from "./HotZoneLayer";
 import { FlightPathLayer } from "./FlightPathLayer";
 import { UserZoneLayer } from "./UserZoneLayer";
 import { AircraftTrailLayer } from "./AircraftTrailLayer";
+import { TrailStatusBadge } from "./TrailStatusBadge";
 import { addUserZone } from "@/lib/user-zones";
 import {
   detectProximityHits,
@@ -233,6 +234,21 @@ export function RadarShell({
         }
         disabled={!rider}
       />
+      {/* PROMPT_19C diagnostic — sits two rows above the HOT ZONES /
+          FLIGHT PATHS pill row (which is at TABBAR_HEIGHT + 16 +
+          bottomBoost) and one row above DistanceRingsToggle (+44).
+          Removed in the follow-up PR once trail rendering is
+          confirmed in the wild. */}
+      <div
+        style={{
+          position: "absolute",
+          left: 12,
+          bottom: TABBAR_HEIGHT + 16 + (airborne.length > 0 ? 130 : 0) + 88,
+          zIndex: 12,
+        }}
+      >
+        <TrailStatusBadge airborne={airborne} />
+      </div>
       <HelpIcon />
 
       <header
