@@ -277,6 +277,51 @@ export default function RadarMap({
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
           "icon-size": 0.85,
+          // Tail label sits 4-6 px above the chevron. Hidden below z9 so
+          // the regional view doesn't clutter; tail-only at z9-11; tail
+          // plus nickname at z12+ for city zoom. Sky-blue mono matches
+          // the brand info palette and stays distinct from the amber
+          // chevron + heat halo.
+          //
+          // Font stack matches distance-rings-labels (the only other text
+          // layer on this map) since MapTiler streets-v2-dark glyphs
+          // ship Open Sans + Arial Unicode but not JetBrains Mono.
+          "text-field": [
+            "step",
+            ["zoom"],
+            "",
+            9,
+            ["get", "tail"],
+            12,
+            [
+              "case",
+              ["has", "nickname"],
+              ["concat", ["get", "tail"], " (", ["get", "nickname"], ")"],
+              ["get", "tail"],
+            ],
+          ],
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            9,
+            10,
+            14,
+            12,
+            18,
+            13,
+          ],
+          "text-offset": [0, -1.6],
+          "text-anchor": "bottom",
+          "text-allow-overlap": false,
+          "text-ignore-placement": false,
+          "text-letter-spacing": 0.05,
+        },
+        paint: {
+          "text-color": SS_TOKENS.sky,
+          "text-halo-color": SS_TOKENS.bg0,
+          "text-halo-width": 1.5,
         },
       });
 
@@ -644,10 +689,20 @@ export default function RadarMap({
         const meta = stateRef.current.metaByTail.get(tail)!;
         const lon = from[0] + (to[0] - from[0]) * tt;
         const lat = from[1] + (to[1] - from[1]) * tt;
+        const props: Record<string, string | number> = {
+          tail,
+          icon: meta.icon,
+          track: meta.track,
+        };
+        // Only include nickname when present so the layer's `["has",
+        // "nickname"]` expression cleanly toggles between "tail" and
+        // "tail (nickname)" formats. Empty-string values would still
+        // pass `has`, breaking the conditional.
+        if (meta.nickname) props.nickname = meta.nickname;
         features.push({
           type: "Feature",
           geometry: { type: "Point", coordinates: [lon, lat] },
-          properties: { tail, icon: meta.icon, track: meta.track },
+          properties: props,
         });
       }
       source.setData({ type: "FeatureCollection", features });
