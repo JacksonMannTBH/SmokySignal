@@ -159,7 +159,7 @@ export default async function FlightSharePage({ params }: Props) {
         {fmtDurationHuman(session.duration_s)}
       </div>
 
-      <PlaneTrackMap points={points} inProgress={false} height={320} />
+      <PlaneTrackMap tail={tail} points={points} inProgress={false} height={320} />
 
       <section
         style={{

@@ -12,6 +12,7 @@ import { fmtAgo, fmtAgoTs, fmtAloft, formatTs } from "@/lib/time";
 import { getTimeFormatPref, isHour12 } from "@/lib/user-prefs";
 import type { Aircraft } from "@/lib/types";
 import type { RecentFlightForTail } from "@/lib/flights";
+import type { TrackPoint } from "@/lib/tracks";
 import { BackLink } from "@/components/BackLink";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { Tooltip } from "@/components/Tooltip";
@@ -176,7 +177,13 @@ export default async function PlanePage({ params, searchParams }: Props) {
         <div className="ss-eyebrow" style={{ marginBottom: 8 }}>
           {recentFlight && !up ? "Last flight" : "Recent track"}
         </div>
-        <RecentTrackBlock tail={entry.tail} flight={recentFlight} hour12={hour12} />
+        <RecentTrackBlock
+          tail={entry.tail}
+          flight={recentFlight}
+          live={live ?? null}
+          isAirborne={up}
+          hour12={hour12}
+        />
       </section>
 
       <section>
@@ -391,13 +398,27 @@ function SquawkKV({ squawk }: { squawk: string | null }) {
 function RecentTrackBlock({
   tail,
   flight,
+  live,
+  isAirborne,
   hour12,
 }: {
   tail: string;
   flight: RecentFlightForTail | null;
+  live: Aircraft | null;
+  isAirborne: boolean;
   hour12: boolean;
 }) {
-  if (!flight || flight.points.length < 2) {
+  // Mount the map whenever there's anything to render — historical
+  // session OR a currently-airborne tail with a live position. The
+  // live-polling inside PlaneTrackMap fills in the polyline as new
+  // /api/trails samples arrive (every 10 s); without this the map
+  // stays a blank "No flight history yet" card for the first few
+  // minutes after takeoff before the session has accumulated 2+
+  // samples.
+  const hasHistory = !!flight && flight.points.length >= 2;
+  const hasLivePosition =
+    isAirborne && typeof live?.lat === "number" && typeof live?.lon === "number";
+  if (!hasHistory && !hasLivePosition) {
     return (
       <Card>
         <div
@@ -416,10 +437,42 @@ function RecentTrackBlock({
     );
   }
 
-  const { session, points, inProgress } = flight;
+  // When the historical session is empty but the tail is live, seed the
+  // map with the single current position so it renders centered while
+  // the trail polls fill in.
+  const seedPoints: TrackPoint[] = hasHistory
+    ? flight!.points
+    : hasLivePosition
+      ? [
+          {
+            lat: live!.lat as number,
+            lon: live!.lon as number,
+            alt: live!.altitude_ft ?? null,
+            spd: live!.ground_speed_kt ?? null,
+            trk: live!.heading ?? null,
+            ts: Math.floor(Date.now() / 1000),
+          },
+        ]
+      : [];
+  const inProgress = isAirborne || (flight?.inProgress ?? false);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <PlaneTrackMap points={points} inProgress={inProgress} />
+      <PlaneTrackMap tail={tail} points={seedPoints} inProgress={inProgress} />
+      {hasHistory && flight && <RecentTrackStats flight={flight} hour12={hour12} />}
+    </div>
+  );
+}
+
+function RecentTrackStats({
+  flight,
+  hour12,
+}: {
+  flight: RecentFlightForTail;
+  hour12: boolean;
+}) {
+  const { session, inProgress } = flight;
+  return (
+    <>
       <Card>
         <div
           style={{
@@ -459,7 +512,7 @@ function RecentTrackBlock({
           Tap map to interact · pinch to zoom.
         </div>
       </Card>
-    </div>
+    </>
   );
 }
 
