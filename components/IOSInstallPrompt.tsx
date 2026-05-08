@@ -133,33 +133,39 @@ export function IOSInstallPrompt() {
         bottom: bottomOffset,
         zIndex: 40,
         pointerEvents: "none",
-        padding: "12px 14px calc(12px + env(safe-area-inset-bottom))",
+        // Tighter vertical padding (was 12px → 8px) so the prompt
+        // takes less map / hero real estate on /radar and /. Also
+        // tighter horizontal padding on the X-button side because
+        // the button itself now carries 44 px hit area.
+        padding: "8px 4px 8px 14px",
+        paddingBottom: "calc(8px + env(safe-area-inset-bottom))",
         background: SS_TOKENS.bg1,
         borderTop: `.5px solid ${SS_TOKENS.hairline}`,
         backdropFilter: "blur(10px)",
         WebkitBackdropFilter: "blur(10px)",
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 8,
       }}
     >
-      <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.5, color: SS_TOKENS.fg0 }}>
+      <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.45, color: SS_TOKENS.fg0 }}>
         {mode === "pre-install" ? (
           <PreInstallCopy />
         ) : (
           <PostInstallCopy pulse={pulse} />
         )}
       </div>
+      {/* 44×44 hit area (a11y minimum) wraps a 28×28 visual circle so
+          the rider hits the dismiss target even with gloves on. */}
       <button
         type="button"
         onClick={dismiss}
         aria-label="Dismiss install prompt"
         style={{
-          width: 28,
-          height: 28,
-          borderRadius: "50%",
+          width: 44,
+          height: 44,
           background: "transparent",
-          border: `.5px solid ${SS_TOKENS.hairline2}`,
+          border: 0,
           color: SS_TOKENS.fg2,
           cursor: "pointer",
           display: "inline-flex",
@@ -168,39 +174,44 @@ export function IOSInstallPrompt() {
           flexShrink: 0,
           padding: 0,
           pointerEvents: "auto",
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
-        <XIcon />
+        <span
+          aria-hidden
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            border: `.5px solid ${SS_TOKENS.hairline2}`,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <XIcon />
+        </span>
       </button>
     </div>
   );
 }
 
 function PreInstallCopy() {
+  // Compressed two-line variant of the prior 5-line block — the prompt
+  // sat over ~40 % of /radar's vertical space and dominated /'s hero
+  // on first visit. Same 3-step intent (share → Add to Home Screen →
+  // Arm alerts), one tighter line.
   return (
     <>
-      <div className="ss-eyebrow" style={{ marginBottom: 4 }}>
-        OPT IN · CHANNEL 19
+      <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 2 }}>
+        iOS push: 2 steps
       </div>
-      <div style={{ fontWeight: 700, marginBottom: 6 }}>
-        Two steps for iOS push.
+      <div style={{ fontSize: 11.5, color: SS_TOKENS.fg1, lineHeight: 1.45 }}>
+        Tap <ShareIcon /> →{" "}
+        <span style={{ color: SS_TOKENS.alert }}>Add to Home Screen</span>,
+        then open from your home screen and arm alerts.
       </div>
-      <ol
-        style={{
-          margin: 0,
-          paddingLeft: 18,
-          fontSize: 11.5,
-          color: SS_TOKENS.fg1,
-          lineHeight: 1.55,
-        }}
-      >
-        <li>
-          Tap <ShareIcon /> →{" "}
-          <span style={{ color: SS_TOKENS.alert }}>Add to Home Screen</span>
-        </li>
-        <li>Open SmokySignal from your home screen</li>
-        <li>Tap the “Arm alerts” button</li>
-      </ol>
     </>
   );
 }
