@@ -56,6 +56,28 @@ export default async function AboutPage() {
         </Link>
       </header>
 
+      <nav
+        aria-label="Site sections"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
+      >
+        <HubLink href="/settings/alerts" label="Settings">
+          Settings
+        </HubLink>
+        <HubLink href="/forecast" label="Weekly forecast">
+          Forecast
+        </HubLink>
+        <HubLink href="/help" label="Help and FAQ">
+          Help
+        </HubLink>
+        <HubLink href="/legal" label="Legal and privacy">
+          Legal
+        </HubLink>
+      </nav>
+
       <Section eyebrow="What this is">
         <div
           style={{
@@ -362,6 +384,46 @@ function OriginGlyph({ rotate }: { rotate: number }) {
     >
       <Logo size={24} mono />
     </div>
+  );
+}
+
+// Hub-style chip linking to one of the secondary rider routes
+// (Settings, Forecast, Help, Legal). The TabBar holds the five
+// primary surfaces; About becomes the hub for everything else.
+// 44 px hit area meets WCAG AA target-size.
+function HubLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="ss-mono"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 44,
+        padding: "10px 16px",
+        borderRadius: 999,
+        border: `.5px solid ${SS_TOKENS.hairline2}`,
+        background: "transparent",
+        color: SS_TOKENS.fg1,
+        fontSize: 12,
+        letterSpacing: ".06em",
+        textDecoration: "none",
+        touchAction: "manipulation",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {children}
+    </Link>
   );
 }
 

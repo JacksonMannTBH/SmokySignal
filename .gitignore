@@ -46,3 +46,5 @@ next-env.d.ts
 !public/icons/**
 tests/visual/out/
 AUDIT-2026-05-07.md
+.env.development
+.env.production

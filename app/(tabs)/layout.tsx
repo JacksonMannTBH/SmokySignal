@@ -2,6 +2,7 @@ import { TabBar } from "@/components/TabBar";
 import { SpeedWarning } from "@/components/SpeedWarning";
 import { ScreenAwake } from "@/components/ScreenAwake";
 import { AppBadge } from "@/components/AppBadge";
+import { SecondaryFooter } from "@/components/SecondaryFooter";
 import { getSpeedWarningEnabled } from "@/lib/flags";
 
 export default async function TabsLayout({
@@ -16,6 +17,7 @@ export default async function TabsLayout({
         Skip to main content
       </a>
       <div id="main-content">{children}</div>
+      <SecondaryFooter />
       <TabBar />
       <ScreenAwake />
       <AppBadge />
