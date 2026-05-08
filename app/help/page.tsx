@@ -27,7 +27,11 @@ export default async function HelpPage() {
         minHeight: "100dvh",
         background: SS_TOKENS.bg0,
         color: SS_TOKENS.fg1,
-        paddingBottom: 60,
+        // /help isn't in the (tabs) layout (no TabBar) but the iOS
+        // install prompt still overlays from the root layout, so
+        // bottom padding needs to clear the prompt (~80 px) plus
+        // breathing room.
+        paddingBottom: 120,
       }}
     >
       <header

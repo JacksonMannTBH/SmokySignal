@@ -156,7 +156,10 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
     <main
       style={{
         minHeight: "100dvh",
-        padding: "12px 18px 100px",
+        // 180 px bottom clears tab bar (66) + iOS install prompt
+        // overlay (~80) + breathing room. Without this the contrast
+        // + time-format cards hid behind the fixed prompt on iOS.
+        padding: "12px 18px 180px",
         maxWidth: 460,
         margin: "0 auto",
         display: "flex",

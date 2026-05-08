@@ -52,7 +52,10 @@ export function UserZonesManager() {
     <div
       style={{
         maxWidth: 460,
-        margin: "16px auto 80px",
+        // Bottom margin clears tab bar (66) + iOS install prompt
+        // overlay (~80) + breathing room. Was 80; bumped so the last
+        // zone card isn't hidden behind the prompt.
+        margin: "16px auto 180px",
         padding: "0 18px",
         display: "flex",
         flexDirection: "column",
