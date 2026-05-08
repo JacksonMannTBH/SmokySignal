@@ -3,11 +3,15 @@
 // programmatic findings (tap targets, horizontal overflow). Output
 // goes to /tmp/p23-audit/. Run via:
 //
-//   cd tests/visual && SS_VISUAL_BASE_URL=https://smokysignal.app \
-//     npx playwright test specs/p23-mobile-audit.spec.ts \
+//   cd tests/visual && SS_VISUAL_BASE_URL=https://www.smokysignal.app \
+//     npx playwright test audits/p23-mobile-audit.spec.ts \
 //     --project=chromium-mobile
 //
-// Audit-only spec — meant to be run on demand, not in CI gates.
+// Lives in tests/visual/audits/ (not specs/) so it sits outside
+// playwright.config.ts's testMatch glob ("specs/**/*.spec.ts").
+// That keeps it from running on a generic `npx playwright test`
+// invocation or any future broad-suite CI workflow. Manual /
+// on-demand only.
 
 import { test } from "@playwright/test";
 import * as fs from "node:fs";
