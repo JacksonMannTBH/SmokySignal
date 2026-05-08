@@ -131,7 +131,14 @@ export function Glanceable({
           // and right:50 each 44px hit area) so the source line never
           // tucks under either icon.
           paddingRight: 96,
-          gap: 12,
+          gap: 8,
+          // Header content can wrap on narrow viewports — the
+          // AlertsStateChip "ALERTS BLOCKED" variant + the source-line
+          // "UPDATED Xs · ADSBFI" together overflow on iPhone widths
+          // when laid out on one line. Wrapping is fine; both rows are
+          // information-only and don't need to share the baseline.
+          flexWrap: "wrap",
+          rowGap: 6,
         }}
       >
         <div
@@ -140,22 +147,15 @@ export function Glanceable({
             alignItems: "center",
             gap: 8,
             minWidth: 0,
+            flexShrink: 1,
           }}
         >
           <Logo size={32} wordmark />
-          <span
-            className="ss-mono"
-            style={{
-              fontSize: 9.5,
-              color: SS_TOKENS.fg2,
-              letterSpacing: ".12em",
-              padding: "2px 6px",
-              border: `.5px solid ${SS_TOKENS.hairline2}`,
-              borderRadius: 4,
-            }}
-          >
-            LIVE
-          </span>
+          {/* Removed standalone "LIVE" pill — the "UPDATED Xs · ADSBFI"
+              source line on the right already conveys liveness via the
+              auto-incrementing seconds counter. The redundant pill cost
+              ~36 px of horizontal real-estate that AlertsStateChip
+              needs when it widens to "ALERTS BLOCKED". */}
           <AlertsStateChip />
         </div>
         <Tooltip
