@@ -1,20 +1,29 @@
 "use client";
 
-// Polls /api/trails for the currently-airborne tail set and renders
-// a polyline behind each plane on /radar.
+// Polls /api/trails for the currently-airborne tail set and renders a
+// polyline + endpoint dots behind each plane on /radar.
 //
-// PROMPT_19C strip-back: three prior paint prompts (19, 19A, 19B) all
-// shipped clean and the trail still wasn't visible on prod. The bug
-// isn't paint. This iteration cuts the layer back to the absolute
-// simplest configuration that could possibly work — one line layer,
-// no halo, no endpoint dots, no reorderTrailLayers, no beforeId,
-// 16 px solid cyan added to the top of the layer stack. If this
-// renders, the prior bugs were halo / dot / ordering interactions.
-// If it still doesn't, the [trail] console.debug logs at every step
-// of the data path tell us exactly which call is failing.
+// PROMPT_22 rebuild on the confirmed-working PROMPT_19C strip-back
+// (PR #119) — the data path was proven; this brings back halo +
+// endpoint dots + zoom-interpolated width + explicit z-ordering.
 //
-// Halo, endpoint dots, semantic z-ordering rebuild in the follow-up
-// PR once the underlying flow is verified.
+// One deviation from PROMPT_22's "decisions locked" section, on the
+// strength of the live visual feedback after #119 deployed:
+//   - Line color is WHITE, not SS_TOKENS.sky. The cyan brand token
+//     (#5BB6FF) read as a desaturated yellow against amber/red
+//     heat density — likely simultaneous-contrast color shift since
+//     cyan and amber are near-opponent hues. White has maximum
+//     luminance contrast against every heatmap stop and against the
+//     dark basemap, and can't be perceptually mistaken for any
+//     existing rider-facing element.
+//   - Widths bumped well past the prompt's spec because Alex
+//     reported the strip-back's flat 16 px still read skinny on
+//     prod. Going wider so a glance-at-a-stoplight rider can
+//     find the trail without looking.
+//
+// The TrailStatusBadge from #119 stays as a debug aid. [trail]
+// console.debug lines stay. Both clean up in a follow-up after the
+// rebuild has soaked.
 
 import { useEffect, useRef } from "react";
 import type { Map as MaplibreMap, GeoJSONSource } from "maplibre-gl";
@@ -22,12 +31,21 @@ import { SS_TOKENS } from "@/lib/tokens";
 import type { Aircraft } from "@/lib/types";
 
 const SOURCE_ID = "aircraft-trails";
+const ENDPOINTS_SOURCE_ID = "aircraft-trail-endpoints";
+const HALO_LAYER_ID = "aircraft-trail-halo";
 const LAYER_ID = "aircraft-trail";
+const START_DOT_LAYER_ID = "aircraft-trail-start-dot";
+const END_DOT_LAYER_ID = "aircraft-trail-end-dot";
+const AIRCRAFT_LAYER_ID = "aircraft";
 const POLL_MS = 10_000;
 const TRAIL_MINUTES = 30;
+const PULSE_PERIOD_MS = 1600;
 
 type TrailPoint = { lat: number; lon: number; ts: number };
 type TrailsResponse = { trails: Record<string, TrailPoint[]> };
+
+type EndpointKind = "start" | "end";
+type EndpointProps = { tail: string; kind: EndpointKind };
 
 function buildFeatureCollection(
   trails: Record<string, TrailPoint[]>,
@@ -47,6 +65,61 @@ function buildFeatureCollection(
   return { type: "FeatureCollection", features };
 }
 
+function buildEndpointCollection(
+  trails: Record<string, TrailPoint[]>,
+): GeoJSON.FeatureCollection<GeoJSON.Point, EndpointProps> {
+  const features: GeoJSON.Feature<GeoJSON.Point, EndpointProps>[] = [];
+  for (const [tail, pts] of Object.entries(trails)) {
+    if (pts.length < 2) continue;
+    const start = pts[0]!;
+    const end = pts[pts.length - 1]!;
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [start.lon, start.lat] },
+      properties: { tail, kind: "start" },
+    });
+    features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [end.lon, end.lat] },
+      properties: { tail, kind: "end" },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+/**
+ * Move all four trail layers to sit just below the aircraft chevron.
+ * Layers were added with no beforeId (default-stack-top) so the
+ * polyline is visible immediately even if the chevron mounts later;
+ * this call slides them into proper position once the chevron exists.
+ *
+ * Idempotent + cheap. Called on attach and on every fetch poll so a
+ * sibling layer mounting late can never bury the trail.
+ */
+function reorderTrailLayers(map: MaplibreMap): void {
+  if (!map.getLayer(AIRCRAFT_LAYER_ID)) {
+    // Aircraft chevron not attached yet — leave the trail at the top
+    // of the stack for now. Next poll will move it down once the
+    // chevron exists.
+    return;
+  }
+  for (const id of [
+    HALO_LAYER_ID,
+    LAYER_ID,
+    START_DOT_LAYER_ID,
+    END_DOT_LAYER_ID,
+  ]) {
+    try {
+      if (map.getLayer(id)) map.moveLayer(id, AIRCRAFT_LAYER_ID);
+    } catch {
+      /* layer torn down mid-call */
+    }
+  }
+  console.debug("[trail] reorder complete", {
+    layers: map.getStyle()?.layers?.map((l) => l.id) ?? [],
+  });
+}
+
 export function AircraftTrailLayer({
   map,
   airborne,
@@ -61,47 +134,146 @@ export function AircraftTrailLayer({
     .join(",");
   const tailsKeyRef = useRef(tailsKey);
   tailsKeyRef.current = tailsKey;
+  const pulseRef = useRef<number | null>(null);
 
   // Layer attachment — once per map instance.
   useEffect(() => {
     if (!map) return;
     const attach = () => {
       if (!map.isStyleLoaded() || map.getSource(SOURCE_ID)) return;
-      console.debug("[trail] attach: adding source + layer");
+      console.debug("[trail] attach: adding sources + layers");
       map.addSource(SOURCE_ID, {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
-      // No beforeId — layer goes to the top of the stack so it sits
-      // above the heatmap, flight-paths, and even the chevron. If a
-      // top-of-stack 16 px cyan line doesn't render, the bug isn't
-      // ordering. Nuclear-simple while we diagnose.
+      map.addSource(ENDPOINTS_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      // Halo first (renders below the line). Page-background near-
+      // black at 0.6 opacity gives the white line a dark outline that
+      // survives over heat density, water, road labels — anything.
+      map.addLayer({
+        id: HALO_LAYER_ID,
+        type: "line",
+        source: SOURCE_ID,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": SS_TOKENS.bg0,
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            8,
+            16,
+            11,
+            22,
+            14,
+            28,
+            18,
+            38,
+          ],
+          "line-opacity": 0.6,
+        },
+      });
+      // Line — white, max luminance contrast against every heatmap
+      // stop AND the dark basemap. Wider than every prior iteration
+      // so a glance-at-a-stoplight rider can't miss it.
       map.addLayer({
         id: LAYER_ID,
         type: "line",
         source: SOURCE_ID,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": SS_TOKENS.sky,
-          "line-width": 16,
+          "line-color": "#FFFFFF",
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            8,
+            10,
+            11,
+            16,
+            14,
+            22,
+            18,
+            32,
+          ],
           "line-opacity": 1.0,
         },
       });
+      map.addLayer({
+        id: START_DOT_LAYER_ID,
+        type: "circle",
+        source: ENDPOINTS_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "start"],
+        paint: {
+          "circle-radius": 7,
+          "circle-color": SS_TOKENS.clear,
+          "circle-stroke-color": "#FFFFFF",
+          "circle-stroke-width": 2,
+        },
+      });
+      map.addLayer({
+        id: END_DOT_LAYER_ID,
+        type: "circle",
+        source: ENDPOINTS_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "end"],
+        paint: {
+          "circle-radius": 8,
+          "circle-color": SS_TOKENS.alert,
+          "circle-stroke-color": "#FFFFFF",
+          "circle-stroke-width": 2,
+        },
+      });
+      // Move the cluster below the chevron once the aircraft layer
+      // exists. If it doesn't yet, the cluster sits at the top of
+      // the stack (visible immediately) and the next fetch poll
+      // re-runs the reorder once the chevron mounts.
+      reorderTrailLayers(map);
       console.debug("[trail] attach: complete", {
-        sourceExists: !!map.getSource(SOURCE_ID),
-        layerExists: !!map.getLayer(LAYER_ID),
-        totalLayers: map.getStyle()?.layers?.length ?? 0,
+        layers: map.getStyle()?.layers?.map((l) => l.id) ?? [],
+        hasAircraft: !!map.getLayer(AIRCRAFT_LAYER_ID),
       });
     };
     if (map.isStyleLoaded()) attach();
     map.on("load", attach);
     map.on("styledata", attach);
 
+    // Pulse the end dot every animation frame. setPaintProperty is
+    // cheap; the radius expression covers every airborne tail in a
+    // single layer (filter handles which features show).
+    const startedAt = Date.now();
+    const tick = () => {
+      if (!map.getLayer(END_DOT_LAYER_ID)) {
+        pulseRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      const phase =
+        ((Date.now() - startedAt) % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
+      const radius = 8 + 5 * Math.sin(phase * Math.PI * 2);
+      try {
+        map.setPaintProperty(END_DOT_LAYER_ID, "circle-radius", radius);
+      } catch {
+        /* layer torn down mid-frame */
+      }
+      pulseRef.current = requestAnimationFrame(tick);
+    };
+    pulseRef.current = requestAnimationFrame(tick);
+
     return () => {
       map.off("load", attach);
       map.off("styledata", attach);
+      if (pulseRef.current != null) cancelAnimationFrame(pulseRef.current);
+      pulseRef.current = null;
       try {
+        if (map.getLayer(END_DOT_LAYER_ID)) map.removeLayer(END_DOT_LAYER_ID);
+        if (map.getLayer(START_DOT_LAYER_ID)) map.removeLayer(START_DOT_LAYER_ID);
         if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+        if (map.getLayer(HALO_LAYER_ID)) map.removeLayer(HALO_LAYER_ID);
+        if (map.getSource(ENDPOINTS_SOURCE_ID)) {
+          map.removeSource(ENDPOINTS_SOURCE_ID);
+        }
         if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
       } catch {
         // map torn down already
@@ -115,9 +287,15 @@ export function AircraftTrailLayer({
   useEffect(() => {
     if (!map) return;
     if (!tailsKey) {
-      console.debug("[trail] no airborne tails, clearing source");
+      console.debug("[trail] no airborne tails, clearing sources");
       const lineSrc = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       if (lineSrc) lineSrc.setData({ type: "FeatureCollection", features: [] });
+      const endpointSrc = map.getSource(ENDPOINTS_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
+      if (endpointSrc) {
+        endpointSrc.setData({ type: "FeatureCollection", features: [] });
+      }
       return;
     }
     let cancelled = false;
@@ -150,14 +328,23 @@ export function AircraftTrailLayer({
         });
         const lineSrc = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
         if (!lineSrc) {
-          console.warn("[trail] fetchOnce: source missing, skipping setData");
+          console.warn("[trail] fetchOnce: line source missing");
           return;
         }
         const fc = buildFeatureCollection(trails);
         lineSrc.setData(fc);
+        const endpointSrc = map.getSource(ENDPOINTS_SOURCE_ID) as
+          | GeoJSONSource
+          | undefined;
+        if (endpointSrc) {
+          endpointSrc.setData(buildEndpointCollection(trails));
+        }
         console.debug("[trail] fetchOnce: setData complete", {
           featureCount: fc.features.length,
         });
+        // Re-run reorder so a sibling layer that mounted between
+        // attach and now (heatmap, flight-paths) can't bury us.
+        reorderTrailLayers(map);
       } catch (e) {
         console.warn("[trail] fetchOnce: threw", e);
       }
