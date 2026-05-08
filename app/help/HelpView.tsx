@@ -204,7 +204,13 @@ export function HelpMarkdown({ source }: { source: string }) {
       >
         {source}
       </ReactMarkdown>
-      <style>{`
+      {/* dangerouslySetInnerHTML bypasses React's HTML-entity encoding
+          of children inside <style>. Without it the SSR pass emits
+          encoded quotes inside CSS comments and a hydration mismatch
+          fires on every help-page mount. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .ss-help-prose h2:hover .ss-help-anchor,
         .ss-help-prose h3:hover .ss-help-anchor,
         .ss-help-prose h2:focus-within .ss-help-anchor,
@@ -213,16 +219,14 @@ export function HelpMarkdown({ source }: { source: string }) {
         }
         .ss-help-prose h2 { scroll-margin-top: 72px; }
         .ss-help-prose h3 { scroll-margin-top: 72px; }
-        /* Hide the "#" permalink anchors on touch-only devices —
-           they're a desktop hover affordance for copying section
-           links, not actionable on a phone. Keeps them invisible on
-           mobile where they were rendering as 16×22 tap targets. */
         @media (hover: none) {
           .ss-help-prose .ss-help-anchor {
             display: none;
           }
         }
-      `}</style>
+      `,
+        }}
+      />
     </div>
   );
 }
