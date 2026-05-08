@@ -1,6 +1,8 @@
 import { AlertsSettings } from "@/components/AlertsSettings";
 import { ContrastSetting } from "@/components/ContrastSetting";
 import { TimeFormatSetting } from "@/components/TimeFormatSetting";
+import { RegionSetting } from "@/components/RegionSetting";
+import { ResetPreferencesButton } from "@/components/ResetPreferencesButton";
 import { getContrastPref, getTimeFormatPref } from "@/lib/user-prefs";
 import { getRegistry } from "@/lib/registry";
 
@@ -10,6 +12,12 @@ export const metadata = {
 };
 
 export const dynamic = "force-dynamic";
+
+const SECTION_WRAP = {
+  maxWidth: 460,
+  margin: "16px auto 0",
+  padding: "0 18px",
+} as const;
 
 export default async function AlertsPage() {
   const [timeFormat, contrast, registry] = await Promise.all([
@@ -27,23 +35,17 @@ export default async function AlertsPage() {
           role: f.role,
         }))}
       />
-      <div
-        style={{
-          maxWidth: 460,
-          margin: "16px auto 0",
-          padding: "0 18px",
-        }}
-      >
+      <div style={SECTION_WRAP}>
         <TimeFormatSetting current={timeFormat} />
       </div>
-      <div
-        style={{
-          maxWidth: 460,
-          margin: "16px auto 80px",
-          padding: "0 18px",
-        }}
-      >
+      <div style={SECTION_WRAP}>
         <ContrastSetting current={contrast} />
+      </div>
+      <div style={SECTION_WRAP}>
+        <RegionSetting />
+      </div>
+      <div style={{ ...SECTION_WRAP, marginBottom: 80 }}>
+        <ResetPreferencesButton />
       </div>
     </>
   );

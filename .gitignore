@@ -45,3 +45,4 @@ next-env.d.ts
 !public/icons
 !public/icons/**
 tests/visual/out/
+AUDIT-2026-05-07.md

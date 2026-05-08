@@ -43,3 +43,13 @@ export async function setContrastAction(formData: FormData): Promise<void> {
   });
   revalidatePath("/", "layout");
 }
+
+/** Clear every server-readable preference cookie. Pairs with the
+ *  client-side localStorage clear in ResetPreferencesButton — together
+ *  they restore a fresh-install state for the rider. */
+export async function resetPreferenceCookiesAction(): Promise<void> {
+  const jar = cookies();
+  jar.delete(TIME_FORMAT_COOKIE);
+  jar.delete(CONTRAST_COOKIE);
+  revalidatePath("/", "layout");
+}
