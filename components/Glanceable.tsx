@@ -114,7 +114,11 @@ export function Glanceable({
       className="ss-hero-bg ss-page-narrow"
       style={{
         minHeight: "100dvh",
-        padding: "12px 18px 100px",
+        // 180 px bottom padding clears the tab bar (66) + the iOS
+        // install prompt overlay (~80) + breathing room. Without this
+        // the LearningPanel and last activity row hid behind the
+        // fixed-position prompt on /.
+        padding: "12px 18px 180px",
         display: "flex",
         flexDirection: "column",
         gap: 16,

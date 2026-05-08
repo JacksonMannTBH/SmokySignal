@@ -13,7 +13,8 @@ export default function LegalPage() {
     <main
       style={{
         minHeight: "100dvh",
-        padding: "12px 18px 100px",
+        // 180 px bottom clears tab bar + iOS install prompt overlay.
+        padding: "12px 18px 180px",
         display: "flex",
         flexDirection: "column",
         gap: 18,

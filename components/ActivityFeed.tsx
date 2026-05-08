@@ -41,7 +41,10 @@ export function ActivityFeed({ initial }: { initial: ActivityEntry[] }) {
       className="ss-page-narrow"
       style={{
         minHeight: "100dvh",
-        padding: `12px 18px ${TABBAR_HEIGHT + 24}px`,
+        // Bottom padding = tab bar (66) + iOS install prompt overlay
+        // (~80) + breathing room. Without this the last activity row
+        // hides behind the fixed-position prompt on iOS Safari.
+        padding: `12px 18px ${TABBAR_HEIGHT + 110}px`,
         display: "flex",
         flexDirection: "column",
         gap: 14,

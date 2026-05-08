@@ -22,7 +22,8 @@ export default async function AboutPage() {
       className="ss-page-narrow"
       style={{
         minHeight: "100dvh",
-        padding: "12px 18px 60px",
+        // 180 px bottom clears tab bar + iOS install prompt overlay.
+        padding: "12px 18px 180px",
         display: "flex",
         flexDirection: "column",
         gap: 18,

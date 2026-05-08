@@ -150,7 +150,10 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
     <main
       style={{
         minHeight: "100dvh",
-        padding: `12px 18px ${TABBAR_HEIGHT + 24}px`,
+        // Bottom padding = tab bar (66) + iOS install prompt overlay
+        // (~80) + breathing room. Without this the last dash card
+        // hides behind the fixed-position prompt on iOS Safari.
+        padding: `12px 18px ${TABBAR_HEIGHT + 110}px`,
         maxWidth: 460,
         margin: "0 auto",
         display: "flex",

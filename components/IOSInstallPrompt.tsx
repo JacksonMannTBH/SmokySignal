@@ -12,8 +12,22 @@ const FIRST_STANDALONE_KEY = "ss_first_standalone_visit";
 const PULSE_KEYFRAME_ID = "ss-arm-alerts-pulse";
 const DISMISS_DAYS = 30;
 const TABBAR_HEIGHT = 66;
-// Routes whose layout includes the bottom tab bar — banner sits above it.
-const TABBAR_PATHS = new Set(["/", "/radar", "/dash"]);
+
+/**
+ * True when the current pathname is rendered inside the (tabs) layout
+ * (which always mounts the bottom TabBar). Without this offset the
+ * install prompt overlapped the tab bar on /forecast, /activity,
+ * /about, /legal, /plane/*, /settings/* — every tabbed route except
+ * the original three. The literal list mirrors the directories under
+ * `app/(tabs)/` so any new tab route lands here too.
+ */
+function isTabbedPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/") return true;
+  return /^\/(radar|dash|forecast|activity|about|legal|plane|settings)(\/|$)/.test(
+    pathname,
+  );
+}
 
 type Standalone = Navigator & { standalone?: boolean };
 type Mode = "hidden" | "pre-install" | "post-install";
@@ -105,7 +119,7 @@ export function IOSInstallPrompt() {
 
   if (mode === "hidden") return null;
 
-  const onTabs = pathname != null && TABBAR_PATHS.has(pathname);
+  const onTabs = isTabbedPath(pathname);
   const bottomOffset = onTabs ? TABBAR_HEIGHT : 0;
   const dismissKey =
     mode === "pre-install" ? STORAGE_KEY : POST_INSTALL_DISMISS_KEY;

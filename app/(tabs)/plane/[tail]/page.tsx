@@ -72,7 +72,8 @@ export default async function PlanePage({ params, searchParams }: Props) {
         minHeight: "100dvh",
         maxWidth: 460,
         margin: "0 auto",
-        padding: "12px 18px 100px",
+        // 180 px bottom clears tab bar + iOS install prompt overlay.
+        padding: "12px 18px 180px",
         display: "flex",
         flexDirection: "column",
         gap: 16,
