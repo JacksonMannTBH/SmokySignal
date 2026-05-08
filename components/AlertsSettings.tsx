@@ -176,7 +176,16 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
         <Link
           href="/"
           className="ss-mono"
-          style={{ fontSize: 11, color: SS_TOKENS.fg1, textDecoration: "none" }}
+          style={{
+            fontSize: 11,
+            color: SS_TOKENS.fg1,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: 44,
+            padding: "0 8px",
+            margin: "-12px -8px",
+          }}
         >
           ← Back
         </Link>

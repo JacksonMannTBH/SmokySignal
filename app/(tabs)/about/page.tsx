@@ -44,6 +44,11 @@ export default async function AboutPage() {
             fontSize: 11,
             color: SS_TOKENS.fg1,
             textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: 44,
+            padding: "0 8px",
+            margin: "-12px -8px",
           }}
         >
           ← Back

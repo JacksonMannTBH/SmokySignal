@@ -605,7 +605,11 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
 
 function pillStyle(color: string): React.CSSProperties {
   return {
-    padding: "8px 12px",
+    // 14 px vertical padding bumps tap height to 44 px (WCAG AA min).
+    // Visual proportion stays nearly identical — the pill grows from
+    // 33 → 44 px, still reads as a compact toolbar pill.
+    padding: "14px 14px",
+    minHeight: 44,
     borderRadius: 999,
     background: "rgba(11,13,16,0.78)",
     border: `.5px solid ${SS_TOKENS.hairline2}`,
@@ -618,6 +622,9 @@ function pillStyle(color: string): React.CSSProperties {
     whiteSpace: "nowrap",
     touchAction: "manipulation",
     WebkitTapHighlightColor: "transparent",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 }
 

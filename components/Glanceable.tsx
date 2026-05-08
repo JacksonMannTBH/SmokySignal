@@ -243,7 +243,7 @@ function Footer() {
         href="https://adsb.fi"
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: SS_TOKENS.fg1, textDecoration: "underline" }}
+        style={FOOTER_LINK}
       >
         adsb.fi
       </a>{" "}
@@ -252,26 +252,33 @@ function Footer() {
         href="https://opensky-network.org"
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: SS_TOKENS.fg1, textDecoration: "underline" }}
+        style={FOOTER_LINK}
       >
         OpenSky Network
       </a>
       <br />
-      <Link
-        href="/about"
-        style={{ color: SS_TOKENS.fg1, textDecoration: "underline" }}
-      >
+      <Link href="/about" style={FOOTER_LINK}>
         About
       </Link>
       {" · "}
-      <Link
-        href="/legal"
-        style={{ color: SS_TOKENS.fg1, textDecoration: "underline" }}
-      >
+      <Link href="/legal" style={FOOTER_LINK}>
         Legal
       </Link>
     </footer>
   );
+}
+
+// Footer link style — inline-block + vertical padding so the tap area
+// reaches WCAG-AA's 44 px minimum without changing visible layout.
+// Negative vertical margin keeps the line-height of the surrounding
+// flow text unchanged.
+const FOOTER_LINK: React.CSSProperties = {
+  color: SS_TOKENS.fg1,
+  textDecoration: "underline",
+  display: "inline-block",
+  padding: "12px 4px",
+  margin: "-12px -4px",
+  lineHeight: 1,
 }
 
 function ActivityStrip({ latest }: { latest: ActivityEntry }) {

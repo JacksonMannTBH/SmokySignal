@@ -60,7 +60,11 @@ export default async function HelpPage() {
               color: SS_TOKENS.fg1,
               textDecoration: "none",
               justifySelf: "start",
-              padding: "4px 0",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: 44,
+              padding: "0 8px",
+              margin: "0 -8px",
             }}
           >
             ← Back

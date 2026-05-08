@@ -375,22 +375,24 @@ function AddZoneButton({
         aria-label="Add geofence at your location"
         style={{
           position: "absolute",
-          top: 60,
-          left: 64,
-          width: 28,
-          height: 28,
+          top: 52,
+          left: 56,
+          width: 44,
+          height: 44,
           borderRadius: "50%",
           border: `.5px solid ${SS_TOKENS.hairline2}`,
           background: "rgba(11,13,16,.7)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
           color: disabled ? SS_TOKENS.fg2 : SS_TOKENS.fg0,
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: 700,
           lineHeight: 1,
           opacity: disabled ? 0.5 : 1,
           cursor: disabled ? "not-allowed" : "pointer",
           zIndex: 10,
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
         +
