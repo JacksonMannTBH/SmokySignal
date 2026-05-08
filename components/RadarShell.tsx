@@ -229,21 +229,25 @@ export function RadarShell({
       <DistanceRingsToggle
         active={showRings}
         onToggle={() => setShowRings((v) => !v)}
-        bottom={
+        bottom={`calc(${
           TABBAR_HEIGHT + 16 + (airborne.length > 0 ? 130 : 0)
-        }
+        }px + var(--ss-install-prompt-h, 0px))`}
         disabled={!rider}
       />
       {/* PROMPT_19C diagnostic — sits two rows above the HOT ZONES /
           FLIGHT PATHS pill row (which is at TABBAR_HEIGHT + 16 +
           bottomBoost) and one row above DistanceRingsToggle (+44).
+          The calc() adds the iOS install-prompt overlay height so
+          the badge stays visible above the prompt on iOS Safari.
           Removed in the follow-up PR once trail rendering is
           confirmed in the wild. */}
       <div
         style={{
           position: "absolute",
           left: 12,
-          bottom: TABBAR_HEIGHT + 16 + (airborne.length > 0 ? 130 : 0) + 88,
+          bottom: `calc(${
+            TABBAR_HEIGHT + 16 + (airborne.length > 0 ? 130 : 0) + 88
+          }px + var(--ss-install-prompt-h, 0px))`,
           zIndex: 12,
         }}
       >
@@ -609,7 +613,7 @@ function DistanceRingsToggle({
 }: {
   active: boolean;
   onToggle: () => void;
-  bottom: number;
+  bottom: number | string;
   disabled?: boolean;
 }) {
   // Sit just above the hot-zones toggle row so it doesn't compete for the
@@ -637,7 +641,10 @@ function DistanceRingsToggle({
         style={{
           position: "absolute",
           left: 12,
-          bottom: bottom + 44,
+          bottom:
+            typeof bottom === "number"
+              ? bottom + 44
+              : `calc(${bottom} + 44px)`,
           zIndex: 12,
           padding: "8px 12px",
           borderRadius: 999,

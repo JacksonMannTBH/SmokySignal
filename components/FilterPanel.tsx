@@ -37,7 +37,10 @@ import {
 } from "@/lib/radar-filter";
 
 type Props = {
-  bottom: number;
+  /** Final CSS bottom value — accepts a number (px) or a string
+   *  (e.g. a calc expression that includes the iOS install-prompt
+   *  height var so the panel clears that overlay). */
+  bottom: number | string;
   filter: Filter;
   onChange: (f: Filter) => void;
   onClose: () => void;

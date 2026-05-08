@@ -420,7 +420,14 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
     }
   }, [map, enabled]);
 
+  // Pixel offset before the install-prompt overlay is added. Kept as
+  // a number for downstream arithmetic (`bottom + 56` etc.); the
+  // final CSS bottom value composes it with the prompt height via
+  // calc() so each absolutely-positioned child still clears the
+  // fixed iOS prompt at the bottom of the viewport.
   const bottom = TABBAR_HEIGHT + 16 + bottomBoost;
+  const offsetCss = (extra: number) =>
+    `calc(${bottom + extra}px + var(--ss-install-prompt-h, 0px))`;
 
   // Empty-state messaging: only show once we know zones returned empty AND
   // the toggle is on (otherwise the user explicitly hid them). Sits just
@@ -458,7 +465,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             position: "absolute",
             left: 12,
             right: 12,
-            bottom: bottom + 56,
+            bottom: offsetCss(56),
             zIndex: 11,
             maxWidth: 380,
             margin: "0 auto",
@@ -471,7 +478,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             position: "absolute",
             left: 12,
             right: 12,
-            bottom: bottom + 56,
+            bottom: offsetCss(56),
             zIndex: 11,
             maxWidth: 380,
             margin: "0 auto",
@@ -508,7 +515,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             position: "absolute",
             left: 12,
             right: 12,
-            bottom: bottom + 56,
+            bottom: offsetCss(56),
             zIndex: 11,
             maxWidth: 380,
             margin: "0 auto",
@@ -530,7 +537,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
         style={{
           position: "absolute",
           left: 12,
-          bottom,
+          bottom: offsetCss(0),
           zIndex: 12,
           display: "flex",
           gap: 6,
@@ -589,7 +596,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
 
       {panelOpen && (
         <FilterPanel
-          bottom={bottom + 44}
+          bottom={offsetCss(44)}
           filter={filter}
           onChange={setFilter}
           onClose={() => setPanelOpen(false)}

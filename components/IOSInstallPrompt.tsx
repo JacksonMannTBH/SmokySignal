@@ -117,6 +117,29 @@ export function IOSInstallPrompt() {
     if (pulse) ensurePulseKeyframes();
   }, [pulse]);
 
+  // Publish prompt height as a CSS variable on <html> so other fixed-
+  // position components on /radar (HotZoneLayer's HOT ZONES / FLIGHT
+  // PATHS pills, the trail status badge) can offset above the prompt
+  // and not be hidden by it. Empty / 0 when the prompt isn't rendering.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const visible = mode !== "hidden";
+    // Approximate height — actual height varies slightly with safe-area
+    // inset and the post-install variant which is shorter. 80 px is the
+    // pre-install variant baseline post-PROMPT_23 compression.
+    const value = visible ? "80px" : "0px";
+    document.documentElement.style.setProperty(
+      "--ss-install-prompt-h",
+      value,
+    );
+    return () => {
+      document.documentElement.style.setProperty(
+        "--ss-install-prompt-h",
+        "0px",
+      );
+    };
+  }, [mode]);
+
   if (mode === "hidden") return null;
 
   const onTabs = isTabbedPath(pathname);
