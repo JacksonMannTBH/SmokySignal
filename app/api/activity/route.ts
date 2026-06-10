@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRecentActivity } from "@/lib/activity";
+import { getSnapshot } from "@/lib/snapshot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export async function GET(req: Request) {
   const limit = Number.isFinite(limitRaw)
     ? Math.max(1, Math.min(500, Math.floor(limitRaw)))
     : 50;
+  await getSnapshot();
   const entries = await getRecentActivity(limit);
   return NextResponse.json(
     { entries, fetched_at: Date.now() },

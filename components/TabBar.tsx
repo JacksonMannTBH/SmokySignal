@@ -20,17 +20,20 @@ export function TabBar() {
       aria-label="Main"
       style={{
         position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
+        left: "max(12px, env(safe-area-inset-left))",
+        right: "max(12px, env(safe-area-inset-right))",
+        bottom: "max(12px, env(safe-area-inset-bottom))",
         display: "flex",
         justifyContent: "space-around",
-        padding: "10px 8px 28px",
-        background:
-          "linear-gradient(to top, rgba(11,13,16,.96) 70%, rgba(11,13,16,0))",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderTop: `.5px solid ${SS_TOKENS.hairline}`,
+        maxWidth: 560,
+        margin: "0 auto",
+        padding: "7px",
+        background: "rgba(255,255,255,0.78)",
+        backdropFilter: "blur(24px) saturate(1.15)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.15)",
+        border: `.5px solid ${SS_TOKENS.hairline2}`,
+        borderRadius: 28,
+        boxShadow: SS_TOKENS.shadowLg,
         zIndex: 50,
       }}
     >
@@ -47,10 +50,12 @@ export function TabBar() {
               flexDirection: "column",
               alignItems: "center",
               gap: 3,
-              padding: "6px 10px",
+              padding: "7px 10px",
               minWidth: 56,
               minHeight: 44,
               color: active ? SS_TOKENS.fg0 : SS_TOKENS.fg2,
+              background: active ? "rgba(244,196,48,0.18)" : "transparent",
+              borderRadius: 22,
               textDecoration: "none",
               touchAction: "manipulation",
               WebkitTapHighlightColor: "transparent",
@@ -62,8 +67,8 @@ export function TabBar() {
             <span
               style={{
                 fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: ".02em",
+                fontWeight: 700,
+                letterSpacing: 0,
               }}
             >
               {t.label}

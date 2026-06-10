@@ -12,7 +12,7 @@ import { getTimeFormatPref, isHour12 } from "@/lib/user-prefs";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "SmokySignal · Admin · Spots",
+  title: "Out Of Sight · Admin · Spots",
   robots: { index: false, follow: false },
 };
 
@@ -195,7 +195,7 @@ function Td({
       style={{
         padding: "8px 8px",
         fontSize: 12,
-        fontFamily: mono ? "var(--font-mono)" : "var(--font-inter)",
+        fontFamily: mono ? "var(--font-mono)" : "var(--font-brand)",
         color: SS_TOKENS.fg1,
         whiteSpace: "nowrap",
       }}

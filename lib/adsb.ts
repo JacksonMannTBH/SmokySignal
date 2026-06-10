@@ -28,7 +28,7 @@ type SeenState = { firstSeenAt: number; lastSeenAt: number };
 const seenByIcao = new Map<string, SeenState>();
 
 const FETCH_OPTS: RequestInit = {
-  headers: { "User-Agent": "SmokySignal/0.1 (+https://github.com/)" },
+  headers: { "User-Agent": "OutOfSight/0.1 (+https://github.com/)" },
   // Avoid Next.js's fetch caching layer — we cache ourselves.
   cache: "no-store",
 };

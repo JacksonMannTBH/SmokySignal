@@ -16,7 +16,7 @@ const STATES_URL = "https://opensky-network.org/api/states/all";
 const TOKEN_KEY = "opensky:token";
 const CREDITS_KEY = "opensky:credits_remaining";
 
-const UA = "SmokySignal/0.1 (+https://www.smokysignal.app)";
+const UA = "OutOfSight/0.1 (+https://www.smokysignal.app)";
 
 type CachedToken = { access_token: string; expires_at: number };
 

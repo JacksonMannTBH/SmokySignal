@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "About",
   description:
-    "What SmokySignal is, where the data comes from, and which tails are tracked.",
+    "What Out Of Sight is, where the data comes from, and which tails are tracked.",
 };
 
 export default async function AboutPage() {
@@ -37,7 +37,7 @@ export default async function AboutPage() {
           marginTop: 4,
         }}
       >
-        <span className="ss-eyebrow">SmokySignal · About</span>
+        <span className="ss-eyebrow">Out Of Sight · About</span>
         <Link
           href="/"
           className="ss-mono"
@@ -102,7 +102,7 @@ export default async function AboutPage() {
           Truckers called them Smokey. We just kept the name.
         </p>
         <p style={{ fontSize: 14, lineHeight: 1.55, color: SS_TOKENS.fg1, margin: 0 }}>
-          SmokySignal tells motorcyclists, drivers, and curious locals — in
+          Out Of Sight tells motorcyclists, drivers, and curious locals — in
           one glance — whether the bird is up, where it is, and what it&rsquo;s
           watching. Coverage: Washington state — every WSP, county sheriff,
           and federal agency airframe we can confirm is broadcasting.
@@ -127,7 +127,7 @@ export default async function AboutPage() {
           />
           <OriginGlyph rotate={-2} />
           <OriginStep
-            title="SmokySignal"
+            title="Out Of Sight"
             body="Smokey (the bear, the trooper, the plane) plus smoke signal (the original beacon-warning system) plus signal (radio, transmission, alert). The product is the modern smoke signal — a quiet, glanceable warning that the bird is watching."
           />
         </div>
@@ -446,7 +446,7 @@ function Section({
 
 function EmbedBadgeCallout() {
   const snippet =
-    '<a href="https://smokysignal.app">\n  <img src="https://smokysignal.app/api/badge.svg" alt="SmokySignal status">\n</a>';
+    '<a href="https://smokysignal.app">\n  <img src="https://smokysignal.app/api/badge.svg" alt="Out Of Sight status">\n</a>';
   return (
     <section
       style={{
@@ -489,7 +489,7 @@ function EmbedBadgeCallout() {
         // tabIndex=0 so the horizontally-scrollable region is reachable
         // by keyboard. axe scrollable-region-focusable rule.
         tabIndex={0}
-        aria-label="SmokySignal embed badge HTML snippet"
+        aria-label="Out Of Sight embed badge HTML snippet"
         style={{
           background: SS_TOKENS.bg2,
           border: `.5px solid ${SS_TOKENS.hairline}`,
@@ -517,7 +517,7 @@ function EmbedBadgeCallout() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/api/badge.svg"
-          alt="SmokySignal status"
+          alt="Out Of Sight status"
           style={{ verticalAlign: "middle" }}
         />
       </p>
@@ -558,7 +558,7 @@ function PrivacyCallout() {
           margin: 0,
         }}
       >
-        SmokySignal pulls public aircraft signals and renders them. Nothing
+        Out Of Sight pulls public aircraft signals and renders them. Nothing
         about you, your speed, or your phone leaves your device on its way
         to anyone — including WSP. Full data flow on{" "}
         <Link

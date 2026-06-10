@@ -9,7 +9,7 @@ const ROOT = path.resolve(__dirname, "..");
 //
 // The "emoji" matcher excludes a small set of glyphs that are part of the
 // SmokySignal design language and not actually emoji:
-//   ©          MapTiler / OpenStreetMap attribution
+//   ©          OpenFreeMap / OpenStreetMap attribution
 //   ↗ ↘ ✦ ⚠   activity-feed kind icons (takeoff/landing/first-seen/squawk)
 //   ↑ ↓ →     directional arrow glyphs used in chrome
 // Adding allowed symbols here is preferred over weakening the regex so we

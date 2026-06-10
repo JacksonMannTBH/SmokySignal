@@ -22,7 +22,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MIN_POINTS_PER_LINE = 5;
+const MIN_POINTS_PER_LINE = 2;
 const MAX_DAYS = 30;
 
 type LineFeature = GeoJSON.Feature<

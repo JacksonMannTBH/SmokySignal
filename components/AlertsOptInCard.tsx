@@ -152,8 +152,8 @@ export function AlertsOptInCard() {
             borderRadius: 999,
             border: 0,
             background: SS_TOKENS.alert,
-            color: SS_TOKENS.bg0,
-            fontFamily: "var(--font-inter)",
+            color: "#fffdf8",
+            fontFamily: "var(--font-brand)",
             fontSize: 12.5,
             fontWeight: 700,
             letterSpacing: ".02em",
@@ -174,7 +174,7 @@ export function AlertsOptInCard() {
             border: `.5px solid ${SS_TOKENS.hairline2}`,
             background: "transparent",
             color: SS_TOKENS.fg1,
-            fontFamily: "var(--font-inter)",
+            fontFamily: "var(--font-brand)",
             fontSize: 12.5,
             fontWeight: 600,
             letterSpacing: ".02em",
@@ -196,7 +196,8 @@ function Wrapper({ children }: { children: React.ReactNode }) {
       style={{
         background: SS_TOKENS.bg1,
         border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: 14,
+        borderRadius: 22,
+        boxShadow: SS_TOKENS.shadowSm,
         padding: "14px 16px",
       }}
     >

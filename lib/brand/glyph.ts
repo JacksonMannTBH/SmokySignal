@@ -16,11 +16,11 @@
 
 export const COLORS = {
   /** Signal amber — must match the icon files. Don't change. */
-  A: "#f5b840",
+  A: "#f4c430",
   /** Deep / page background. */
-  D: "#0B0D10",
+  D: "#050505",
   /** Foreground / wordmark text default. */
-  FG: "#F2F4F7",
+  FG: "#050505",
 } as const;
 
 // 64×64 grid. Full mark: hat + orbit blip + arc.
@@ -114,11 +114,11 @@ export function wordmark(
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 64" width="${360 * s}" height="${64 * s}" style="display:block">
     ${markPaths(accent)}
     <text x="80" y="42"
-      font-family="Inter, system-ui, sans-serif"
+      font-family="Math Bold, Cambria Math, STIX Two Math, serif"
       font-weight="800"
       font-size="30"
       letter-spacing="-0.02em"
-      fill="${color}">SmokySignal</text>
+      fill="${color}">Out Of Sight</text>
   </svg>`;
 }
 

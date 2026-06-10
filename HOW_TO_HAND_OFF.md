@@ -63,7 +63,7 @@ npm run dev                # predev hook checks for missing keys.
 
 If `npm run dev` aborts with a missing-env error, follow its instructions — usually it just means re-running `npm run env:pull` after Vercel got new env vars. If `npx vercel` itself errors with "token provided via VERCEL_TOKEN environment variable is not valid," your shell has a stale token set; `unset VERCEL_TOKEN` and try again.
 
-**MapTiler note.** If `npm run dev` boots but the radar map shows blank tiles, your MapTiler key may be domain-restricted to production hosts. Open https://cloud.maptiler.com/account/keys/, edit the key, and add `http://localhost:3000` (or `*` for any localhost port) to the allowed origins. Or generate a separate unrestricted dev key and put it in `.env.local` only.
+**Map note.** Radar uses OpenFreeMap's public dark style by default. To test a self-hosted style, set `NEXT_PUBLIC_MAP_STYLE_URL` in `.env.local`.
 
 ---
 
@@ -89,7 +89,6 @@ The first thing Claude Code will do is read `design_handoff/README.md` end-to-en
 ## 5. Before you let it write code, you'll need
 
 - **A Vercel account** (free) — https://vercel.com/signup
-- **A MapTiler account** (free tier is fine) — https://maptiler.com/cloud/ — grab an API key
 - **Node 20+** locally
 - **The Vercel CLI** — `npm i -g vercel`
 - **Decide on auth for the admin tail editor.** Easiest v1: a single passcode in an env var. Claude Code will ask.

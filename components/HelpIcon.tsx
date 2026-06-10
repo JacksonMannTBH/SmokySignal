@@ -56,13 +56,14 @@ export function HelpIcon({
             width: 32,
             height: 32,
             borderRadius: "50%",
-            background: "rgba(11,13,16,0.55)",
+            background: "rgba(255,255,255,0.84)",
             border: `.5px solid ${SS_TOKENS.hairline}`,
+            boxShadow: SS_TOKENS.shadowSm,
             color: SS_TOKENS.fg1,
             fontSize: 14,
             fontWeight: 700,
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
+            backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
           }}
         >
           ?

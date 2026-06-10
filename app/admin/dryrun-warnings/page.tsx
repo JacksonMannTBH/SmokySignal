@@ -10,7 +10,7 @@ import { SS_TOKENS } from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "SmokySignal · Admin · Dry-run warnings",
+  title: "Out Of Sight · Admin · Dry-run warnings",
   robots: { index: false, follow: false },
 };
 

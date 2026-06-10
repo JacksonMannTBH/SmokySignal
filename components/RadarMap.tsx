@@ -8,6 +8,7 @@ import maplibregl, {
   MapGeoJSONFeature,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_LABEL_FONT, MAP_STYLE_URL } from "@/lib/map-style";
 import { SS_TOKENS } from "@/lib/tokens";
 import type { Aircraft, FleetRole } from "@/lib/types";
 import {
@@ -53,7 +54,7 @@ function circleRingCoords(
 // expression picks the right one per feature via properties.icon.
 // 'unknown' maps to 'aircraft-smokey' (see glyphRoleFor — conservative
 // alert default, matches computeStatus()).
-const AIRCRAFT_ICON_SIZE = 32; // bitmap raster size; layer `icon-size` scales it
+const AIRCRAFT_ICON_SIZE = 40; // bitmap raster size; layer `icon-size` scales it
 const ROLE_ICON_KEY: Record<GlyphRole, string> = {
   smokey: "aircraft-smokey",
   patrol: "aircraft-patrol",
@@ -153,25 +154,10 @@ export default function RadarMap({
   // Mount the map once.
   useEffect(() => {
     if (!containerRef.current) return;
-    const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-
-    if (!key) {
-      containerRef.current.innerHTML = `
-        <div style="
-          position:absolute; inset:0; display:flex; align-items:center;
-          justify-content:center; padding:24px; text-align:center;
-          color:${SS_TOKENS.fg2}; font-size:13px; line-height:1.5;
-        ">
-          NEXT_PUBLIC_MAPTILER_KEY missing in this build.<br/>
-          Map tiles unavailable.
-        </div>
-      `;
-      return;
-    }
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${key}`,
+      style: MAP_STYLE_URL,
       center: PUGET_SOUND,
       zoom: DEFAULT_ZOOM,
       attributionControl: { compact: true },
@@ -188,7 +174,10 @@ export default function RadarMap({
       const [riderImg, ...roleImgs] = await Promise.all([
         loadSvgBitmap(RIDER_SVG, 48),
         ...roleEntries.map(([role]) =>
-          loadSvgBitmap(aircraftSvg(role, { size: AIRCRAFT_ICON_SIZE }), AIRCRAFT_ICON_SIZE),
+          loadSvgBitmap(
+            aircraftSvg(role, { size: AIRCRAFT_ICON_SIZE, tone: "radar" }),
+            AIRCRAFT_ICON_SIZE,
+          ),
         ),
       ]);
       if (!mapRef.current) return; // guard — unmounted while loading
@@ -228,7 +217,7 @@ export default function RadarMap({
           visibility: showDistanceRingsRef.current ? "visible" : "none",
           "text-field": ["get", "label"],
           "text-size": 9,
-          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-font": MAP_LABEL_FONT,
           "text-offset": [0, -0.6],
           "text-anchor": "bottom",
           "text-allow-overlap": false,
@@ -276,16 +265,14 @@ export default function RadarMap({
           "icon-rotation-alignment": "map",
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
-          "icon-size": 0.85,
+          "icon-size": 0.95,
           // Tail label sits 4-6 px above the chevron. Hidden below z9 so
           // the regional view doesn't clutter; tail-only at z9-11; tail
           // plus nickname at z12+ for city zoom. Sky-blue mono matches
           // the brand info palette and stays distinct from the amber
           // chevron + heat halo.
           //
-          // Font stack matches distance-rings-labels (the only other text
-          // layer on this map) since MapTiler streets-v2-dark glyphs
-          // ship Open Sans + Arial Unicode but not JetBrains Mono.
+          // Font stack matches OpenFreeMap's bundled glyphs.
           "text-field": [
             "step",
             ["zoom"],
@@ -300,7 +287,7 @@ export default function RadarMap({
               ["get", "tail"],
             ],
           ],
-          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-font": MAP_LABEL_FONT,
           "text-size": [
             "interpolate",
             ["linear"],
@@ -319,9 +306,9 @@ export default function RadarMap({
           "text-letter-spacing": 0.05,
         },
         paint: {
-          "text-color": SS_TOKENS.sky,
-          "text-halo-color": SS_TOKENS.bg0,
-          "text-halo-width": 1.5,
+          "text-color": SS_TOKENS.danger,
+          "text-halo-color": "#fff7f2",
+          "text-halo-width": 2,
         },
       });
 
@@ -385,7 +372,7 @@ export default function RadarMap({
       })
         .setLngLat(pos)
         .setHTML(
-          `<div style="font:600 12px/1.4 ui-monospace,Menlo,monospace;color:${SS_TOKENS.bg0}">` +
+          `<div style="font:700 12px/1.4 Math Bold,Cambria Math,STIX Two Math,serif;color:${SS_TOKENS.bg0}">` +
             `<div>${label}</div>` +
             `<a href="/plane/${tail}" style="color:${SS_TOKENS.sky};text-decoration:underline;font-weight:400">View detail</a>` +
             `</div>`,

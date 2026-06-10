@@ -26,7 +26,13 @@ function ensureKeyframes() {
   document.head.appendChild(style);
 }
 
-export function ProximityFlash({ active }: { active: boolean }) {
+export function ProximityFlash({
+  active,
+  color = SS_TOKENS.alert,
+}: {
+  active: boolean;
+  color?: string;
+}) {
   if (!active) return null;
   ensureKeyframes();
   return (
@@ -37,7 +43,7 @@ export function ProximityFlash({ active }: { active: boolean }) {
         position: "fixed",
         inset: 0,
         pointerEvents: "none",
-        background: `radial-gradient(circle at 50% 50%, transparent 30%, ${SS_TOKENS.alert} 130%)`,
+        background: `radial-gradient(circle at 50% 50%, transparent 30%, ${color} 130%)`,
         animation: "ss-proximity-flash 1.8s ease-in-out infinite",
         zIndex: 49,
       }}

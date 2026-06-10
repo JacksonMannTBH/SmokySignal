@@ -314,8 +314,8 @@ tradeoff conversation. New infra OK if it's commodity.
   scale.
 - **Brand tension:** none.
 - **Dependencies:** decide provider (NOAA NWS API is free but US-gov
-  reliability is what it is; OpenWeather has a free tier; MapTiler offers
-  weather tiles for an extra fee).
+  reliability is what it is; OpenWeather has a free tier; OpenFreeMap
+  does not include weather tiles).
 - **Status:** ready to design.
 
 ### NX3. Apple Wallet "Smokey status" pass
@@ -429,7 +429,7 @@ tradeoff conversation. New infra OK if it's commodity.
   (custom corridor alerts, longer flight-history retention, or
   early access to new regions). NO ACCOUNTS — Stripe Customer ID
   in localStorage; rider can restore by entering their email.
-- **Why it matters:** Cost ceiling rising as data + Vercel + MapTiler
+- **Why it matters:** Cost ceiling rising as data + Vercel + push
   usage grows. Even token monetization changes the math from "Alex
   eating cost forever" to "self-sustaining."
 - **Effort:** M — Stripe integration well-trodden; the harder
@@ -557,7 +557,7 @@ tradeoff is worth surfacing. Native shells, federation, paid tiers.
   ($5/$10/$25 buttons) or a recurring $3/mo "Smokey Plus" tier with a
   small non-feature perk (custom corridor alerts, longer history retention,
   first-in-line for new regions).
-- **Why it matters:** Hosting + MapTiler + push aren't free. Even token
+- **Why it matters:** Hosting + push aren't free. Even token
   monetization changes the math from "Alex eating cost forever" to
   "self-sustaining."
 - **Effort:** M — Stripe integration is well-trodden; the harder question
@@ -591,19 +591,20 @@ tradeoff is worth surfacing. Native shells, federation, paid tiers.
 PROMOTED to NX8 in P10. See Tier 2.
 
 ### L8. PMTiles self-hosting
-- **Description:** Replace MapTiler-served vector tiles with self-hosted
-  PMTiles for the Puget Sound region. Drops the MapTiler API dependency
-  and the per-month tile cost ceiling.
-- **Why it matters:** MapTiler is currently free at our usage but a 10x
-  spike (e.g. featured on a moto blog) would hit a paywall. Self-hosting
-  on Vercel Blob is one-time work + indefinite control.
+- **Description:** Replace public OpenFreeMap vector tiles with self-hosted
+  PMTiles for the Puget Sound region. Drops the public tile dependency
+  while keeping the same MapLibre rendering path.
+- **Why it matters:** OpenFreeMap has no key gate or view cap, but a public
+  endpoint is still an external dependency. Self-hosting on Vercel Blob is
+  one-time work + indefinite control.
 - **Effort:** L — generate the tile bundle, host it, switch the map
   source.
 - **Risk:** med — if PMTiles serving is slow on Vercel Blob, the radar gets
   worse.
 - **Brand tension:** none.
 - **Dependencies:** none.
-- **Status:** preemptive; ship if usage approaches the MapTiler free tier.
+- **Status:** preemptive; ship if the public tile endpoint becomes a real
+  reliability constraint.
 
 ## Tier 4 — Maybe-Never (deliberate rejections)
 

@@ -1,4 +1,4 @@
-// SmokySignal service worker. Web Push only — caching is out of scope here
+// Out Of Sight service worker. Web Push only — caching is out of scope here
 // (we lean on Vercel's edge cache for static assets). Keep this file tiny so
 // installed PWAs update fast.
 
@@ -12,11 +12,11 @@ self.addEventListener("push", (event) => {
   } catch (_) {
     payload = {};
   }
-  const title = payload.title || "Smokey";
+  const title = payload.title || "Out Of Sight";
   const options = {
     body: payload.body || "",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/favicon-96.png",
+    icon: "/icons/washington-eye-logo.svg",
+    badge: "/icons/favicon.svg",
     tag: payload.tag || "smokey",
     renotify: false,
     data: payload.data || {},

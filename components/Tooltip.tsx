@@ -64,7 +64,7 @@ export function Tooltip({
             border: `.5px solid ${SS_TOKENS.hairline2}`,
             boxShadow:
               "0 6px 20px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.30)",
-            fontFamily: "var(--font-inter)",
+            fontFamily: "var(--font-brand)",
             fontSize: 12,
             fontWeight: 500,
             lineHeight: 1.4,

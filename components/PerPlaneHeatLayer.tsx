@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl, { Map as MaplibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_STYLE_URL } from "@/lib/map-style";
 import { SS_TOKENS } from "@/lib/tokens";
 import type { HotZone } from "@/lib/hotzones";
 
@@ -51,12 +52,10 @@ export default function PerPlaneHeatLayer({ tail }: { tail: string }) {
   useEffect(() => {
     if (state.kind !== "ready" || state.zones.length === 0) return;
     if (!containerRef.current) return;
-    const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-    if (!key) return;
     const zones = state.zones;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${key}`,
+      style: MAP_STYLE_URL,
       center: PUGET_SOUND,
       zoom: DEFAULT_ZOOM,
       attributionControl: { compact: true },

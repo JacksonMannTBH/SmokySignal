@@ -12,10 +12,13 @@ export function Card({ children, padded = true, raised = false, style }: Props) 
   return (
     <div
       style={{
-        background: raised ? SS_TOKENS.bg2 : SS_TOKENS.bg1,
+        background: raised ? SS_TOKENS.bg2 : SS_TOKENS.surface,
         border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: 14,
-        padding: padded ? 14 : 0,
+        borderRadius: raised ? 24 : 20,
+        boxShadow: raised ? SS_TOKENS.shadowMd : SS_TOKENS.shadowSm,
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
+        padding: padded ? 16 : 0,
         ...style,
       }}
     >

@@ -1,8 +1,6 @@
 // Generates a 1200×630 social-share card for /flight/[tail]/[flightId].
-// Uses MapTiler Static Maps to render the polyline as the background;
-// Next.js ImageResponse overlays the tail/nickname/date/duration. If the
-// flight or MapTiler key is missing, falls back to a plain dark card so
-// share previews never 500.
+// Draws the flight polyline directly into the ImageResponse so share
+// previews do not depend on a third-party static map image service.
 //
 // TZ NOTE: dates render in PT and are labelled "PT". OG images are
 // rendered once per flight share URL on the server and embedded in
@@ -19,14 +17,15 @@ import { fmtDurationHuman, formatTs } from "@/lib/time";
 export const runtime = "nodejs";
 export const contentType = "image/png";
 export const size = { width: 1200, height: 630 };
-export const alt = "SmokySignal flight track";
+export const alt = "Out Of Sight flight track";
 
 const SS_BG = "#0b0d10";
 const SS_FG = "#eef0f3";
 const SS_FG2 = "#a8adb6";
-const SS_ALERT = "#f5b840";
+const SS_ALERT = "#f4c430";
 
-const MAX_PATH_POINTS = 200; // MapTiler URL length cap
+const MAX_PATH_POINTS = 200;
+const TRACK_PAD = 80;
 
 type Props = { params: { tail: string; flightId: string } };
 
@@ -38,10 +37,9 @@ export default async function OGImage({ params }: Props) {
     ? await getFlightById(tail, entry.nickname, params.flightId)
     : null;
 
-  const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-  const staticMapUrl =
-    key && flight && flight.points.length >= 2
-      ? buildStaticMapUrl(flight.points, key)
+  const trackArt =
+    flight && flight.points.length >= 2
+      ? buildTrackArt(flight.points)
       : null;
 
   const title = entry
@@ -66,20 +64,50 @@ export default async function OGImage({ params }: Props) {
           position: "relative",
         }}
       >
-        {staticMapUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={staticMapUrl}
-            alt=""
-            width={1200}
-            height={630}
+        {trackArt && (
+          <svg
+            width={size.width}
+            height={size.height}
+            viewBox={`0 0 ${size.width} ${size.height}`}
             style={{
               position: "absolute",
               inset: 0,
-              objectFit: "cover",
-              opacity: 0.85,
+              opacity: 0.9,
             }}
-          />
+          >
+            <path
+              d={trackArt.path}
+              fill="none"
+              stroke="rgba(245,184,64,0.22)"
+              strokeWidth="22"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d={trackArt.path}
+              fill="none"
+              stroke={SS_ALERT}
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle
+              cx={trackArt.start[0]}
+              cy={trackArt.start[1]}
+              r="10"
+              fill="#5DD9A7"
+              stroke={SS_BG}
+              strokeWidth="4"
+            />
+            <circle
+              cx={trackArt.end[0]}
+              cy={trackArt.end[1]}
+              r="11"
+              fill={SS_ALERT}
+              stroke={SS_BG}
+              strokeWidth="4"
+            />
+          </svg>
         )}
         <div
           style={{
@@ -165,26 +193,65 @@ export default async function OGImage({ params }: Props) {
   );
 }
 
-function buildStaticMapUrl(
-  points: { lat: number; lon: number }[],
-  key: string,
-): string {
-  // Downsample to MAX_PATH_POINTS to stay under MapTiler URL length limits.
+type TrackArt = {
+  path: string;
+  start: [number, number];
+  end: [number, number];
+};
+
+function buildTrackArt(points: { lat: number; lon: number }[]): TrackArt | null {
   const stride = Math.max(1, Math.ceil(points.length / MAX_PATH_POINTS));
-  const sampled: string[] = [];
+  const sampled: { lat: number; lon: number }[] = [];
   for (let i = 0; i < points.length; i += stride) {
-    const p = points[i]!;
-    sampled.push(`${p.lat.toFixed(5)},${p.lon.toFixed(5)}`);
+    sampled.push(points[i]!);
   }
-  if (
-    points.length > 0 &&
-    sampled[sampled.length - 1] !==
-      `${points[points.length - 1]!.lat.toFixed(5)},${points[points.length - 1]!.lon.toFixed(5)}`
-  ) {
+  if (points.length > 0 && sampled[sampled.length - 1] !== points[points.length - 1]) {
     const last = points[points.length - 1]!;
-    sampled.push(`${last.lat.toFixed(5)},${last.lon.toFixed(5)}`);
+    sampled.push(last);
   }
-  const path = `path=fill:transparent|stroke:${encodeURIComponent("#F5B840")}|width:5|${sampled.join("|")}`;
-  return `https://api.maptiler.com/maps/streets-v2-dark/static/auto/1200x630.png?${path}&key=${key}`;
+  const projected = sampled.map((p) => ({
+    x: p.lon,
+    y: mercatorY(p.lat),
+  }));
+  const xs = projected.map((p) => p.x);
+  const ys = projected.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const spanX = maxX - minX;
+  const spanY = maxY - minY;
+  if (spanX === 0 && spanY === 0) return null;
+
+  const availableW = size.width - TRACK_PAD * 2;
+  const availableH = size.height - TRACK_PAD * 2;
+  const scale = Math.min(
+    spanX > 0 ? availableW / spanX : Number.POSITIVE_INFINITY,
+    spanY > 0 ? availableH / spanY : Number.POSITIVE_INFINITY,
+  );
+  if (!Number.isFinite(scale) || scale <= 0) return null;
+
+  const drawnW = spanX * scale;
+  const drawnH = spanY * scale;
+  const left = (size.width - drawnW) / 2;
+  const top = (size.height - drawnH) / 2;
+  const screen = projected.map<[number, number]>((p) => [
+    left + (p.x - minX) * scale,
+    top + (maxY - p.y) * scale,
+  ]);
+  const path = screen
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(" ");
+  return {
+    path,
+    start: screen[0]!,
+    end: screen[screen.length - 1]!,
+  };
+}
+
+function mercatorY(lat: number): number {
+  const clamped = Math.max(-85, Math.min(85, lat));
+  const rad = (clamped * Math.PI) / 180;
+  return Math.log(Math.tan(Math.PI / 4 + rad / 2));
 }
 

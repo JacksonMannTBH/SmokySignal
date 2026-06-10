@@ -186,10 +186,10 @@ export async function showLocalTestNotification(): Promise<boolean> {
     const reg = await navigator.serviceWorker.getRegistration();
     if (!reg) return false;
     if (Notification.permission !== "granted") return false;
-    await reg.showNotification("Smokey · test", {
+    await reg.showNotification("Out Of Sight · test", {
       body: "Channel 19. Test ping. 10-4.",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/favicon-96.png",
+      icon: "/icons/washington-eye-logo.svg",
+      badge: "/icons/favicon.svg",
       tag: "smokey-test",
       data: { url: "/settings/alerts" },
     });

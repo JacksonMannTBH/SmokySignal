@@ -1,6 +1,6 @@
 "use client";
 
-// Radar filter panel — extracted from HotZoneLayer.tsx in P16 Phase 3.
+// Radar filter panel.
 // Lives in its own file so other surfaces (future weather toggle,
 // time-scrubber settings) can mount alongside the existing radar
 // filters without bloating the heatmap layer module.
@@ -9,7 +9,7 @@
 //   Categories — Smokey / Search & Rescue / Transport buckets
 //   Operators  — multi-select chips per registry operator
 //   Tails      — typeahead + chip set, follow a single tail
-//   Layers     — Hot zones / Flight paths toggles inside the panel
+//   Layers     — Flight paths toggle inside the panel
 //
 // The pre-P19 Quick filter row (All / Smokey / Operator) duplicated
 // the rider buckets in Categories and the multi-select chips in
@@ -44,8 +44,6 @@ type Props = {
   filter: Filter;
   onChange: (f: Filter) => void;
   onClose: () => void;
-  hotZonesEnabled: boolean;
-  onToggleHotZones: () => void;
   flightPathsEnabled: boolean;
   onToggleFlightPaths: () => void;
 };
@@ -55,8 +53,6 @@ export function FilterPanel({
   filter,
   onChange,
   onClose,
-  hotZonesEnabled,
-  onToggleHotZones,
   flightPathsEnabled,
   onToggleFlightPaths,
 }: Props) {
@@ -97,12 +93,13 @@ export function FilterPanel({
         maxWidth: "calc(100vw - 24px)",
         maxHeight: "60vh",
         overflowY: "auto",
-        padding: "12px 14px",
-        borderRadius: 14,
-        background: "rgba(11,13,16,0.92)",
+        padding: "14px",
+        borderRadius: 24,
+        background: "rgba(255,255,255,0.9)",
         border: `.5px solid ${SS_TOKENS.hairline2}`,
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
+        boxShadow: SS_TOKENS.shadowLg,
+        backdropFilter: "blur(24px) saturate(1.12)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.12)",
         color: SS_TOKENS.fg0,
         display: "flex",
         flexDirection: "column",
@@ -117,8 +114,7 @@ export function FilterPanel({
         }}
       >
         <span
-          className="ss-mono"
-          style={{ fontSize: 11, color: SS_TOKENS.fg2, letterSpacing: ".1em" }}
+          style={{ fontSize: 13, fontWeight: 800, color: SS_TOKENS.fg0 }}
         >
           FILTERS
         </span>
@@ -127,7 +123,7 @@ export function FilterPanel({
           onClick={onClose}
           aria-label="Close filter panel"
           style={{
-            background: "transparent",
+            background: "rgba(245,247,246,0.76)",
             border: 0,
             color: SS_TOKENS.fg2,
             cursor: "pointer",
@@ -172,9 +168,6 @@ export function FilterPanel({
       />
 
       <Group label="Layers">
-        <Pill active={hotZonesEnabled} onClick={onToggleHotZones}>
-          Hot zones
-        </Pill>
         <Pill active={flightPathsEnabled} onClick={onToggleFlightPaths}>
           Flight paths
         </Pill>
@@ -234,12 +227,12 @@ function TailGroup({
         spellCheck={false}
         className="ss-mono"
         style={{
-          background: SS_TOKENS.bg2,
+          background: "rgba(245,247,246,0.92)",
           border: `.5px solid ${SS_TOKENS.hairline2}`,
           color: SS_TOKENS.fg0,
           fontSize: 12,
           padding: "6px 8px",
-          borderRadius: 8,
+          borderRadius: 14,
           outline: "none",
         }}
       />
@@ -256,9 +249,9 @@ function TailGroup({
               className="ss-mono"
               style={{
                 textAlign: "left",
-                background: "transparent",
+                background: "rgba(255,255,255,0.82)",
                 border: `.5px solid ${SS_TOKENS.hairline2}`,
-                borderRadius: 6,
+                borderRadius: 12,
                 padding: "5px 8px",
                 color: SS_TOKENS.fg1,
                 fontSize: 11,
@@ -288,9 +281,9 @@ function TailGroup({
               style={{
                 padding: "5px 8px 5px 10px",
                 borderRadius: 999,
-                background: SS_TOKENS.alert,
-                border: `.5px solid ${SS_TOKENS.alert}`,
-                color: SS_TOKENS.bg0,
+                background: SS_TOKENS.alertDim,
+                border: `.5px solid rgba(244,196,48,0.42)`,
+                color: SS_TOKENS.alert,
                 fontSize: 10.5,
                 letterSpacing: ".04em",
                 cursor: "pointer",
@@ -323,8 +316,7 @@ function Group({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <span
-        className="ss-mono"
-        style={{ fontSize: 9.5, color: SS_TOKENS.fg2, letterSpacing: ".1em" }}
+        style={{ fontSize: 11, color: SS_TOKENS.fg2, fontWeight: 700 }}
       >
         {label}
       </span>
@@ -347,15 +339,14 @@ function Pill({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className="ss-mono"
       style={{
-        padding: "5px 10px",
+        padding: "7px 11px",
         borderRadius: 999,
-        background: active ? SS_TOKENS.alert : "transparent",
-        border: `.5px solid ${active ? SS_TOKENS.alert : SS_TOKENS.hairline2}`,
-        color: active ? SS_TOKENS.bg0 : SS_TOKENS.fg1,
-        fontSize: 10.5,
-        letterSpacing: ".04em",
+        background: active ? SS_TOKENS.skyDim : "rgba(245,247,246,0.84)",
+        border: `.5px solid ${active ? "rgba(244,196,48,0.42)" : SS_TOKENS.hairline2}`,
+        color: active ? SS_TOKENS.sky : SS_TOKENS.fg1,
+        fontSize: 12,
+        fontWeight: 700,
         cursor: "pointer",
         touchAction: "manipulation",
         WebkitTapHighlightColor: "transparent",

@@ -17,7 +17,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "SmokySignal · Forecast",
+  title: "Out Of Sight · Forecast",
   description: "Weekly probability of fleet takeoffs by hour and day.",
 };
 
@@ -69,7 +69,7 @@ export default async function ForecastPage({
           gap: 12,
         }}
       >
-        <span className="ss-eyebrow">SmokySignal · Forecast</span>
+        <span className="ss-eyebrow">Out Of Sight · Forecast</span>
         <Link
           href="/"
           className="ss-mono"

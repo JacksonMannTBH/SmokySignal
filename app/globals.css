@@ -3,27 +3,38 @@
 @tailwind utilities;
 
 :root {
-  --ss-bg0: #0B0D10;
-  --ss-bg1: #15181D;
-  --ss-bg2: #1E2229;
-  --ss-bg3: #1E2229;
-  --ss-fg0: #F2F4F7;
-  --ss-fg1: #A8AEB8;
-  --ss-fg2: #82899A;
-  --ss-fg3: #3f4651;
+  --font-brand: "Math Bold", "Cambria Math", "STIX Two Math", "Noto Sans Math", "Times New Roman", serif;
+  --font-mono: var(--font-brand);
+  --ss-bg0: #ffffff;
+  --ss-bg1: rgba(255, 255, 255, 0.94);
+  --ss-bg2: rgba(244, 196, 48, 0.12);
+  --ss-bg3: rgba(244, 196, 48, 0.20);
+  --ss-surface: rgba(255, 255, 255, 0.96);
+  --ss-surface-translucent: rgba(255, 255, 255, 0.82);
+  --ss-fg0: #050505;
+  --ss-fg1: #2a2a2a;
+  --ss-fg2: #5c5642;
+  --ss-fg3: #8b846b;
   /* SEMANTIC: speed-enforcement plane up. Matches the icon files in
-     Design/ — alert orange is amber #f5b840, not BRAND.md's #FF7A1A.
+     Design/ - alert saffron is #f4c430.
      #FF7A1A is reserved as --ss-warn for future speed-warning UX. */
-  --ss-alert: #f5b840;
-  --ss-alert-dim: rgba(245, 184, 64, 0.13);
-  --ss-warn: #FF7A1A;
-  --ss-warn-dim: rgba(255, 122, 26, 0.13);
-  --ss-clear: #5DD9A7;
-  --ss-clear-dim: rgba(93, 217, 167, 0.13);
-  --ss-sky: #5BB6FF;
-  --ss-sky-dim: rgba(91, 182, 255, 0.13);
-  --ss-hairline: rgba(255, 255, 255, 0.06);
-  --ss-hairline-2: rgba(255, 255, 255, 0.10);
+  --ss-alert: #f4c430;
+  --ss-alert-dim: rgba(244, 196, 48, 0.18);
+  --ss-warn: #d79b00;
+  --ss-warn-dim: rgba(215, 155, 0, 0.16);
+  --ss-clear: #050505;
+  --ss-clear-dim: rgba(5, 5, 5, 0.10);
+  --ss-sky: #050505;
+  --ss-sky-dim: rgba(5, 5, 5, 0.10);
+  --ss-hairline: rgba(5, 5, 5, 0.12);
+  --ss-hairline-2: rgba(5, 5, 5, 0.22);
+  --ss-shadow-sm: 0 4px 14px rgba(5, 5, 5, 0.08);
+  --ss-shadow-md: 0 12px 34px rgba(5, 5, 5, 0.13);
+  --ss-shadow-lg: 0 22px 60px rgba(5, 5, 5, 0.18);
+  --ss-radius-sm: 10px;
+  --ss-radius-md: 16px;
+  --ss-radius-lg: 22px;
+  --ss-radius-xl: 28px;
 }
 
 /* High-contrast variant — stays dark, lifts secondary text + hairline
@@ -31,37 +42,39 @@
    conditions. Brand alert/clear/sky/warn semantic colors NOT changed —
    they're the same hue everyone learns to recognize on the radar. */
 body[data-contrast="high"] {
-  --ss-fg1: #D0D5DD;
-  --ss-fg2: #B0B7C2;
-  --ss-fg3: #6B7380;
-  --ss-hairline: rgba(255, 255, 255, 0.14);
-  --ss-hairline-2: rgba(255, 255, 255, 0.22);
+  --ss-fg1: #111111;
+  --ss-fg2: #262626;
+  --ss-fg3: #47402b;
+  --ss-hairline: rgba(5, 5, 5, 0.24);
+  --ss-hairline-2: rgba(5, 5, 5, 0.36);
 }
 
 html,
 body {
-  background: var(--ss-bg0);
+  background: #ffffff;
   color: var(--ss-fg0);
 }
 
 body {
-  font-family: var(--font-inter), Inter, -apple-system, "SF Pro Text", system-ui, sans-serif;
+  font-family: var(--font-brand);
+  font-weight: 700;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 .ss-mono {
-  font-family: var(--font-mono), "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--font-brand);
   font-feature-settings: "zero", "ss20", "cv01", "tnum";
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .ss-eyebrow {
-  font-family: var(--font-mono), "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-family: var(--font-brand);
   font-feature-settings: "zero";
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  font-weight: 700;
   color: var(--ss-fg2);
 }
 
@@ -123,9 +136,9 @@ body {
   outline: none;
 }
 :focus-visible {
-  outline: 2px solid var(--ss-alert);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 3px solid rgba(244, 196, 48, 0.55);
+  outline-offset: 3px;
+  border-radius: var(--ss-radius-sm);
 }
 
 /* Skip-to-main-content link — invisible until keyboard-focused, then
@@ -137,13 +150,13 @@ body {
   left: 8px;
   padding: 8px 14px;
   z-index: 100;
-  background: var(--ss-bg1);
+  background: var(--ss-surface);
   color: var(--ss-fg0);
   border: 0.5px solid var(--ss-hairline-2);
-  border-radius: 6px;
-  font-family: var(--font-mono);
+  border-radius: 999px;
+  box-shadow: var(--ss-shadow-sm);
+  font-family: inherit;
   font-size: 12px;
-  letter-spacing: 0.04em;
   text-decoration: none;
   /* Off-screen but still focusable */
   transform: translateY(-200%);
@@ -152,6 +165,33 @@ body {
 .ss-skip-link:focus,
 .ss-skip-link:focus-visible {
   transform: translateY(0);
+}
+
+a,
+button {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+button:active,
+a:active {
+  transform: translateY(1px);
+}
+
+.maplibregl-ctrl-attrib {
+  border-radius: 999px 0 0 0;
+  background: rgba(255, 255, 255, 0.74) !important;
+  color: var(--ss-fg1) !important;
+  backdrop-filter: blur(18px);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--ss-fg0) !important;
 }
 
 /* Responsive page-width container — mobile-first 460 px column that

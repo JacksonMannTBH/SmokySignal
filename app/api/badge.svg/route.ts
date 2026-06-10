@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 const FG = "#F2F4F7";
 const BG = "#15181D";
 const STROKE = "#262B33";
-const ALERT = "#f5b840";
+const ALERT = "#f4c430";
 const CLEAR = "#5DD9A7";
 const STALE = "#6B7380";
 
@@ -55,12 +55,12 @@ export async function GET() {
 
   const W = 140;
   const H = 24;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="SmokySignal status: ${escape(label)}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Out Of Sight status: ${escape(label)}">
   <rect x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="11.5" ry="11.5" fill="${BG}" stroke="${STROKE}" />
   <circle cx="12" cy="12" r="3.4" fill="${dot}">
     <animate attributeName="opacity" values="1;0.45;1" dur="1.6s" repeatCount="indefinite" />
   </circle>
-  <text x="22" y="16" font-family="JetBrains Mono, ui-monospace, Menlo, monospace" font-size="10.5" font-weight="600" fill="${FG}" letter-spacing="0.04em">${escape(label)}</text>
+  <text x="22" y="16" font-family="Math Bold, Cambria Math, STIX Two Math, serif" font-size="10.5" font-weight="700" fill="${FG}" letter-spacing="0">${escape(label)}</text>
 </svg>`;
 
   return new Response(svg, {

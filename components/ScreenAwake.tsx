@@ -122,7 +122,7 @@ export function ScreenAwake() {
       align="end"
       content={
         lit
-          ? "Wake lock on — your phone won't sleep while SmokySignal is open."
+          ? "Wake lock on — your phone won't sleep while Out Of Sight is open."
           : "Wake lock off — phone sleeps normally. Tap to enable."
       }
     >
@@ -163,11 +163,12 @@ export function ScreenAwake() {
             width: 32,
             height: 32,
             borderRadius: "50%",
-            background: lit ? "rgba(245,184,64,0.12)" : "rgba(11,13,16,0.55)",
+            background: lit ? "rgba(255,247,235,0.88)" : "rgba(255,255,255,0.84)",
             border: `.5px solid ${lit ? `${SS_TOKENS.alert}55` : SS_TOKENS.hairline}`,
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            transition: "background 200ms, border-color 200ms",
+            boxShadow: SS_TOKENS.shadowSm,
+            backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
+            transition: "background 200ms, border-color 200ms, box-shadow 200ms",
           }}
         >
           <MoonStateIcon lit={lit} />

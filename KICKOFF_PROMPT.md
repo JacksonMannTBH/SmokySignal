@@ -50,7 +50,7 @@ The README mentions a few things I haven't fully decided. Ask me about:
 
 - The exact ICAO24 hexes for each tail (or whether you should compute them from the N-number using the FAA algorithm — that's fine).
 - Admin passcode for the tail editor (a single env var is fine for v1).
-- MapTiler API key — I'll provide.
+- Optional `NEXT_PUBLIC_MAP_STYLE_URL` only if we need to test a self-hosted OpenFreeMap style.
 - Whether to include any tails beyond the seed list before v1 launch.
 
 Go.

@@ -1,28 +1,18 @@
 "use client";
 
 // Reads /api/predict on mount and renders the top likely-sweep window
-// derived from accumulated activity events. Renders the canonical
-// LearningPanel whenever we're inside the 30-day learning window OR
-// the predictor returned too few events for a useful forecast.
+// derived from accumulated activity events. Home stays quiet while the
+// predictor is still learning; /forecast owns the detailed learning copy.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "./Card";
-import { LearningPanel } from "./LearningPanel";
 import { SS_TOKENS } from "@/lib/tokens";
 import type { PredictorOutput, PredictionWindow } from "@/lib/predictor";
-import { LEARNING_THRESHOLD_DAYS, type LearningState } from "@/lib/learning";
+import type { LearningState } from "@/lib/learning";
 import { formatTs, formatTsBare } from "@/lib/time";
 
 const MIN_TOTAL_EVENTS_FOR_PREDICTION = 10;
-
-const FALLBACK_LEARNING: LearningState = {
-  firstSampleIso: null,
-  daysElapsed: 0,
-  daysRemaining: LEARNING_THRESHOLD_DAYS,
-  progress: 0,
-  stillLearning: true,
-};
 
 export function PredictionCard({
   learning,
@@ -56,18 +46,7 @@ export function PredictionCard({
 
   const tooFew = data.total_events < MIN_TOTAL_EVENTS_FOR_PREDICTION;
   const top = data.windows[0];
-  // Show the learning panel whenever we're inside the 30-day window OR
-  // the predictor doesn't have enough data yet. Past the threshold + with
-  // enough events, the regular forecast card takes over.
-  if (learning?.stillLearning || tooFew || !top) {
-    return (
-      <LearningPanel
-        state={learning ?? FALLBACK_LEARNING}
-        eventsSeen={data.total_events}
-        variant="card"
-      />
-    );
-  }
+  if (learning?.stillLearning || tooFew || !top) return null;
 
   return (
     <Card>

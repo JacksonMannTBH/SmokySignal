@@ -8,6 +8,7 @@ import { SS_TOKENS } from "@/lib/tokens";
 import { SMOKY_TAIL } from "@/lib/seed";
 import { DEFAULT_SPEED_LIMIT_MPH, haversineNm } from "@/lib/geo";
 import { evaluateWarning } from "@/lib/speed-warning";
+import { proximityBandForDistance } from "@/lib/proximity-alert";
 import { fmtAgoTs } from "@/lib/time";
 import type { HotZone } from "@/lib/hotzones";
 import { StatusPill } from "./StatusPill";
@@ -22,6 +23,7 @@ const NEAR_NM = 5;
 // Top-N airborne planes to surface in the watcher list. Three is enough
 // to convey crowdedness without dominating the screen.
 const NEAREST_LIST_LIMIT = 3;
+type WatcherEntry = { plane: Aircraft; distanceNm: number | null };
 
 type Props = {
   initial: Snapshot;
@@ -34,20 +36,24 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
   const { pos } = useRiderPos();
   const [activity, setActivity] = useState<ActivityEntry[]>(initialActivity);
 
-  const smoky = snap.aircraft.find((a) => a.tail === SMOKY_TAIL);
-  const up = Boolean(smoky?.airborne);
   const airborne = useMemo(
     () => snap.aircraft.filter((a) => a.airborne),
     [snap.aircraft],
   );
+  const smoky = snap.aircraft.find((a) => a.tail === SMOKY_TAIL);
+  const smokyUp = Boolean(smoky?.airborne);
+  const up = airborne.length > 0;
 
   // Top-N airborne planes by Haversine distance — sorted ascending so
   // nearestList[0] is the single closest. Drives both the watcher list
   // and the proximity-flash trigger.
-  const nearestList = useMemo<
-    Array<{ plane: Aircraft; distanceNm: number }>
-  >(() => {
-    if (!pos) return [];
+  const watcherList = useMemo<WatcherEntry[]>(() => {
+    if (!pos) {
+      return airborne.slice(0, NEAREST_LIST_LIMIT).map((plane) => ({
+        plane,
+        distanceNm: null,
+      }));
+    }
     const ranked: Array<{ plane: Aircraft; distanceNm: number }> = [];
     for (const a of airborne) {
       if (a.lat == null || a.lon == null) continue;
@@ -59,7 +65,10 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
     ranked.sort((x, y) => x.distanceNm - y.distanceNm);
     return ranked.slice(0, NEAREST_LIST_LIMIT);
   }, [pos, airborne]);
-  const nearest = nearestList[0] ?? null;
+  const nearest = watcherList.find((entry) => entry.distanceNm != null) ?? null;
+  const nearestBand = nearest?.distanceNm != null
+    ? proximityBandForDistance(nearest.distanceNm)
+    : null;
 
   // N1a dry-run logging: fetch hot zones once on mount, then on each
   // rider geolocation tick + airborne refresh, evaluate the warning
@@ -98,7 +107,7 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
       airborneAircraft: airborne,
     });
     if (!result.wouldFire) return;
-    const nearestTail = nearestList[0]?.plane.tail ?? null;
+    const nearestTail = nearest?.plane.tail ?? null;
     console.log("[dryrun]", result.reason);
     void fetch("/api/dryrun-warnings", {
       method: "POST",
@@ -118,7 +127,7 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
     }).catch(() => {
       // best-effort; transient network errors don't matter for dry-run
     });
-  }, [pos, hotZones, airborne, nearestList]);
+  }, [pos, hotZones, airborne, nearest]);
 
   // Poll /api/activity every 10s.
   useEffect(() => {
@@ -169,7 +178,7 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
           marginTop: 4,
         }}
       >
-        <span className="ss-eyebrow">SmokySignal · Dash</span>
+        <span className="ss-eyebrow">Out Of Sight · Dash</span>
         <StatusPill
           kind={up ? "alert" : "clear"}
           label={up ? "BIRD UP" : "ALL CLEAR"}
@@ -178,9 +187,10 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
       </header>
 
       <NearestCard
-        nearestList={nearestList}
+        watcherList={watcherList}
         riderHasFix={Boolean(pos)}
-        smokyUp={up}
+        smokyUp={smokyUp}
+        airborneCount={airborne.length}
       />
 
       <ContextLine
@@ -195,34 +205,44 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
       <ProximityFlash
         active={
           nearest != null &&
+          nearest.distanceNm != null &&
           nearest.distanceNm <= NEAR_NM &&
           (nearest.plane.role === "smokey" || nearest.plane.role === "patrol")
         }
+        color={nearestBand?.color}
       />
     </main>
   );
 }
 
 function NearestCard({
-  nearestList,
+  watcherList,
   riderHasFix,
   smokyUp,
+  airborneCount,
 }: {
-  nearestList: Array<{ plane: Aircraft; distanceNm: number }>;
+  watcherList: WatcherEntry[];
   riderHasFix: boolean;
   smokyUp: boolean;
+  airborneCount: number;
 }) {
   return (
     <Card padded={false}>
       <div style={{ padding: "12px 14px 8px" }}>
-        <span className="ss-eyebrow">Nearest watchers</span>
+        <span className="ss-eyebrow">
+          {riderHasFix ? "Nearest watchers" : "Airborne now"}
+        </span>
       </div>
-      {nearestList.length > 0 ? (
-        nearestList.map((entry, i) => (
+      {watcherList.length > 0 ? (
+        watcherList.map((entry, i) => (
           <NearestRow key={entry.plane.tail} entry={entry} primary={i === 0} />
         ))
       ) : (
-        <NearestEmpty riderHasFix={riderHasFix} smokyUp={smokyUp} />
+        <NearestEmpty
+          riderHasFix={riderHasFix}
+          smokyUp={smokyUp}
+          airborneCount={airborneCount}
+        />
       )}
     </Card>
   );
@@ -232,10 +252,10 @@ function NearestRow({
   entry,
   primary,
 }: {
-  entry: { plane: Aircraft; distanceNm: number };
+  entry: WatcherEntry;
   primary: boolean;
 }) {
-  const inRange = entry.distanceNm <= NEAR_NM;
+  const inRange = entry.distanceNm != null && entry.distanceNm <= NEAR_NM;
   return (
     <Link
       href={`/plane/${entry.plane.tail}`}
@@ -289,7 +309,7 @@ function NearestRow({
           color: inRange ? SS_TOKENS.alert : SS_TOKENS.fg1,
         }}
       >
-        {entry.distanceNm.toFixed(1)} nm
+        {entry.distanceNm == null ? "LIVE" : `${entry.distanceNm.toFixed(1)} nm`}
       </span>
     </Link>
   );
@@ -298,14 +318,23 @@ function NearestRow({
 function NearestEmpty({
   riderHasFix,
   smokyUp,
+  airborneCount,
 }: {
   riderHasFix: boolean;
   smokyUp: boolean;
+  airborneCount: number;
 }) {
   const baseStyle: React.CSSProperties = {
     padding: "12px 14px 16px",
     borderTop: `.5px solid ${SS_TOKENS.hairline}`,
   };
+  if (!riderHasFix && airborneCount > 0) {
+    return (
+      <div style={{ ...baseStyle, fontSize: 13, color: SS_TOKENS.fg2 }}>
+        Aircraft are live. Grant location to sort them by distance.
+      </div>
+    );
+  }
   if (!riderHasFix) {
     return (
       <div style={{ ...baseStyle, fontSize: 13, color: SS_TOKENS.fg2 }}>
@@ -345,16 +374,16 @@ function ContextLine({
   nearest,
 }: {
   airborneCount: number;
-  nearest: { plane: Aircraft; distanceNm: number } | null;
+  nearest: WatcherEntry | null;
 }) {
   let text: string;
   let color: string;
-  if (nearest && nearest.distanceNm <= NEAR_NM) {
+  if (nearest?.distanceNm != null && nearest.distanceNm <= NEAR_NM) {
     const display = nearest.plane.nickname || nearest.plane.tail;
     text = `Heads up · ${display} ${nearest.distanceNm.toFixed(1)}nm away`;
     color = SS_TOKENS.warn;
   } else if (airborneCount > 0) {
-    text = "Smokey up but not nearby";
+    text = "Bird up but not nearby";
     color = SS_TOKENS.fg1;
   } else {
     text = "Clear skies";

@@ -129,7 +129,7 @@ export function Glanceable({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
           marginTop: 4,
           // Reserve room for the fixed wake-lock + help buttons (right:6
           // and right:50 each 44px hit area) so the source line never
@@ -149,12 +149,12 @@ export function Glanceable({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap: 10,
             minWidth: 0,
             flexShrink: 1,
           }}
         >
-          <Logo size={32} wordmark />
+          <Logo size={48} markSize={72} wordmark />
           {/* Removed standalone "LIVE" pill — the "UPDATED Xs · ADSBFI"
               source line on the right already conveys liveness via the
               auto-incrementing seconds counter. The redundant pill cost

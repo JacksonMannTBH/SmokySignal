@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Boot-time env check. Runs before `npm run dev` and `npm run build`.
-// Reads .env.local (if present) and complains about missing keys that
-// matter for local dev. Stays silent when everything is fine.
+// Reads .env.local (if present) and complains about missing optional keys
+// that matter for local dev. Stays silent when everything is fine.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -24,12 +24,7 @@ const WARN = [
 ];
 
 // Keys we BLOCK on (dev/build aborts with a clear error).
-const BLOCK = [
-  [
-    "NEXT_PUBLIC_MAPTILER_KEY",
-    "Required for the radar map to render. Run `npm run env:pull`.",
-  ],
-];
+const BLOCK = [];
 
 function readEnvFile(p) {
   try {
@@ -48,28 +43,25 @@ function readEnvFile(p) {
 // On Vercel / CI there is no .env.local — env vars are injected directly
 // into process.env. Source from there and skip the file-missing nag.
 const isCI = process.env.VERCEL === "1" || process.env.CI === "true";
-const env = isCI ? { ...process.env } : readEnvFile(ENV_LOCAL);
+const env = isCI ? { ...process.env } : (readEnvFile(ENV_LOCAL) ?? {});
 
-if (!env) {
-  console.error(
+if (!isCI && !fs.existsSync(ENV_LOCAL) && !process.env.SS_QUIET_ENV_CHECK) {
+  console.warn(
     [
       "",
       "─── SmokySignal: .env.local missing ─────────────────────────────",
       "",
-      "Local dev needs an .env.local file. Quick fix:",
+      "Local dev will run with fallbacks. To sync production-like values:",
       "",
       "    npm run env:pull",
       "",
-      "That syncs every env var from Vercel's Development scope into",
-      ".env.local (gitignored). One-time setup; rerun whenever Vercel",
-      "env vars change.",
+      "That writes .env.local (gitignored) from Vercel's Development scope.",
       "",
       "Prerequisite: `npx vercel link` against the SmokySignal project.",
       "─────────────────────────────────────────────────────────────────",
       "",
     ].join("\n"),
   );
-  process.exit(1);
 }
 
 const missingBlocking = BLOCK.filter(([k]) => !env[k] || env[k].trim() === "");

@@ -9,7 +9,7 @@
 //   Family B — HELICOPTER → patrol, sar
 //
 // COLOR STRATEGY (rationale doc, design/brand/aircraft-glyphs.md):
-//   alert     (smokey, patrol)    fill #F2F4F7, stroke #f5b840 1.0px
+//   alert     (smokey, patrol)    fill #F2F4F7, stroke #f4c430 1.0px
 //   non-alert (sar, transport)    fill #6B7380, stroke none
 //
 // White fill + amber stroke borrows ATC display convention so alert
@@ -34,13 +34,19 @@ import type { FleetRole } from "@/lib/types";
 
 export const AIRCRAFT_COLORS = {
   ALERT_FILL: "#F2F4F7",
-  ALERT_STROKE: "#f5b840",
+  ALERT_STROKE: "#f4c430",
   MUTED_FILL: "#6B7380",
+  RADAR_FILL: "#f4c430",
+  RADAR_STROKE: "#050505",
+  RADAR_BLIP: "#050505",
 } as const;
 
 const ALERT_FILL = AIRCRAFT_COLORS.ALERT_FILL;
 const ALERT_STROKE = AIRCRAFT_COLORS.ALERT_STROKE;
 const MUTED_FILL = AIRCRAFT_COLORS.MUTED_FILL;
+const RADAR_FILL = AIRCRAFT_COLORS.RADAR_FILL;
+const RADAR_STROKE = AIRCRAFT_COLORS.RADAR_STROKE;
+const RADAR_BLIP = AIRCRAFT_COLORS.RADAR_BLIP;
 
 type GlyphFamily = "plane" | "heli";
 
@@ -97,8 +103,8 @@ function planeBody(fillColor: string, strokeColor: string | null): string {
   `;
 }
 
-function planeBlip(): string {
-  return `<circle cx="12" cy="1.6" r="0.8" fill="${ALERT_STROKE}"/>`;
+function planeBlip(fillColor: string = ALERT_STROKE): string {
+  return `<circle cx="12" cy="1.6" r="0.8" fill="${fillColor}"/>`;
 }
 
 // ── HELICOPTER ────────────────────────────────────────────────────────────
@@ -136,8 +142,8 @@ function heliBody(fillColor: string, strokeColor: string | null): string {
   `;
 }
 
-function heliBlip(): string {
-  return `<circle cx="12" cy="1.4" r="0.8" fill="${ALERT_STROKE}"/>`;
+function heliBlip(fillColor: string = ALERT_STROKE): string {
+  return `<circle cx="12" cy="1.4" r="0.8" fill="${fillColor}"/>`;
 }
 
 export function pathPlaneAlert(): string {
@@ -170,7 +176,7 @@ export function glyphRoleFor(role: FleetRole | undefined | null): GlyphRole {
   return "smokey";
 }
 
-export type AircraftSvgOpts = { size?: number };
+export type AircraftSvgOpts = { size?: number; tone?: "default" | "radar" };
 
 /** SVG markup for the role's glyph at the requested pixel size (default 24). */
 export function aircraftSvg(
@@ -179,6 +185,13 @@ export function aircraftSvg(
 ): string {
   const r = ROLES[glyphRoleFor(role)];
   const size = opts.size ?? 24;
+  if (opts.tone === "radar") {
+    const inner =
+      r.family === "plane"
+        ? planeBody(RADAR_FILL, RADAR_STROKE) + planeBlip(RADAR_BLIP)
+        : heliBody(RADAR_FILL, RADAR_STROKE) + heliBlip(RADAR_BLIP);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" data-role="${role}"><filter id="ss-radar-aircraft-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.1" flood-color="#050908" flood-opacity="0.72"/></filter><g filter="url(#ss-radar-aircraft-shadow)">${inner}</g></svg>`;
+  }
   const inner =
     r.family === "plane"
       ? r.alert

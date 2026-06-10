@@ -71,7 +71,7 @@ once at the start of any meaningful contribution.
 
 **High-fidelity** for visuals, layout, copy, and interaction logic. Final colors, typography, spacing, component composition, and state behavior are all locked. Pixel-match the designs.
 
-The map is **stylized** (hand-drawn SVG of Puget Sound) and is a v1 placeholder — production should swap to MapLibre GL JS with an OSM/MapTiler basemap. All other screens are production-ready visually.
+The production map uses MapLibre GL JS with the OpenFreeMap dark vector basemap. All other screens are production-ready visually.
 
 ---
 
@@ -88,7 +88,7 @@ WSP runs a small fleet of traffic-enforcement Cessnas. The most famous is **Smok
 | Framework | **Next.js 14 App Router** | Vercel-native, RSC for the fleet status, edge for `/api/aircraft` |
 | Hosting | **Vercel** | User explicitly wants this |
 | Storage | **Vercel KV** (Upstash Redis) | 30-day rolling track history, hot-zone heatmap cache |
-| Map | **MapLibre GL JS** + MapTiler streets-v2 (or self-hosted PMTiles) | Free, no Mapbox token gates |
+| Map | **MapLibre GL JS** + OpenFreeMap dark | Free, no Mapbox or tile-key gates |
 | Realtime | **Server-Sent Events** from `/api/aircraft/stream` | Simpler than WebSocket, perfect for one-way push |
 | Push | **Web Push API** + service worker | "Smoky just went up" alerts; PWA, no app store |
 | Geolocation | **`navigator.geolocation.watchPosition`** | Foreground-reliable; background needs native shell |
@@ -231,7 +231,7 @@ Pulled from the prototype's inline styles. Promote these to CSS variables / Tail
 2. **adsb.fi/OpenSky terms** are permissive but require attribution. Add a footer credit on the about page.
 3. **Hot-zone learning needs ~30 days** of logged data before confidence numbers are meaningful. Ship with a "Learning your sky" state for the first month.
 4. **Tail registry from the photo** — the rider's printed list may be partial or stale. Verify each N-number on FAA registry (`registry.faa.gov`) before launch; some Cessnas in the photo may have been sold.
-5. **MapLibre tiles cost money at scale.** Free tier of MapTiler is ~100k loads/mo. If this hits front page of /r/motorcycles, self-host PMTiles from a Cloudflare R2 bucket.
+5. **Public tile services can change.** OpenFreeMap has no API key or view cap, but keep `NEXT_PUBLIC_MAP_STYLE_URL` ready for a self-hosted style if the public endpoint ever becomes unreliable.
 6. **Push notifications are aggressive.** Default off, opt-in per zone. Quiet hours by default 11pm–6am.
 7. **Legal posture:** the app *informs*, it does not *evade*. Never word UI copy as "avoid getting caught" — frame it as situational awareness. The rider gets this.
 

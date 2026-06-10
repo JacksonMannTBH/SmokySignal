@@ -140,16 +140,30 @@ export function AircraftTrailLayer({
   useEffect(() => {
     if (!map) return;
     const attach = () => {
-      if (!map.isStyleLoaded() || map.getSource(SOURCE_ID)) return;
+      if (map.getSource(SOURCE_ID)) {
+        if (map.getLayer(LAYER_ID)) return;
+        try {
+          if (map.getSource(ENDPOINTS_SOURCE_ID)) {
+            map.removeSource(ENDPOINTS_SOURCE_ID);
+          }
+          map.removeSource(SOURCE_ID);
+        } catch {
+          return;
+        }
+      }
       console.debug("[trail] attach: adding sources + layers");
-      map.addSource(SOURCE_ID, {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-      map.addSource(ENDPOINTS_SOURCE_ID, {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
+      try {
+        map.addSource(SOURCE_ID, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        map.addSource(ENDPOINTS_SOURCE_ID, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+      } catch {
+        return;
+      }
       // Halo first (renders below the line). Page-background near-
       // black at 0.6 opacity gives the white line a dark outline that
       // survives over heat density, water, road labels — anything.
@@ -159,7 +173,7 @@ export function AircraftTrailLayer({
         source: SOURCE_ID,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": SS_TOKENS.bg0,
+          "line-color": "rgba(255,255,255,0.92)",
           "line-width": [
             "interpolate",
             ["linear"],
@@ -173,7 +187,7 @@ export function AircraftTrailLayer({
             18,
             38,
           ],
-          "line-opacity": 0.6,
+          "line-opacity": 0.9,
         },
       });
       // Line — white, max luminance contrast against every heatmap
@@ -185,7 +199,7 @@ export function AircraftTrailLayer({
         source: SOURCE_ID,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#FFFFFF",
+          "line-color": SS_TOKENS.sky,
           "line-width": [
             "interpolate",
             ["linear"],
@@ -199,7 +213,7 @@ export function AircraftTrailLayer({
             18,
             32,
           ],
-          "line-opacity": 1.0,
+          "line-opacity": 0.86,
         },
       });
       map.addLayer({
@@ -220,8 +234,8 @@ export function AircraftTrailLayer({
         source: ENDPOINTS_SOURCE_ID,
         filter: ["==", ["get", "kind"], "end"],
         paint: {
-          "circle-radius": 8,
-          "circle-color": SS_TOKENS.alert,
+          "circle-radius": 9,
+          "circle-color": SS_TOKENS.danger,
           "circle-stroke-color": "#FFFFFF",
           "circle-stroke-width": 2,
         },
@@ -236,9 +250,10 @@ export function AircraftTrailLayer({
         hasAircraft: !!map.getLayer(AIRCRAFT_LAYER_ID),
       });
     };
-    if (map.isStyleLoaded()) attach();
+    attach();
     map.on("load", attach);
     map.on("styledata", attach);
+    map.on("data", attach);
 
     // Pulse the end dot every animation frame. setPaintProperty is
     // cheap; the radius expression covers every airborne tail in a
@@ -264,6 +279,7 @@ export function AircraftTrailLayer({
     return () => {
       map.off("load", attach);
       map.off("styledata", attach);
+      map.off("data", attach);
       if (pulseRef.current != null) cancelAnimationFrame(pulseRef.current);
       pulseRef.current = null;
       try {

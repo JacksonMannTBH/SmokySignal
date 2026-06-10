@@ -148,8 +148,8 @@ export function SpottedButton({ airborne }: { airborne: Aircraft[] }) {
           width: 56,
           height: 56,
           borderRadius: "50%",
-          background: SS_TOKENS.alert,
-          color: SS_TOKENS.bg0,
+          background: `linear-gradient(180deg, ${SS_TOKENS.alert}, ${SS_TOKENS.warn})`,
+          color: "#fffdf8",
           border: 0,
           cursor: "pointer",
           // Removes iOS' 300ms double-tap delay and disables browser
@@ -162,8 +162,7 @@ export function SpottedButton({ airborne }: { airborne: Aircraft[] }) {
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          boxShadow:
-            "0 4px 16px rgba(245,184,64,0.30), 0 1px 4px rgba(0,0,0,0.40)",
+          boxShadow: "0 12px 30px rgba(244,196,48,0.34), 0 3px 10px rgba(5,5,5,0.14)",
           transform: pulsing ? "scale(0.9)" : "scale(1)",
           transition: "transform 200ms ease, opacity 200ms ease",
         }}
@@ -182,12 +181,14 @@ export function SpottedButton({ airborne }: { airborne: Aircraft[] }) {
             zIndex: 26,
             padding: "8px 14px",
             borderRadius: 999,
-            background: "rgba(11,13,16,0.92)",
+            background: "rgba(255,255,255,0.92)",
             color: SS_TOKENS.fg0,
             border: `.5px solid ${SS_TOKENS.hairline2}`,
-            fontFamily: "var(--font-mono)",
+            boxShadow: SS_TOKENS.shadowMd,
+            backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
+            fontFamily: "inherit",
             fontSize: 11,
-            letterSpacing: ".04em",
             whiteSpace: "nowrap",
           }}
         >

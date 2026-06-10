@@ -73,7 +73,7 @@ The bird is not the threat. The app is. Until it isn't.
 **Values:**
 - A clear "no accounts, no server-side persistence of personal data" statement on the about page.
 - A linked GitHub repo showing the source. (The product does not have one publicly. They notice. Some of them will ask.)
-- A network-tab story they can verify. They want to see exactly which third-party origins the app talks to: adsb.fi, OpenSky fallback, MapTiler, web-push endpoints. Anything else triggers an alarm.
+- A network-tab story they can verify. They want to see exactly which third-party origins the app talks to: adsb.fi, OpenSky fallback, OpenFreeMap, web-push endpoints. Anything else triggers an alarm.
 - A service worker that does not cache PII and does not phone home.
 - A push payload that contains only the bird's data, not the user's data.
 - A public statement that the operator will not comply with subpoenas for user-level data because no user-level data exists.
@@ -107,7 +107,7 @@ Sample reviews:
 > Three questions:
 > 1. The push subscription POST sends `endpoint`, `keys.p256dh`, `keys.auth`, and a `userAgent` string. Why is `userAgent` included? It's a fingerprint vector and it isn't required by the Web Push spec. Drop it or document why.
 > 2. `lib/proximity-alert.ts` reads `navigator.geolocation.watchPosition` — confirm that this position is **never** sent to a server. The KV key list in `lib/storage-keys.ts` doesn't include any user-position keys, which is good, but I want it stated in the privacy policy explicitly.
-> 3. The Mapbox tile URL referer header is leaking the page path. Switch to MapTiler with the `referer` policy stripped.
+> 3. The map tile URL referer header is leaking the page path. Document the OpenFreeMap origin and keep the app free of map API keys tied to user accounts.
 
 > The about page says "no accounts." That's good. It does **not** say what happens to the push subscription endpoint after I uninstall the PWA. Add a sentence: "Subscription endpoints are deleted N days after the last successful push. We do not retain them indefinitely."
 

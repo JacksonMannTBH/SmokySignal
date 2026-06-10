@@ -178,7 +178,7 @@ We don't use enforcement-tier feeds, FlightAware Pro, ADS-B Exchange premium, or
 ## When something looks wrong
 
 - **The hot-zones heatmap is empty.** Either we're inside the 30-day learning window (see "Why is it still learning?" above), or your filter is narrow enough that nothing matches — try widening the operator or region.
-- **The map shows "MapTiler key missing."** The deployment is missing its `NEXT_PUBLIC_MAPTILER_KEY` environment variable. The app still works, but maps won't render.
+- **The map shows blank tiles.** The public OpenFreeMap style may be unreachable from your network. Refresh once; if it persists, the status page and alerts still work.
 - **"Couldn't get a fix" when tapping Spotted.** Your browser's location permission is denied or your GPS is having a moment. Allow location access for `smokysignal.app` in browser settings.
 - **The activity feed is empty.** Either no fleet member has had a state change recently, or, if it's been many hours, the cron job that refreshes the snapshot may be on its daily schedule. Activity events fire once per snapshot refresh.
 - **Push permission prompt never appears on iPhone.** Web Push on iOS only works inside an installed home-screen PWA. Tap the share icon in Safari, choose "Add to Home Screen," then open SmokySignal from the home-screen icon.

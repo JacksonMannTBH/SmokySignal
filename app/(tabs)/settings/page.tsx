@@ -3,7 +3,7 @@ import { SS_TOKENS } from "@/lib/tokens";
 
 export const metadata = {
   title: "Settings",
-  description: "Tune SmokySignal for how you ride.",
+  description: "Tune Out Of Sight for how you ride.",
 };
 
 export const dynamic = "force-static";
@@ -45,7 +45,7 @@ export default function SettingsHub() {
           marginBottom: 4,
         }}
       >
-        <span className="ss-eyebrow">SmokySignal · Settings</span>
+        <span className="ss-eyebrow">Out Of Sight · Settings</span>
         <h1
           style={{
             fontSize: 26,
@@ -55,7 +55,7 @@ export default function SettingsHub() {
             color: SS_TOKENS.fg0,
           }}
         >
-          Tune SmokySignal.
+          Tune Out Of Sight.
         </h1>
         <p
           style={{
@@ -81,9 +81,12 @@ export default function SettingsHub() {
             style={{
               display: "block",
               padding: "16px 18px",
-              borderRadius: 12,
+              borderRadius: 24,
               border: `.5px solid ${SS_TOKENS.hairline2}`,
-              background: SS_TOKENS.bg1,
+              background: SS_TOKENS.surface,
+              boxShadow: SS_TOKENS.shadowSm,
+              backdropFilter: "blur(18px)",
+              WebkitBackdropFilter: "blur(18px)",
               textDecoration: "none",
               minHeight: 44,
             }}

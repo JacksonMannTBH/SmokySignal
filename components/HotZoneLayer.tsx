@@ -483,11 +483,12 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             maxWidth: 380,
             margin: "0 auto",
             padding: "12px 14px",
-            borderRadius: 12,
-            background: "rgba(11,13,16,0.92)",
+            borderRadius: 22,
+            background: "rgba(255,255,255,0.9)",
             border: `.5px solid ${SS_TOKENS.hairline2}`,
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            boxShadow: SS_TOKENS.shadowMd,
+            backdropFilter: "blur(24px) saturate(1.1)",
+            WebkitBackdropFilter: "blur(24px) saturate(1.1)",
             color: SS_TOKENS.fg1,
           }}
         >
@@ -520,11 +521,12 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             maxWidth: 380,
             margin: "0 auto",
             padding: "10px 14px",
-            borderRadius: 12,
-            background: "rgba(11,13,16,0.92)",
+            borderRadius: 22,
+            background: "rgba(255,255,255,0.9)",
             border: `.5px solid ${SS_TOKENS.hairline2}`,
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            boxShadow: SS_TOKENS.shadowMd,
+            backdropFilter: "blur(24px) saturate(1.1)",
+            WebkitBackdropFilter: "blur(24px) saturate(1.1)",
             color: SS_TOKENS.fg1,
             fontSize: 11,
             letterSpacing: ".04em",
@@ -557,7 +559,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
             className="ss-mono"
             style={pillStyle(enabled ? SS_TOKENS.alert : SS_TOKENS.fg1)}
           >
-            {enabled ? "● HOT ZONES" : "○ HOT ZONES"}
+            {enabled ? "Hot zones on" : "Hot zones"}
           </button>
         </Tooltip>
         <Tooltip
@@ -574,7 +576,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
               flightPathsEnabled ? SS_TOKENS.alert : SS_TOKENS.fg1,
             )}
           >
-            {flightPathsEnabled ? "● FLIGHT PATHS" : "○ FLIGHT PATHS"}
+            {flightPathsEnabled ? "Flight paths on" : "Flight paths"}
           </button>
         </Tooltip>
         <Tooltip side="top" content="Filter by category, operator, or tail.">
@@ -589,7 +591,7 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
               padding: "8px 10px",
             }}
           >
-            {panelOpen ? "▴" : "▾"}
+            {panelOpen ? "Filters up" : "Filters"}
           </button>
         </Tooltip>
       </div>
@@ -600,8 +602,6 @@ export function HotZoneLayer({ map, bottomBoost = 0, learning }: Props) {
           filter={filter}
           onChange={setFilter}
           onClose={() => setPanelOpen(false)}
-          hotZonesEnabled={enabled}
-          onToggleHotZones={toggleHotZones}
           flightPathsEnabled={flightPathsEnabled}
           onToggleFlightPaths={toggleFlightPaths}
         />
@@ -618,13 +618,15 @@ function pillStyle(color: string): React.CSSProperties {
     padding: "14px 14px",
     minHeight: 44,
     borderRadius: 999,
-    background: "rgba(11,13,16,0.78)",
+    background: "rgba(255,255,255,0.9)",
     border: `.5px solid ${SS_TOKENS.hairline2}`,
     color,
     fontSize: 11,
-    letterSpacing: ".06em",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
+    fontWeight: 700,
+    letterSpacing: 0,
+    boxShadow: SS_TOKENS.shadowMd,
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
     cursor: "pointer",
     whiteSpace: "nowrap",
     touchAction: "manipulation",

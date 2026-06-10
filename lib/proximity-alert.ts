@@ -10,6 +10,7 @@
 "use client";
 
 import { haversineNm } from "./geo";
+import { SS_TOKENS } from "./tokens";
 import type { Aircraft, FleetRole } from "./types";
 import { speakAlert } from "./voice-mode";
 
@@ -24,6 +25,29 @@ const ALERT_ROLES: ReadonlySet<FleetRole> = new Set([
   "patrol",
   "unknown",
 ]);
+
+type ServiceWorkerNotificationOptions = NotificationOptions & {
+  renotify?: boolean;
+};
+
+export type ProximityBand = "stop" | "slow" | "watch";
+
+export type ProximityBandInfo = {
+  band: ProximityBand;
+  label: string;
+  color: string;
+  severity: number;
+};
+
+export function proximityBandForDistance(distanceNm: number): ProximityBandInfo {
+  if (distanceNm <= 1) {
+    return { band: "stop", label: "STOP", color: SS_TOKENS.danger, severity: 3 };
+  }
+  if (distanceNm <= 3) {
+    return { band: "slow", label: "SLOW", color: SS_TOKENS.warn, severity: 2 };
+  }
+  return { band: "watch", label: "Watch", color: SS_TOKENS.sky, severity: 1 };
+}
 
 export function getProximityThresholdNm(): number {
   if (typeof window === "undefined") return DEFAULT_PROXIMITY_NM;
@@ -49,18 +73,29 @@ export function setProximityEnabled(on: boolean): void {
   window.localStorage.setItem(PROXIMITY_ENABLED_KEY, on ? "1" : "0");
 }
 
-function recentlySeen(tail: string): boolean {
+function recentlySeen(tail: string, band: ProximityBandInfo): boolean {
   if (typeof window === "undefined") return false;
   const raw = window.localStorage.getItem(`${COOLDOWN_PREFIX}${tail}`);
   if (!raw) return false;
-  const ts = Number(raw);
-  if (!Number.isFinite(ts)) return false;
-  return Date.now() - ts < COOLDOWN_MS;
+  try {
+    const seen = JSON.parse(raw) as { ts?: number; severity?: number };
+    const ts = Number(seen.ts);
+    const severity = Number(seen.severity);
+    if (!Number.isFinite(ts) || Date.now() - ts >= COOLDOWN_MS) return false;
+    return Number.isFinite(severity) && severity >= band.severity;
+  } catch {
+    const ts = Number(raw);
+    if (!Number.isFinite(ts) || Date.now() - ts >= COOLDOWN_MS) return false;
+    return band.severity <= 1;
+  }
 }
 
-function markSeen(tail: string): void {
+function markSeen(tail: string, band: ProximityBandInfo): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(`${COOLDOWN_PREFIX}${tail}`, String(Date.now()));
+  window.localStorage.setItem(
+    `${COOLDOWN_PREFIX}${tail}`,
+    JSON.stringify({ ts: Date.now(), band: band.band, severity: band.severity }),
+  );
 }
 
 export type ProximityHit = {
@@ -85,8 +120,9 @@ export function detectProximityHits(
     if (!a.airborne) continue;
     if (a.lat == null || a.lon == null) continue;
     if (!ALERT_ROLES.has(a.role)) continue;
-    if (recentlySeen(a.tail)) continue;
     const d = haversineNm(rider.lat, rider.lon, a.lat, a.lon);
+    const band = proximityBandForDistance(d);
+    if (recentlySeen(a.tail, band)) continue;
     if (d <= thresholdNm) {
       hits.push({
         tail: a.tail,
@@ -119,8 +155,9 @@ export async function fireProximityNotifications(
   for (const h of hits) {
     const name = h.nickname ?? h.tail;
     const dist = h.distanceNm.toFixed(1);
+    const band = proximityBandForDistance(h.distanceNm);
     try {
-      const title = `${name} nearby`;
+      const title = `${band.label} - ${dist} nm - ${name} nearby`;
       // Smokey umbrella: every alert-class proximity hit reads as
       // Smokey. The smokey-class FLIR detail (Watching.) is preserved
       // for fixed-wing speed enforcement; the rest collapse to a plain
@@ -129,17 +166,26 @@ export async function fireProximityNotifications(
         h.role === "smokey"
           ? `${dist} nm out. Watching.`
           : `${dist} nm out.`;
-      await reg.showNotification(title, {
+      const options: ServiceWorkerNotificationOptions = {
         body,
-        icon: "/icons/icon-192.png",
-        badge: "/icons/favicon-96.png",
+        icon: "/icons/washington-eye-logo.svg",
+        badge: "/icons/favicon.svg",
         tag: `proximity-${h.tail}`,
-        data: { url: `/plane/${h.tail}`, tail: h.tail, kind: "proximity" },
-      });
+        renotify: true,
+        data: {
+          url: `/plane/${h.tail}`,
+          tail: h.tail,
+          kind: "proximity",
+          band: band.band,
+          color: band.color,
+          distanceNm: h.distanceNm,
+        },
+      };
+      await reg.showNotification(title, options);
       // Voice-mode readback (no-op when off / unsupported). Title + body
       // separated by a period so the synth pauses naturally.
       speakAlert(`${title}. ${body}`);
-      markSeen(h.tail);
+      markSeen(h.tail, band);
       posted += 1;
     } catch {
       // Best-effort. Don't markSeen on failure.

@@ -220,30 +220,42 @@ function diffEvents(prev: Snapshot | null, curr: Snapshot): ActivityEntry[] {
  */
 export async function recordActivity(curr: Snapshot): Promise<void> {
   const redis = await getRedis();
-  if (!redis) return;
 
   let prev: Snapshot | null = null;
-  try {
-    const raw = await redis.get(PREV_KEY);
-    if (raw) {
-      prev =
-        typeof raw === "string"
-          ? (JSON.parse(raw) as Snapshot)
-          : (raw as Snapshot);
+  if (redis) {
+    try {
+      const raw = await redis.get(PREV_KEY);
+      if (raw) {
+        prev =
+          typeof raw === "string"
+            ? (JSON.parse(raw) as Snapshot)
+            : (raw as Snapshot);
+      }
+    } catch (e) {
+      console.warn("[activity] read prev failed:", e);
     }
-  } catch (e) {
-    console.warn("[activity] read prev failed:", e);
+  } else {
+    prev = await cacheGet<Snapshot>(PREV_KEY);
   }
 
   const events = diffEvents(prev, curr);
   if (events.length > 0) {
-    try {
-      const payload = events.map((e) => JSON.stringify(e));
-      await redis.rpush(FEED_KEY, ...payload);
-      await redis.ltrim(FEED_KEY, -FEED_LIMIT, -1);
-      await redis.expire(FEED_KEY, FEED_TTL_SECONDS);
-    } catch (e) {
-      console.warn("[activity] rpush failed:", e);
+    if (redis) {
+      try {
+        const payload = events.map((e) => JSON.stringify(e));
+        await redis.rpush(FEED_KEY, ...payload);
+        await redis.ltrim(FEED_KEY, -FEED_LIMIT, -1);
+        await redis.expire(FEED_KEY, FEED_TTL_SECONDS);
+      } catch (e) {
+        console.warn("[activity] rpush failed:", e);
+      }
+    } else {
+      const feed = (await cacheGet<ActivityEntry[]>(FEED_KEY)) ?? [];
+      await cacheSet(
+        FEED_KEY,
+        [...feed, ...events].slice(-FEED_LIMIT),
+        FEED_TTL_SECONDS,
+      );
     }
 
     // Fan out push notifications for each takeoff. Best-effort; the
@@ -279,7 +291,11 @@ export async function recordActivity(curr: Snapshot): Promise<void> {
   }
 
   try {
-    await redis.set(PREV_KEY, JSON.stringify(curr), { ex: PREV_TTL_SECONDS });
+    if (redis) {
+      await redis.set(PREV_KEY, JSON.stringify(curr), { ex: PREV_TTL_SECONDS });
+    } else {
+      await cacheSet(PREV_KEY, curr, PREV_TTL_SECONDS);
+    }
   } catch (e) {
     console.warn("[activity] write prev failed:", e);
   }
@@ -292,11 +308,14 @@ export async function recordActivity(curr: Snapshot): Promise<void> {
  */
 export async function getRecentActivity(limit = 50): Promise<ActivityEntry[]> {
   const cacheKey = `ss:activity-recent:${limit}`;
+  const redis = await getRedis();
+  if (!redis) {
+    const feed = (await cacheGet<ActivityEntry[]>(FEED_KEY)) ?? [];
+    return normalizeActivityEntries(feed.slice(-limit));
+  }
+
   const cached = await cacheGet<ActivityEntry[]>(cacheKey);
   if (cached) return cached;
-
-  const redis = await getRedis();
-  if (!redis) return [];
 
   let raw: unknown[] = [];
   try {
@@ -305,7 +324,14 @@ export async function getRecentActivity(limit = 50): Promise<ActivityEntry[]> {
     return [];
   }
 
-  const entries = raw
+  const entries = normalizeActivityEntries(raw);
+
+  await cacheSet(cacheKey, entries, READ_CACHE_TTL);
+  return entries;
+}
+
+function normalizeActivityEntries(raw: unknown[]): ActivityEntry[] {
+  return raw
     .map((s) => {
       if (typeof s === "string") {
         try {
@@ -321,7 +347,4 @@ export async function getRecentActivity(limit = 50): Promise<ActivityEntry[]> {
     // Normalize: if ts looks like seconds (10-digit unix), promote to ms.
     .map((e) => (e.ts < 1e12 ? { ...e, ts: e.ts * 1000 } : e))
     .reverse(); // newest first
-
-  await cacheSet(cacheKey, entries, READ_CACHE_TTL);
-  return entries;
 }

@@ -4,7 +4,7 @@ import { getRecentActivity } from "@/lib/activity";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
 
 export const metadata = {
-  title: "SmokySignal · Dash",
+  title: "Out Of Sight · Dash",
 };
 
 export const dynamic = "force-dynamic";

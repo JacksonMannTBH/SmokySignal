@@ -20,7 +20,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "SmokySignal · Admin · Tracks · Day",
+  title: "Out Of Sight · Admin · Tracks · Day",
   robots: { index: false, follow: false },
 };
 

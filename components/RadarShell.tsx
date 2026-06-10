@@ -9,11 +9,10 @@ import { SS_TOKENS } from "@/lib/tokens";
 import { computeStatus } from "@/lib/status";
 import { StatusPill } from "./StatusPill";
 import { SpottedButton } from "./SpottedButton";
-import { HotZoneLayer } from "./HotZoneLayer";
+import { RadarLayerControls } from "./RadarLayerControls";
 import { FlightPathLayer } from "./FlightPathLayer";
 import { UserZoneLayer } from "./UserZoneLayer";
 import { AircraftTrailLayer } from "./AircraftTrailLayer";
-import { TrailStatusBadge } from "./TrailStatusBadge";
 import { addUserZone } from "@/lib/user-zones";
 import {
   detectProximityHits,
@@ -40,7 +39,6 @@ import {
   type RadarFilter,
 } from "@/lib/radar-filter";
 import type { Aircraft, FleetEntry, Snapshot } from "@/lib/types";
-import type { LearningState } from "@/lib/learning";
 
 export type RiderPos = { lat: number; lon: number };
 
@@ -58,11 +56,15 @@ const RadarMap = nextDynamic(() => import("./RadarMap"), {
 });
 
 const TABBAR_HEIGHT = 66;
+const AIRBORNE_PANEL_EXPANDED_BOOST = 130;
+const AIRBORNE_PANEL_COLLAPSED_BOOST = 52;
+const AIRBORNE_PANEL_COLLAPSED_KEY = "ss_airborne_panel_collapsed";
+const GLASS_BG = "rgba(255,255,255,0.76)";
+const GLASS_BG_STRONG = "rgba(255,255,255,0.9)";
 
 type Props = {
   initial: Snapshot;
   mockOn?: boolean;
-  learning?: LearningState;
   /** ms-since-epoch of the most recent track sample. null = unknown. */
   lastSampleMs?: number | null;
 };
@@ -70,7 +72,6 @@ type Props = {
 export function RadarShell({
   initial,
   mockOn = false,
-  learning,
   lastSampleMs = null,
 }: Props) {
   const snap = useAircraft(initial, mockOn);
@@ -119,11 +120,15 @@ export function RadarShell({
   const [toast, setToast] = useState<string | null>(null);
   const [map, setMap] = useState<MaplibreMap | null>(null);
   const [showRings, setShowRings] = useState(false);
+  const [airbornePanelCollapsed, setAirbornePanelCollapsed] = useState(false);
   const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
   // Hydrate the rings pref + region from localStorage on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
     setShowRings(window.localStorage.getItem("ss_distance_rings_visible") === "1");
+    setAirbornePanelCollapsed(
+      window.localStorage.getItem(AIRBORNE_PANEL_COLLAPSED_KEY) === "1",
+    );
     setRegionId(getRegion());
     const onChange = (e: Event) => {
       const detail = (e as CustomEvent<{ id: RegionId }>).detail;
@@ -139,6 +144,13 @@ export function RadarShell({
       showRings ? "1" : "0",
     );
   }, [showRings]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      AIRBORNE_PANEL_COLLAPSED_KEY,
+      airbornePanelCollapsed ? "1" : "0",
+    );
+  }, [airbornePanelCollapsed]);
 
   // Foreground proximity alerts. Runs whenever snap.aircraft changes
   // (every poll cycle from useAircraft) — when a tracked alert-tier
@@ -199,12 +211,20 @@ export function RadarShell({
     }
   }, [rider, regionId]);
 
+  const airbornePanelBoost =
+    airborne.length > 0
+      ? airbornePanelCollapsed
+        ? AIRBORNE_PANEL_COLLAPSED_BOOST
+        : AIRBORNE_PANEL_EXPANDED_BOOST
+      : 0;
+
   return (
     <main
       style={{
         position: "fixed",
         inset: 0,
-        paddingBottom: TABBAR_HEIGHT,
+        paddingBottom: TABBAR_HEIGHT + 18,
+        background: SS_TOKENS.bg0,
       }}
     >
       <RadarMap
@@ -214,11 +234,7 @@ export function RadarShell({
         regionId={regionId}
         onMapReady={setMap}
       />
-      <HotZoneLayer
-        map={map}
-        bottomBoost={airborne.length > 0 ? 130 : 0}
-        learning={learning}
-      />
+      <RadarLayerControls bottomBoost={airbornePanelBoost} />
       <FlightPathLayer map={map} />
       <UserZoneLayer map={map} />
       <AircraftTrailLayer map={map} airborne={airborne} />
@@ -230,7 +246,7 @@ export function RadarShell({
         active={showRings}
         onToggle={() => setShowRings((v) => !v)}
         bottom={`calc(${
-          TABBAR_HEIGHT + 16 + (airborne.length > 0 ? 130 : 0)
+          TABBAR_HEIGHT + 16 + airbornePanelBoost
         }px + var(--ss-install-prompt-h, 0px))`}
         disabled={!rider}
       />
@@ -246,12 +262,11 @@ export function RadarShell({
           position: "absolute",
           left: 12,
           bottom: `calc(${
-            TABBAR_HEIGHT + 16 + (airborne.length > 0 ? 130 : 0) + 88
+            TABBAR_HEIGHT + 16 + airbornePanelBoost + 88
           }px + var(--ss-install-prompt-h, 0px))`,
           zIndex: 12,
         }}
       >
-        <TrailStatusBadge airborne={airborne} />
       </div>
       <HelpIcon />
 
@@ -265,9 +280,9 @@ export function RadarShell({
           // button (right:12) AND the help icon (right:52) so the
           // airborne counter never tucks under either.
           padding: "12px 96px 12px 16px",
-          background: "rgba(11,13,16,.7)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
+          background: "linear-gradient(180deg, rgba(246,248,246,0.92), rgba(246,248,246,0.54))",
+          backdropFilter: "blur(24px) saturate(1.08)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.08)",
           borderBottom: `.5px solid ${SS_TOKENS.hairline}`,
           display: "flex",
           alignItems: "center",
@@ -311,25 +326,32 @@ export function RadarShell({
       <div
         style={{
           position: "absolute",
-          top: 60,
+          top: 68,
           left: 12,
-          padding: "4px 8px",
-          borderRadius: 6,
-          background: "rgba(11,13,16,0.7)",
+          padding: "7px 11px",
+          borderRadius: 999,
+          background: GLASS_BG,
           border: `.5px solid ${SS_TOKENS.hairline}`,
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          boxShadow: SS_TOKENS.shadowSm,
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
           zIndex: 10,
         }}
       >
         <FreshnessLabel lastSampleMs={lastSampleMs} />
       </div>
 
-      {airborne.length > 0 && <Carousel airborne={airborne} />}
+      {airborne.length > 0 && (
+        <Carousel
+          airborne={airborne}
+          collapsed={airbornePanelCollapsed}
+          onToggleCollapsed={() => setAirbornePanelCollapsed((v) => !v)}
+        />
+      )}
 
       <SpottedButton airborne={airborne} />
 
-      {toast && <Toast message={toast} hasCarousel={airborne.length > 0} />}
+      {toast && <Toast message={toast} bottomBoost={airbornePanelBoost} />}
     </main>
   );
 }
@@ -385,9 +407,10 @@ function AddZoneButton({
           height: 44,
           borderRadius: "50%",
           border: `.5px solid ${SS_TOKENS.hairline2}`,
-          background: "rgba(11,13,16,.7)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          background: GLASS_BG_STRONG,
+          boxShadow: SS_TOKENS.shadowMd,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           color: disabled ? SS_TOKENS.fg2 : SS_TOKENS.fg0,
           fontSize: 18,
           fontWeight: 700,
@@ -407,14 +430,14 @@ function AddZoneButton({
 
 function Toast({
   message,
-  hasCarousel,
+  bottomBoost,
 }: {
   message: string;
-  hasCarousel: boolean;
+  bottomBoost: number;
 }) {
   // Sit just above whatever's currently anchored to the bottom — carousel
   // when present, tab bar otherwise.
-  const bottomOffset = hasCarousel ? TABBAR_HEIGHT + 130 : TABBAR_HEIGHT + 16;
+  const bottomOffset = TABBAR_HEIGHT + 16 + bottomBoost;
   return (
     <div
       role="status"
@@ -424,13 +447,13 @@ function Toast({
         transform: "translateX(-50%)",
         bottom: bottomOffset,
         padding: "8px 14px",
-        borderRadius: 8,
-        background: SS_TOKENS.bg2,
+        borderRadius: 999,
+        background: GLASS_BG_STRONG,
         border: `.5px solid ${SS_TOKENS.hairline}`,
+        boxShadow: SS_TOKENS.shadowMd,
         color: SS_TOKENS.fg2,
-        fontFamily: "var(--font-mono)",
+        fontFamily: "inherit",
         fontSize: 11,
-        letterSpacing: ".04em",
         zIndex: 20,
         whiteSpace: "nowrap",
       }}
@@ -451,17 +474,18 @@ function CompassN() {
           position: "absolute",
           top: 60,
           right: 12,
-          width: 28,
-          height: 28,
+          width: 34,
+          height: 34,
           borderRadius: "50%",
           border: `.5px solid ${SS_TOKENS.hairline2}`,
-          background: "rgba(11,13,16,.7)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          background: GLASS_BG_STRONG,
+          boxShadow: SS_TOKENS.shadowMd,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: 700,
           color: SS_TOKENS.fg1,
           zIndex: 10,
@@ -474,7 +498,59 @@ function CompassN() {
   );
 }
 
-function Carousel({ airborne }: { airborne: Aircraft[] }) {
+function Carousel({
+  airborne,
+  collapsed,
+  onToggleCollapsed,
+}: {
+  airborne: Aircraft[];
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
+  if (collapsed) {
+    return (
+      <Tooltip side="top" align="start" content="Show airborne aircraft cards">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={false}
+          aria-label="Show airborne aircraft cards"
+          className="ss-mono"
+          style={{
+            position: "absolute",
+            left: 12,
+            bottom: `calc(${TABBAR_HEIGHT + 16}px + var(--ss-install-prompt-h, 0px))`,
+            zIndex: 14,
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            border: `.5px solid ${SS_TOKENS.hairline2}`,
+            background: "rgba(255,255,255,0.92)",
+            color: SS_TOKENS.alert,
+            boxShadow: SS_TOKENS.shadowMd,
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            cursor: "pointer",
+            display: "inline-flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1,
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <span style={{ fontSize: 17, fontWeight: 800, lineHeight: 1 }}>
+            {airborne.length}
+          </span>
+          <span style={{ fontSize: 9, fontWeight: 800, lineHeight: 1 }}>
+            UP
+          </span>
+        </button>
+      </Tooltip>
+    );
+  }
+
   return (
     <div
       style={{
@@ -482,34 +558,84 @@ function Carousel({ airborne }: { airborne: Aircraft[] }) {
         left: 0,
         right: 0,
         bottom: TABBAR_HEIGHT,
-        padding: "8px 16px 12px",
-        background:
-          "linear-gradient(to top, rgba(11,13,16,.92) 60%, rgba(11,13,16,0))",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        padding: collapsed ? "10px 14px 12px" : "14px 14px 18px",
+        background: "rgba(255,255,255,0.88)",
+        borderTop: `.5px solid ${SS_TOKENS.hairline}`,
+        borderRadius: "18px 18px 0 0",
+        boxShadow: SS_TOKENS.shadowLg,
+        backdropFilter: "blur(24px) saturate(1.12)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.12)",
         zIndex: 10,
       }}
     >
       <div
         className="ss-eyebrow"
-        style={{ marginBottom: 8, paddingLeft: 2 }}
-      >
-        Up right now · tap to track
-      </div>
-      <div
-        className="ss-scroll"
         style={{
           display: "flex",
-          gap: 10,
-          overflowX: "auto",
-          // Allow cards to bleed into right edge; iOS smooth scroll.
-          WebkitOverflowScrolling: "touch",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: collapsed ? 0 : 10,
+          paddingLeft: 2,
+          color: SS_TOKENS.fg1,
         }}
       >
-        {airborne.map((p) => (
-          <PlaneCard key={p.tail} p={p} />
-        ))}
+        Up right now · tap to track
+        <Tooltip
+          side="top"
+          align="end"
+          content={collapsed ? "Show airborne cards" : "Collapse airborne cards"}
+        >
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={
+              collapsed
+                ? "Show airborne aircraft cards"
+                : "Collapse airborne aircraft cards"
+            }
+            className="ss-mono"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              border: `.5px solid ${SS_TOKENS.hairline2}`,
+              background: "rgba(255,255,255,0.92)",
+              color: SS_TOKENS.fg1,
+              boxShadow: SS_TOKENS.shadowSm,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 0,
+              fontWeight: 800,
+              lineHeight: 1,
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <span style={{ fontSize: 16 }}>v</span>
+            {collapsed ? "⌃" : "⌄"}
+          </button>
+        </Tooltip>
       </div>
+      {!collapsed && (
+        <div
+          className="ss-scroll"
+          style={{
+            display: "flex",
+            gap: 10,
+            overflowX: "auto",
+            // Allow cards to bleed into right edge; iOS smooth scroll.
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {airborne.map((p) => (
+            <PlaneCard key={p.tail} p={p} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -522,10 +648,11 @@ function PlaneCard({ p }: { p: Aircraft }) {
       style={{
         flex: "0 0 auto",
         minWidth: 200,
-        padding: 12,
-        borderRadius: 12,
-        background: SS_TOKENS.bg1,
+        padding: 14,
+        borderRadius: 20,
+        background: "rgba(255,255,255,0.94)",
         border: `.5px solid ${SS_TOKENS.hairline}`,
+        boxShadow: SS_TOKENS.shadowSm,
         textDecoration: "none",
         color: "inherit",
       }}
@@ -646,9 +773,9 @@ function DistanceRingsToggle({
               ? bottom + 44
               : `calc(${bottom} + 44px)`,
           zIndex: 12,
-          padding: "8px 12px",
+          padding: "9px 13px",
           borderRadius: 999,
-          background: "rgba(11,13,16,0.78)",
+          background: GLASS_BG_STRONG,
           border: `.5px solid ${SS_TOKENS.hairline2}`,
           color: disabled
             ? SS_TOKENS.fg3
@@ -656,9 +783,10 @@ function DistanceRingsToggle({
               ? SS_TOKENS.alert
               : SS_TOKENS.fg1,
           fontSize: 11,
-          letterSpacing: ".06em",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          letterSpacing: 0,
+          boxShadow: SS_TOKENS.shadowMd,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           cursor: disabled ? "not-allowed" : "pointer",
           whiteSpace: "nowrap",
           touchAction: "manipulation",
@@ -666,7 +794,7 @@ function DistanceRingsToggle({
           opacity: disabled ? 0.6 : 1,
         }}
       >
-        {active ? "● RINGS" : "○ RINGS"}
+        {active ? "Rings on" : "Rings"}
       </button>
     </Tooltip>
   );

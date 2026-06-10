@@ -1,7 +1,7 @@
 "use client";
 
 // Renders the most-recent-flight track for a single tail as a polyline
-// over the same MapTiler dark base used on /radar. Native MapLibre
+// over the same OpenFreeMap dark base used on /radar. Native MapLibre
 // interactions are enabled (pinch, drag, double-tap, +/- buttons) so
 // the user can dig into the route on the plane detail page.
 //
@@ -20,6 +20,7 @@ import maplibregl, {
   NavigationControl,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_STYLE_URL } from "@/lib/map-style";
 import { SS_TOKENS } from "@/lib/tokens";
 import type { TrackPoint } from "@/lib/tracks";
 
@@ -98,24 +99,11 @@ export default function PlaneTrackMap({
   // Mount the map once.
   useEffect(() => {
     if (!containerRef.current) return;
-    const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-    if (!key) {
-      containerRef.current.innerHTML = `
-        <div style="
-          position:absolute; inset:0; display:flex; align-items:center;
-          justify-content:center; padding:24px; text-align:center;
-          color:${SS_TOKENS.fg2}; font-size:13px; line-height:1.5;
-        ">
-          NEXT_PUBLIC_MAPTILER_KEY missing — map unavailable.
-        </div>
-      `;
-      return;
-    }
 
     const initialCoords = pointsToCoords(points);
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${key}`,
+      style: MAP_STYLE_URL,
       center: initialCoords[0] ?? PUGET_SOUND,
       zoom: initialCoords.length < 2 ? SHORT_TRACK_ZOOM : FALLBACK_ZOOM,
       attributionControl: { compact: true },
@@ -171,7 +159,7 @@ export default function PlaneTrackMap({
             ["get", "kind"],
             "start",
             SS_TOKENS.clear,
-            SS_TOKENS.alert,
+            SS_TOKENS.danger,
           ],
           "circle-stroke-color": SS_TOKENS.bg0,
           "circle-stroke-width": 2,

@@ -78,7 +78,10 @@ function Empty() {
         padding: "32px 16px",
         background: SS_TOKENS.bg1,
         border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: 14,
+        borderRadius: 24,
+        boxShadow: SS_TOKENS.shadowSm,
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -102,7 +105,10 @@ function List({ entries }: { entries: ActivityEntry[] }) {
       style={{
         background: SS_TOKENS.bg1,
         border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: 14,
+        borderRadius: 24,
+        boxShadow: SS_TOKENS.shadowSm,
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
         overflow: "hidden",
       }}
     >

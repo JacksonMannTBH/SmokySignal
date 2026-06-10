@@ -39,11 +39,11 @@ export async function generateMetadata({ params }: Props) {
   const entry = fleet.find((f) => f.tail === tail);
   const niceName = entry?.nickname ? ` "${entry.nickname}"` : "";
   return {
-    title: `${tail}${niceName} · Flight ${params.flightId} · SmokySignal`,
-    description: `Flight track for ${tail}${niceName}, captured by SmokySignal.`,
+    title: `${tail}${niceName} · Flight ${params.flightId} · Out Of Sight`,
+    description: `Flight track for ${tail}${niceName}, captured by Out Of Sight.`,
     openGraph: {
       title: `${tail}${niceName} · Flight ${params.flightId}`,
-      description: `Flight track captured by SmokySignal.`,
+      description: `Flight track captured by Out Of Sight.`,
       url: `https://www.smokysignal.app/flight/${tail}/${params.flightId}`,
       type: "article",
     },
@@ -211,7 +211,7 @@ export default async function FlightSharePage({ params }: Props) {
           href="/"
           style={{ color: SS_TOKENS.fg1, textDecoration: "underline" }}
         >
-          SmokySignal
+          Out Of Sight
         </Link>
         <br />
         <Link

@@ -16,7 +16,7 @@ import { SS_TOKENS } from "@/lib/tokens";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "SmokySignal · QA dashboard",
+  title: "Out Of Sight · QA dashboard",
   robots: { index: false, follow: false },
 };
 

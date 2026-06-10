@@ -12,7 +12,7 @@ import { AdminHeader } from "./AdminHeader";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "SmokySignal · Admin · Tracks",
+  title: "Out Of Sight · Admin · Tracks",
   robots: { index: false, follow: false },
 };
 
@@ -183,7 +183,7 @@ function Td({
       style={{
         padding: "10px 8px",
         fontSize: 12,
-        fontFamily: mono ? "var(--font-mono)" : "var(--font-inter)",
+        fontFamily: mono ? "var(--font-mono)" : "var(--font-brand)",
         fontWeight: bold ? 600 : undefined,
         color: dim ? SS_TOKENS.fg2 : SS_TOKENS.fg0,
         whiteSpace: "nowrap",

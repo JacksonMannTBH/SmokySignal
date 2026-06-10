@@ -24,7 +24,7 @@ import { getTimeFormatPref, isHour12 } from "@/lib/user-prefs";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "SmokySignal · Admin · Tracks",
+  title: "Out Of Sight · Admin · Tracks",
   robots: { index: false, follow: false },
 };
 
@@ -348,7 +348,7 @@ function Td({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
       style={{
         padding: "6px 8px",
         fontSize: 11.5,
-        fontFamily: mono ? "var(--font-mono)" : "var(--font-inter)",
+        fontFamily: mono ? "var(--font-mono)" : "var(--font-brand)",
         color: SS_TOKENS.fg1,
         whiteSpace: "nowrap",
       }}

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { Map as MaplibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { MAP_STYLE_URL } from "@/lib/map-style";
 import { SS_TOKENS } from "@/lib/tokens";
 import type { TrackPoint } from "@/lib/tracks";
 
@@ -12,26 +13,13 @@ export default function TracksMap({ samples }: { samples: TrackPoint[] }) {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const key = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-    if (!key) {
-      containerRef.current.innerHTML = `
-        <div style="
-          position:absolute; inset:0; display:flex; align-items:center;
-          justify-content:center; padding:24px; text-align:center;
-          color:${SS_TOKENS.fg2}; font-size:13px;
-        ">
-          NEXT_PUBLIC_MAPTILER_KEY missing.
-        </div>
-      `;
-      return;
-    }
     if (samples.length < 2) return;
 
     const coords: [number, number][] = samples.map((s) => [s.lon, s.lat]);
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${key}`,
+      style: MAP_STYLE_URL,
       center: coords[0]!,
       zoom: 11,
       attributionControl: { compact: true },

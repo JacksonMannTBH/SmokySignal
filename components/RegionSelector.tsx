@@ -36,16 +36,18 @@ export function RegionSelector({ className, style }: Props) {
       value={current}
       onChange={(e) => setRegion(e.target.value as RegionId)}
       aria-label="Region"
-      className={`ss-mono ${className ?? ""}`}
+      className={className ?? ""}
       style={{
-        fontSize: 11,
-        background: "rgba(11,13,16,0.78)",
+        fontSize: 12,
+        fontWeight: 700,
+        background: "rgba(255,255,255,0.84)",
         color: SS_TOKENS.fg0,
         border: `.5px solid ${SS_TOKENS.hairline2}`,
-        borderRadius: 6,
-        padding: "4px 8px",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        borderRadius: 999,
+        padding: "7px 11px",
+        boxShadow: SS_TOKENS.shadowSm,
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
         cursor: "pointer",
         ...style,
       }}

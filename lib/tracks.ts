@@ -25,6 +25,11 @@ export type TrackPoint = {
 
 const TTL_SECONDS = 35 * 24 * 60 * 60; // 35 days
 
+const memoryTracks = new Map<
+  string,
+  { points: TrackPoint[]; expiresAt: number }
+>();
+
 function utcDateKey(d: Date): string {
   const y = d.getUTCFullYear();
   const m = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -38,7 +43,6 @@ function utcDateKey(d: Date): string {
  */
 export async function logTracks(snap: Snapshot): Promise<void> {
   const redis = await getRedis();
-  if (!redis) return; // dev or unconfigured KV — skip
 
   const date = utcDateKey(new Date(snap.fetched_at));
   const tsSec = Math.floor(snap.fetched_at / 1000);
@@ -57,6 +61,28 @@ export async function logTracks(snap: Snapshot): Promise<void> {
   // SAMPLE label amber when this cron silently dies. Best-effort; never
   // throws.
   await recordLastSample(snap.fetched_at);
+
+  if (!redis) {
+    for (const a of points) {
+      const key = trackKey(a.tail, date);
+      const entry = memoryTracks.get(key) ?? {
+        points: [],
+        expiresAt: Date.now() + TTL_SECONDS * 1000,
+      };
+      entry.points.push({
+        lat: a.lat as number,
+        lon: a.lon as number,
+        alt: a.altitude_ft ?? null,
+        spd: a.ground_speed_kt ?? null,
+        trk: a.heading ?? null,
+        ts: tsSec,
+      });
+      entry.expiresAt = Date.now() + TTL_SECONDS * 1000;
+      memoryTracks.set(key, entry);
+    }
+    pruneMemoryTracks();
+    return;
+  }
 
   const writes = points.map(async (a) => {
     const key = trackKey(a.tail, date);
@@ -82,7 +108,17 @@ export async function logTracks(snap: Snapshot): Promise<void> {
 /** Sorted list of YYYYMMDD dates that have tracks for this tail (newest first). */
 export async function listTrackKeys(tail: string): Promise<string[]> {
   const redis = await getRedis();
-  if (!redis) return [];
+  if (!redis) {
+    pruneMemoryTracks();
+    const prefix = trackScanPattern(tail).replace("*", "");
+    const dates = new Set<string>();
+    for (const k of memoryTracks.keys()) {
+      if (!k.startsWith(prefix)) continue;
+      const d = k.split(":")[2];
+      if (d) dates.add(d);
+    }
+    return [...dates].sort().reverse();
+  }
   const dates = new Set<string>();
   let cursor: string | number = 0;
   do {
@@ -105,7 +141,10 @@ export async function getTracksForDay(
   date: string,
 ): Promise<TrackPoint[]> {
   const redis = await getRedis();
-  if (!redis) return [];
+  if (!redis) {
+    pruneMemoryTracks();
+    return [...(memoryTracks.get(trackKey(tail, date))?.points ?? [])];
+  }
   const key = trackKey(tail, date);
   let raw: unknown[] = [];
   try {
@@ -183,5 +222,12 @@ function safeParse(s: unknown): TrackPoint | null {
     return JSON.parse(s) as TrackPoint;
   } catch {
     return null;
+  }
+}
+
+function pruneMemoryTracks(): void {
+  const now = Date.now();
+  for (const [key, entry] of memoryTracks) {
+    if (entry.expiresAt < now) memoryTracks.delete(key);
   }
 }

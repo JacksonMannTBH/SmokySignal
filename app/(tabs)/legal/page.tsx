@@ -30,7 +30,7 @@ export default function LegalPage() {
           marginTop: 4,
         }}
       >
-        <span className="ss-eyebrow">SmokySignal · Legal</span>
+        <span className="ss-eyebrow">Out Of Sight · Legal</span>
         <Link
           href="/about"
           className="ss-mono"
@@ -60,7 +60,7 @@ export default function LegalPage() {
         }}
       >
         <p>
-          SmokySignal is a personal/hobby project. The information shown is
+          Out Of Sight is a personal/hobby project. The information shown is
           derived from public ADS-B telemetry — no private feeds, no
           enforcement-tier sources.
         </p>
@@ -125,7 +125,7 @@ export default function LegalPage() {
             rel="noopener noreferrer"
             style={{ color: SS_TOKENS.fg0, textDecoration: "underline" }}
           >
-            github.com/adavenport-ops/SmokySignal
+            project repository
           </a>
           .
         </p>
@@ -153,7 +153,7 @@ function DataFlowSection() {
         How your data flows
       </h2>
       <p>
-        SmokySignal is a one-way receiver. We listen to public aircraft
+        Out Of Sight is a one-way receiver. We listen to public aircraft
         signals and render them on a map. Nothing about you, your phone,
         or your speed leaves your device on its way to anyone — not WSP,
         not the FAA, not us, not third parties.
@@ -216,7 +216,7 @@ function DataFlowSection() {
               className="ss-mono"
               style={{ color: SS_TOKENS.fg0, textDecoration: "underline" }}
             >
-              github.com/adavenport-ops/SmokySignal
+              project repository
             </a>
             {" "}— read it, run your own fork if you&rsquo;d rather.
           </>,

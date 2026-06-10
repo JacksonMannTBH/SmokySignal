@@ -3,7 +3,7 @@
 // Flight-path polyline overlay. Threads each tail-day's track samples
 // as a thin amber line beneath the hot-zone heatmap layer — corridors
 // (I-5 transit, lake-patrol orbits) read as actual lines instead of
-// blob density. Pairs with HotZoneLayer.tsx; visibility tracks its own
+// blob density. Visibility tracks its own
 // `ss_flight_paths_visible` localStorage key so riders can dim the
 // heat while keeping live paths or vice versa. Both layers also listen
 // for the LAYER_VISIBILITY_CHANGE_EVENT broadcast from each toggle so
@@ -28,12 +28,11 @@ import { DEFAULT_REGION, type RegionId } from "@/lib/regions";
 import {
   FLIGHT_PATHS_VISIBLE_KEY,
   LAYER_VISIBILITY_CHANGE_EVENT,
-} from "./HotZoneLayer";
+} from "@/lib/radar-layer-events";
 
 const VISIBLE_KEY = FLIGHT_PATHS_VISIBLE_KEY;
 const SOURCE_ID = "flight-paths";
 const LAYER_ID = "flight-paths-line";
-const HEATMAP_LAYER_ID = "hotzones-heat";
 const AIRCRAFT_LAYER_ID = "aircraft";
 
 function buildQueryString(f: Filter, regionId: RegionId): string {
@@ -64,7 +63,7 @@ export function FlightPathLayer({ map }: Props) {
   enabledRef.current = enabled;
 
   // Mirror persisted state + cross-component change events same as
-  // HotZoneLayer — both layers respond identically to filter / region
+  // Keep filter / region / visibility changes in sync with radar controls.
   // / visibility changes.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -81,7 +80,7 @@ export function FlightPathLayer({ map }: Props) {
       const detail = (e as CustomEvent<{ id: RegionId }>).detail;
       setRegionId(detail?.id ?? getRegion());
     };
-    // Same-tab broadcast from HotZoneLayer's toggleFlightPaths — sync
+    // Same-tab broadcast from the flight-path toggle — sync
     // visibility instantly when the rider taps the bottom-left pill or
     // the in-panel Layers row.
     const onLayerVisChange = (e: Event) => {
@@ -134,7 +133,7 @@ export function FlightPathLayer({ map }: Props) {
   }, [filter, regionId]);
 
   // Add the source + layer once the map is ready. Same retry-on-data
-  // pattern as HotZoneLayer because MapLibre's isStyleLoaded() is
+  // pattern used by sibling layers because MapLibre's isStyleLoaded() is
   // unreliable post-mount under Next.js dynamic-import.
   useEffect(() => {
     if (!map) return;
@@ -152,11 +151,9 @@ export function FlightPathLayer({ map }: Props) {
         // still lands beneath the chevrons; when heatmap attaches
         // later it'll auto-insert above the polyline (its own
         // beforeId targets the aircraft layer).
-        const beforeId = map.getLayer(HEATMAP_LAYER_ID)
-          ? HEATMAP_LAYER_ID
-          : map.getLayer(AIRCRAFT_LAYER_ID)
-            ? AIRCRAFT_LAYER_ID
-            : undefined;
+        const beforeId = map.getLayer(AIRCRAFT_LAYER_ID)
+          ? AIRCRAFT_LAYER_ID
+          : undefined;
         map.addLayer(
           {
             id: LAYER_ID,

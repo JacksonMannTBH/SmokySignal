@@ -102,11 +102,12 @@ export function TrailStatusBadge({ airborne }: { airborne: Aircraft[] }) {
       style={{
         padding: "6px 10px",
         borderRadius: 999,
-        background: "rgba(11,13,16,0.78)",
+        background: "rgba(255,255,255,0.88)",
         border: `.5px solid ${SS_TOKENS.hairline2}`,
+        boxShadow: SS_TOKENS.shadowSm,
         color,
         fontSize: 9.5,
-        letterSpacing: ".06em",
+        letterSpacing: 0,
         whiteSpace: "nowrap",
       }}
     >

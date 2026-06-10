@@ -1071,7 +1071,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 6,
   padding: "8px 10px",
   color: SS_TOKENS.fg0,
-  fontFamily: "var(--font-inter)",
+  fontFamily: "var(--font-brand)",
   fontSize: 12.5,
 };
 
@@ -1143,7 +1143,7 @@ function Td({
       style={{
         padding: "8px 8px",
         fontSize: 12,
-        fontFamily: mono ? "var(--font-mono)" : "var(--font-inter)",
+        fontFamily: mono ? "var(--font-mono)" : "var(--font-brand)",
         color: dim ? SS_TOKENS.fg2 : SS_TOKENS.fg0,
         whiteSpace: "nowrap",
       }}

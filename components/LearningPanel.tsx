@@ -123,12 +123,13 @@ export function LearningPanel({
       <div
         className={className}
         style={{
-          background: "rgba(11,13,16,0.92)",
+          background: "rgba(255,255,255,0.9)",
           border: `.5px solid ${SS_TOKENS.hairline2}`,
-          borderRadius: 14,
+          borderRadius: 22,
+          boxShadow: SS_TOKENS.shadowMd,
           padding: "14px 16px",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
+          backdropFilter: "blur(24px) saturate(1.1)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.1)",
           ...style,
         }}
       >
@@ -144,7 +145,8 @@ export function LearningPanel({
       style={{
         background: SS_TOKENS.bg1,
         border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: 14,
+        borderRadius: 20,
+        boxShadow: SS_TOKENS.shadowSm,
         padding: "14px 16px",
         ...style,
       }}

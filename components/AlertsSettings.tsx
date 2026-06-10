@@ -278,7 +278,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                   border: 0,
                   background: subId ? SS_TOKENS.bg2 : SS_TOKENS.alert,
                   color: subId ? SS_TOKENS.fg1 : SS_TOKENS.bg0,
-                  fontFamily: "var(--font-inter)",
+                  fontFamily: "var(--font-brand)",
                   fontSize: 13,
                   fontWeight: 700,
                   letterSpacing: ".02em",
@@ -302,7 +302,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                 }}
               >
                 Your browser blocked alerts. Open Safari → Settings →
-                SmokySignal to fix.
+                Out Of Sight to fix.
               </p>
             )}
           </Card>
@@ -463,8 +463,25 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
           <Section eyebrow="Proximity">
             <p style={{ fontSize: 13, color: SS_TOKENS.fg1, margin: 0, lineHeight: 1.45 }}>
               While the app is open and GPS is granted, ping me when a
-              tracked bird gets within range.
+              tracked bird gets within range. Native iOS banners keep Apple&apos;s
+              system styling; Out Of Sight names the proximity band and uses
+              color inside the app.
             </p>
+            <div
+              className="ss-mono"
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                marginTop: 10,
+                fontSize: 10.5,
+                letterSpacing: ".04em",
+              }}
+            >
+              <BandPill label="STOP" color={SS_TOKENS.danger} />
+              <BandPill label="SLOW" color={SS_TOKENS.warn} />
+              <BandPill label="Watch" color={SS_TOKENS.sky} />
+            </div>
             <div
               style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}
             >
@@ -640,10 +657,13 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
             bottom: 84,
             padding: "10px 14px",
             borderRadius: 999,
-            background: "rgba(11,13,16,0.92)",
+            background: "rgba(255,255,255,0.92)",
             color: SS_TOKENS.fg0,
             border: `.5px solid ${SS_TOKENS.hairline2}`,
-            fontFamily: "var(--font-mono)",
+            boxShadow: SS_TOKENS.shadowMd,
+            backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
+            fontFamily: "inherit",
             fontSize: 12,
             letterSpacing: ".04em",
             zIndex: 30,
@@ -692,7 +712,8 @@ function Card({ children }: { children: React.ReactNode }) {
       style={{
         background: SS_TOKENS.bg1,
         border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: 14,
+        borderRadius: 22,
+        boxShadow: SS_TOKENS.shadowSm,
         padding: "14px 16px",
       }}
     >
@@ -737,6 +758,22 @@ function RadioCard({
       </span>
       <span style={{ fontSize: 12, color: SS_TOKENS.fg1 }}>{body}</span>
     </button>
+  );
+}
+
+function BandPill({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+      style={{
+        padding: "5px 8px",
+        borderRadius: 999,
+        color,
+        background: `${color}1f`,
+        border: `.5px solid ${color}55`,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 

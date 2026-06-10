@@ -267,9 +267,9 @@ function PostInstallCopy({ pulse }: { pulse: boolean }) {
         style={{
           display: "inline-block",
           background: SS_TOKENS.alert,
-          color: SS_TOKENS.bg0,
+          color: "#fffdf8",
           padding: "6px 12px",
-          borderRadius: 8,
+          borderRadius: 999,
           fontSize: 12.5,
           fontWeight: 600,
           textDecoration: "none",

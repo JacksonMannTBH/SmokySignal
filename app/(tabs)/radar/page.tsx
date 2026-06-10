@@ -1,7 +1,6 @@
 import { RadarShell } from "@/components/RadarShell";
 import { getSnapshot } from "@/lib/snapshot";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
-import { getLearningState } from "@/lib/learning";
 import { getFreshness } from "@/lib/freshness";
 
 export const metadata = {
@@ -17,9 +16,8 @@ export default async function RadarPage({
 }: {
   searchParams: SP;
 }) {
-  const [real, learning, freshness] = await Promise.all([
+  const [real, freshness] = await Promise.all([
     getSnapshot(),
-    getLearningState(),
     getFreshness(),
   ]);
   const mockState = parseMockState(searchParams.mock);
@@ -29,7 +27,6 @@ export default async function RadarPage({
     <RadarShell
       initial={initial}
       mockOn={mockOn}
-      learning={learning}
       lastSampleMs={freshness.lastSampleMs}
     />
   );

@@ -49,7 +49,7 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props) {
-  return { title: `SmokySignal · ${params.tail.toUpperCase()}` };
+  return { title: `Out Of Sight · ${params.tail.toUpperCase()}` };
 }
 
 export default async function PlanePage({ params, searchParams }: Props) {

@@ -87,7 +87,7 @@ export function ArmAlertsCallout() {
           letterSpacing: ".04em",
         }}
       >
-        Browser blocked alerts. Open Safari → Settings → SmokySignal to unblock.
+        Browser blocked alerts. Open Safari → Settings → Out Of Sight to unblock.
       </div>
     );
   }
@@ -99,7 +99,8 @@ export function ArmAlertsCallout() {
       style={{
         background: SS_TOKENS.bg1,
         border: `.5px solid ${SS_TOKENS.alert}`,
-        borderRadius: 12,
+        borderRadius: 22,
+        boxShadow: SS_TOKENS.shadowSm,
         padding: 14,
         display: "flex",
         alignItems: "center",
@@ -127,9 +128,9 @@ export function ArmAlertsCallout() {
           href="/settings/alerts"
           style={{
             background: SS_TOKENS.alert,
-            color: SS_TOKENS.bg0,
+            color: "#fffdf8",
             padding: "8px 14px",
-            borderRadius: 8,
+            borderRadius: 999,
             fontSize: 13,
             fontWeight: 600,
             textDecoration: "none",

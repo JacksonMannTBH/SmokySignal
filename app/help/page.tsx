@@ -8,7 +8,7 @@ import { HelpMarkdown, HelpScrollTopButton } from "./HelpView";
 export const metadata = {
   title: "Help",
   description:
-    "What SmokySignal shows you, where the data comes from, and how to read each screen.",
+    "What Out Of Sight shows you, where the data comes from, and how to read each screen.",
 };
 
 export default async function HelpPage() {
@@ -39,10 +39,11 @@ export default async function HelpPage() {
           position: "sticky",
           top: 0,
           zIndex: 10,
-          background: "rgba(11,13,16,0.85)",
+          background: "rgba(255,255,255,0.86)",
           borderBottom: `.5px solid ${SS_TOKENS.hairline}`,
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
+          boxShadow: SS_TOKENS.shadowSm,
+          backdropFilter: "blur(22px) saturate(1.08)",
+          WebkitBackdropFilter: "blur(22px) saturate(1.08)",
         }}
       >
         <div
@@ -84,7 +85,7 @@ export default async function HelpPage() {
               whiteSpace: "nowrap",
             }}
           >
-            SmokySignal · Help
+            Out Of Sight · Help
           </span>
           <span />
         </div>
