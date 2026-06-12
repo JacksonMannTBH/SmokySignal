@@ -1653,3 +1653,131 @@
  GET /api/aircraft 200 in 73ms
  GET /api/aircraft 200 in 1089ms
  GET /api/aircraft 200 in 1071ms
+ ○ Compiling /api/activity ...
+ ✓ Compiled /api/activity in 583ms (527 modules)
+ GET /api/aircraft 200 in 1152ms
+[adsb] primary failed, falling back to OpenSky: Error: adsb.fi 429
+    at fetchAdsbFi (webpack-internal:///(rsc)/./lib/adsb.ts:34:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async buildSnapshot (webpack-internal:///(rsc)/./lib/adsb.ts:54:15)
+    at async eval (webpack-internal:///(rsc)/./lib/snapshot.ts:75:26)
+ GET /api/aircraft 200 in 1835ms
+ GET /api/aircraft 200 in 1847ms
+ GET /api/activity?limit=1 200 in 1858ms
+ GET /api/activity?limit=1 200 in 1835ms
+ GET /api/aircraft 200 in 14ms
+ GET /api/aircraft 200 in 1805ms
+ GET /api/aircraft 200 in 1394ms
+ GET /api/activity?limit=1 200 in 1745ms
+ GET /api/aircraft 200 in 100ms
+ GET /api/activity?limit=1 200 in 102ms
+ GET /api/aircraft 200 in 1102ms
+ GET /api/aircraft 200 in 37ms
+ GET /api/aircraft 200 in 18ms
+ GET /api/aircraft 200 in 1160ms
+ GET /api/activity?limit=1 200 in 1159ms
+ GET /api/aircraft 200 in 49ms
+ GET /api/aircraft 200 in 1113ms
+ GET /api/aircraft 200 in 19ms
+ GET /api/aircraft 200 in 869ms
+ GET /api/activity?limit=1 200 in 861ms
+ GET /api/aircraft 200 in 52ms
+ GET /api/aircraft 200 in 1184ms
+ GET /api/aircraft 200 in 16ms
+ GET /api/aircraft 200 in 864ms
+ GET /api/activity?limit=1 200 in 863ms
+ GET /api/aircraft 200 in 21ms
+ GET /api/aircraft 200 in 819ms
+ GET /api/aircraft 200 in 25ms
+ GET /api/aircraft 200 in 1084ms
+ GET /api/activity?limit=1 200 in 1083ms
+ GET /api/aircraft 200 in 21ms
+ GET /api/aircraft 200 in 1123ms
+ GET /api/aircraft 200 in 16ms
+ GET /api/aircraft 200 in 1088ms
+ GET /api/activity?limit=1 200 in 1084ms
+ GET /api/aircraft 200 in 29ms
+ GET /api/aircraft 200 in 1204ms
+ GET /api/aircraft 200 in 29ms
+ GET /api/aircraft 200 in 1118ms
+ GET /api/activity?limit=1 200 in 1117ms
+ GET /api/aircraft 200 in 38ms
+ GET /api/aircraft 200 in 900ms
+ GET /api/aircraft 200 in 27ms
+ GET /api/aircraft 200 in 1098ms
+ GET /api/activity?limit=1 200 in 1097ms
+ GET /api/aircraft 200 in 36ms
+ GET /api/aircraft 200 in 1011ms
+ GET /api/aircraft 200 in 15ms
+ GET /api/aircraft 200 in 1128ms
+ GET /api/activity?limit=1 200 in 1119ms
+ GET /api/aircraft 200 in 20ms
+ GET /api/aircraft 200 in 1077ms
+ GET /api/aircraft 200 in 22ms
+ GET /api/aircraft 200 in 1025ms
+ GET /api/activity?limit=1 200 in 1023ms
+ GET /api/aircraft 200 in 33ms
+ GET /api/aircraft 200 in 1075ms
+ GET /api/aircraft 200 in 11ms
+ GET /api/aircraft 200 in 1053ms
+ GET /api/activity?limit=1 200 in 1052ms
+ GET /api/aircraft 200 in 48ms
+ GET /api/aircraft 200 in 821ms
+ GET /api/aircraft 200 in 22ms
+ GET /api/aircraft 200 in 1008ms
+ GET /api/activity?limit=1 200 in 1007ms
+ GET /api/aircraft 200 in 33ms
+ GET /api/aircraft 200 in 1090ms
+ GET /api/aircraft 200 in 18ms
+ GET /api/aircraft 200 in 1198ms
+ GET /api/activity?limit=1 200 in 1197ms
+ GET /api/aircraft 200 in 17ms
+ GET /api/aircraft 200 in 1145ms
+ GET /api/aircraft 200 in 21ms
+ GET /api/aircraft 200 in 1096ms
+ GET /api/activity?limit=1 200 in 1096ms
+ GET /api/aircraft 200 in 22ms
+ GET /api/aircraft 200 in 1004ms
+ GET /api/aircraft 200 in 16ms
+ GET /api/aircraft 200 in 1017ms
+ GET /api/activity?limit=1 200 in 1015ms
+ GET /api/aircraft 200 in 33ms
+ GET /api/aircraft 200 in 1034ms
+ GET /api/aircraft 200 in 321ms
+ GET /api/aircraft 200 in 995ms
+ GET /api/activity?limit=1 200 in 995ms
+ GET /api/aircraft 200 in 23ms
+ GET /api/aircraft 200 in 510ms
+ ✓ Compiled in 824ms (527 modules)
+ GET /radar?mock=smokey 200 in 1986ms
+ ○ Compiling /api/aircraft ...
+ ✓ Compiled /api/aircraft in 984ms (526 modules)
+ ✓ Compiled (528 modules)
+ GET /api/flight-paths?region_id=all_wa 200 in 2941ms
+ GET /api/flight-paths?region_id=all_wa 200 in 2814ms
+ GET /api/aircraft 200 in 3491ms
+ GET /api/aircraft 200 in 3490ms
+ GET /api/aircraft 200 in 3485ms
+ GET /api/aircraft 200 in 3616ms
+ GET /api/aircraft 200 in 649ms
+ GET /api/aircraft 200 in 606ms
+ GET /api/flight-paths?region_id=all_wa 200 in 61ms
+ GET /api/aircraft 200 in 31ms
+ GET /api/aircraft 200 in 47ms
+ GET /api/aircraft 200 in 1139ms
+ GET /api/aircraft 200 in 1132ms
+ GET /api/aircraft 200 in 42ms
+ GET /api/aircraft 200 in 56ms
+ GET /api/aircraft 200 in 54ms
+ GET /api/aircraft 200 in 1200ms
+ GET /api/aircraft 200 in 1200ms
+ ○ Compiling /api/trails ...
+ ✓ Compiled /api/trails in 942ms (530 modules)
+ GET /api/trails?tails=N2108J 200 in 1117ms
+ GET /api/trails?tails=N2108J 200 in 27ms
+ GET /api/aircraft 200 in 1475ms
+ GET /api/aircraft 200 in 1474ms
+ GET /api/aircraft 200 in 31ms
+ GET /api/aircraft 200 in 38ms
+ GET /api/aircraft 200 in 36ms
+ GET /api/trails?tails=N2108J 200 in 59ms
