@@ -12,6 +12,7 @@
 
 import { getRedis } from "./cache";
 import { FLEET as SEED } from "./seed";
+import { isTrackedTail, trackedTailOrder } from "./tracked-tails";
 import type { FleetEntry } from "./types";
 
 const REGISTRY_KEY = "registry:tails";
@@ -89,6 +90,9 @@ export async function getRegistry(): Promise<FleetEntry[]> {
       console.warn("[registry] read failed, using seed:", e);
     }
   }
+  value = value
+    .filter((entry) => isTrackedTail(entry.tail))
+    .sort((a, b) => trackedTailOrder(a.tail) - trackedTailOrder(b.tail));
   memCache = { value, expiresAt: Date.now() + MEM_CACHE_MS };
   return value;
 }

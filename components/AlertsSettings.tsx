@@ -1,10 +1,5 @@
 "use client";
 
-// /settings/alerts — single-screen opt-in surface for push notifications.
-// Five sections: status row + tier picker + zones + quiet hours + test.
-// All copy passes the design/BRAND.md voice rules (no emoji, no '!',
-// 3–6 word headlines, ≤140 char bodies, "Smokey" with the E for the bird).
-
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SS_TOKENS } from "@/lib/tokens";
@@ -18,11 +13,7 @@ import {
   unsubscribePush,
   updatePushPrefs,
 } from "@/lib/push/client";
-import {
-  DEFAULT_PREFS,
-  type AlertPrefs,
-  type AlertTier,
-} from "@/lib/push/types";
+import { DEFAULT_PREFS, type AlertPrefs } from "@/lib/push/types";
 import {
   DEFAULT_PROXIMITY_NM,
   getProximityThresholdNm,
@@ -30,47 +21,31 @@ import {
   setProximityEnabled,
   setProximityThresholdNm,
 } from "@/lib/proximity-alert";
-import {
-  isVoiceModeEnabled,
-  isVoiceModeSupported,
-  setVoiceModeEnabled,
-  speakAlert,
-} from "@/lib/voice-mode";
+import { TRACKED_TAILS } from "@/lib/tracked-tails";
 
 type LoadState = "loading" | "ready";
 
-export type TailOption = {
-  tail: string;
-  nickname: string | null;
-  operator: string;
-  role: string;
-};
-
-export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] }) {
+export function AlertsSettings() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [supported, setSupported] = useState(true);
   const [contextOk, setContextOk] = useState<{
     available: boolean;
     reason?: "ios-not-pwa" | "ios-too-old";
   }>({ available: true });
-  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [permission, setPermission] =
+    useState<NotificationPermission>("default");
   const [subId, setSubId] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULT_PREFS);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [proximityOn, setProximityOn] = useState<boolean>(false);
   const [proximityNm, setProximityNm] = useState<number>(DEFAULT_PROXIMITY_NM);
-  const [voiceOn, setVoiceOn] = useState<boolean>(false);
-  const [voiceSupported, setVoiceSupported] = useState<boolean>(true);
-  // Hydrate proximity prefs from localStorage on mount.
+
   useEffect(() => {
     setProximityOn(isProximityEnabled());
     setProximityNm(getProximityThresholdNm());
-    setVoiceOn(isVoiceModeEnabled());
-    setVoiceSupported(isVoiceModeSupported());
   }, []);
 
-  // Hydrate from current SW state on mount.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -94,9 +69,20 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
     setTimeout(() => setToast(null), 3500);
   }, []);
 
+  const fixedPrefs = useMemo<AlertPrefs>(
+    () => ({
+      ...prefs,
+      tier: "all",
+      zones: "any",
+      tails: undefined,
+      userZones: undefined,
+    }),
+    [prefs],
+  );
+
   const onArm = useCallback(async () => {
     setBusy(true);
-    const r = await subscribePush(prefs);
+    const r = await subscribePush(fixedPrefs);
     setBusy(false);
     setPermission(getPushPermission());
     if (r.ok) {
@@ -111,7 +97,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
     } else {
       flash("Couldn't subscribe. Try again in a moment.");
     }
-  }, [prefs, flash]);
+  }, [fixedPrefs, flash]);
 
   const onDisarm = useCallback(async () => {
     setBusy(true);
@@ -125,7 +111,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
     async (next: Partial<AlertPrefs>) => {
       const merged: AlertPrefs = { ...prefs, ...next };
       setPrefs(merged);
-      if (!subId) return; // not yet subscribed; nothing to persist
+      if (!subId) return;
       const ok = await updatePushPrefs(subId, next);
       if (!ok) flash("Couldn't save preference. Try again.");
     },
@@ -141,24 +127,18 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
     if (!ok) flash("Couldn't send the test ping.");
   }, [permission, flash]);
 
-  const statusBadge = useMemo<{ label: string; color: string; bg: string }>(() => {
-    if (!subId) return { label: "OFF", color: SS_TOKENS.fg2, bg: SS_TOKENS.bg2 };
-    if (prefs.tier === "all")
-      return { label: "ALL", color: SS_TOKENS.alert, bg: SS_TOKENS.alertDim };
-    return {
-      label: "ALERT-ONLY",
-      color: SS_TOKENS.alert,
-      bg: SS_TOKENS.alertDim,
-    };
-  }, [subId, prefs.tier]);
+  const statusBadge = useMemo<{ label: string; color: string; bg: string }>(
+    () =>
+      subId
+        ? { label: "ARMED", color: SS_TOKENS.alert, bg: SS_TOKENS.alertDim }
+        : { label: "OFF", color: SS_TOKENS.fg2, bg: SS_TOKENS.bg2 },
+    [subId],
+  );
 
   return (
     <main
       style={{
         minHeight: "100dvh",
-        // 180 px bottom clears tab bar (66) + iOS install prompt
-        // overlay (~80) + breathing room. Without this the contrast
-        // + time-format cards hid behind the fixed prompt on iOS.
         padding: "12px 18px 180px",
         maxWidth: 460,
         margin: "0 auto",
@@ -175,7 +155,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
           marginTop: 4,
         }}
       >
-        <span className="ss-eyebrow">Alerts · Channel 19</span>
+        <span className="ss-eyebrow">Alerts - Channel 19</span>
         <Link
           href="/"
           className="ss-mono"
@@ -190,7 +170,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
             margin: "-12px -8px",
           }}
         >
-          ← Back
+          Back
         </Link>
       </header>
 
@@ -198,18 +178,18 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
         style={{
           fontSize: 28,
           fontWeight: 800,
-          letterSpacing: "-.03em",
+          letterSpacing: 0,
           lineHeight: 1.1,
           color: SS_TOKENS.fg0,
           margin: 0,
         }}
       >
-        Get a ping when the bird&rsquo;s up.
+        Get a ping when the bird's up.
       </h1>
 
       {loadState === "loading" ? (
         <Card>
-          <p style={{ color: SS_TOKENS.fg2, fontSize: 13 }}>Checking…</p>
+          <p style={{ color: SS_TOKENS.fg2, fontSize: 13 }}>Checking...</p>
         </Card>
       ) : !supported ? (
         <UnsupportedCard />
@@ -217,7 +197,6 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
         <IosNotPwaCard reason={contextOk.reason} />
       ) : (
         <>
-          {/* Status row */}
           <Card>
             <div
               style={{
@@ -232,7 +211,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                   className="ss-mono"
                   style={{
                     fontSize: 9.5,
-                    letterSpacing: ".12em",
+                    letterSpacing: 0,
                     color: SS_TOKENS.fg2,
                   }}
                 >
@@ -247,7 +226,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                     borderRadius: 999,
                     fontSize: 11,
                     fontWeight: 700,
-                    letterSpacing: ".1em",
+                    letterSpacing: 0,
                     color: statusBadge.color,
                     background: statusBadge.bg,
                     border: `.5px solid ${statusBadge.color}55`,
@@ -264,7 +243,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                       lineHeight: 1.45,
                     }}
                   >
-                    Quiet skies. No alerts armed.
+                    Alerts are off. Arm once to follow the fixed aircraft list.
                   </p>
                 )}
               </div>
@@ -281,8 +260,9 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                   fontFamily: "var(--font-brand)",
                   fontSize: 13,
                   fontWeight: 700,
-                  letterSpacing: ".02em",
-                  cursor: busy || permission === "denied" ? "default" : "pointer",
+                  letterSpacing: 0,
+                  cursor:
+                    busy || permission === "denied" ? "default" : "pointer",
                   opacity: busy || permission === "denied" ? 0.6 : 1,
                   touchAction: "manipulation",
                   WebkitTapHighlightColor: "transparent",
@@ -301,189 +281,70 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                   lineHeight: 1.45,
                 }}
               >
-                Your browser blocked alerts. Open Safari → Settings →
-                Out Of Sight to fix.
+                Your browser blocked alerts. Open Safari settings for Out Of
+                Sight to fix.
               </p>
             )}
           </Card>
 
-          {/* Tier picker */}
-          <Section eyebrow="What pings you">
-            <RadioCard
-              active={prefs.tier === "alert_only"}
-              onClick={() => persistPrefs({ tier: "alert_only" satisfies AlertTier })}
-              title="Alert only"
-              body="Bird up. Heads up."
-            />
-            <RadioCard
-              active={prefs.tier === "all"}
-              onClick={() => persistPrefs({ tier: "all" satisfies AlertTier })}
-              title="All aircraft"
-              body="Every wing in the air."
-            />
-          </Section>
-
-          {/* Tails — optional allow-list. Empty = all tails (subject to other
-              filters). Each row toggles a tail in/out of prefs.tails. */}
-          <Section eyebrow="Tails">
-            <p style={{ fontSize: 13, color: SS_TOKENS.fg1, margin: 0, lineHeight: 1.45 }}>
-              Pick specific tails to follow. Leave all unchecked to hear about
-              every bird that passes the tier filter.
-            </p>
-            <div
-              className="ss-mono"
-              style={{ fontSize: 10.5, color: SS_TOKENS.fg2, marginTop: 8, marginBottom: 6, letterSpacing: ".06em" }}
-            >
-              {!prefs.tails || prefs.tails.length === 0
-                ? "ALL TAILS"
-                : `${prefs.tails.length} TAIL${prefs.tails.length === 1 ? "" : "S"}`}
-            </div>
-            {registry.length === 0 ? (
-              <p style={{ fontSize: 12, color: SS_TOKENS.fg2, margin: 0 }}>
-                Registry unavailable.
-              </p>
-            ) : (
-              <div
-                role="group"
-                aria-label="Per-tail allow-list"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  border: `.5px solid ${SS_TOKENS.hairline}`,
-                  borderRadius: 8,
-                  overflow: "hidden",
-                }}
-              >
-                {registry.map((t, i) => {
-                  const checked =
-                    Array.isArray(prefs.tails) &&
-                    prefs.tails.includes(t.tail.toUpperCase());
-                  return (
-                    <label
-                      key={t.tail}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "8px 12px",
-                        borderBottom:
-                          i === registry.length - 1
-                            ? 0
-                            : `.5px solid ${SS_TOKENS.hairline}`,
-                        cursor: "pointer",
-                        background: checked ? SS_TOKENS.bg2 : "transparent",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const upper = t.tail.toUpperCase();
-                          const current = Array.isArray(prefs.tails)
-                            ? prefs.tails
-                            : [];
-                          const next = e.target.checked
-                            ? Array.from(new Set([...current, upper]))
-                            : current.filter((x) => x !== upper);
-                          // Empty array → drop the field so dispatcher
-                          // sees "no constraint" cleanly.
-                          persistPrefs({
-                            tails: next.length > 0 ? next : undefined,
-                          });
-                        }}
-                        style={{ flexShrink: 0 }}
-                      />
-                      <span
-                        className="ss-mono"
-                        style={{ fontSize: 12, fontWeight: 600, minWidth: 60 }}
-                      >
-                        {t.tail}
-                      </span>
-                      {t.nickname && (
-                        <span
-                          style={{
-                            fontSize: 12,
-                            color: SS_TOKENS.fg1,
-                            fontStyle: "italic",
-                          }}
-                        >
-                          &ldquo;{t.nickname}&rdquo;
-                        </span>
-                      )}
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: SS_TOKENS.fg2,
-                          marginLeft: "auto",
-                          textTransform: "uppercase",
-                          letterSpacing: ".04em",
-                        }}
-                      >
-                        {t.role}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </Section>
-
-          {/* Zones (placeholder — per-zone opt-in needs hot-zone load; today is 'any') */}
-          <Section eyebrow="Zones">
-            <p style={{ fontSize: 13, color: SS_TOKENS.fg1, margin: 0, lineHeight: 1.45 }}>
-              Pings fire for any corridor. Per-zone filters land once your
-              local hot-zones have settled in.
-            </p>
-            <div
-              className="ss-mono"
-              style={{ fontSize: 10.5, color: SS_TOKENS.fg2, marginTop: 8, letterSpacing: ".06em" }}
-            >
-              {prefs.zones === "any"
-                ? "ANY ZONE"
-                : `${prefs.zones.length} ZONE${prefs.zones.length === 1 ? "" : "S"}`}
-            </div>
-            <Link
-              href="/settings/zones"
+          <Section eyebrow="Tracked aircraft">
+            <p
               style={{
-                display: "inline-block",
-                marginTop: 10,
-                color: SS_TOKENS.alert,
                 fontSize: 13,
-                textDecoration: "none",
+                color: SS_TOKENS.fg1,
+                margin: 0,
+                lineHeight: 1.45,
               }}
             >
-              Manage your zones →
-            </Link>
-          </Section>
-
-          {/* Proximity (foreground-only, client-side) — fires a local
-              notification when an alert-tier tail enters the threshold
-              while the app is open + GPS granted. No server-side rider
-              position; pure client logic. */}
-          <Section eyebrow="Proximity">
-            <p style={{ fontSize: 13, color: SS_TOKENS.fg1, margin: 0, lineHeight: 1.45 }}>
-              While the app is open and GPS is granted, ping me when a
-              tracked bird gets within range. Native iOS banners keep Apple&apos;s
-              system styling; Out Of Sight names the proximity band and uses
-              color inside the app.
+              Alerts use this fixed list for everyone.
             </p>
             <div
               className="ss-mono"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))",
+                gap: 6,
+              }}
+            >
+              {TRACKED_TAILS.map((tail) => (
+                <span
+                  key={tail}
+                  style={{
+                    padding: "7px 8px",
+                    borderRadius: 8,
+                    background: SS_TOKENS.bg2,
+                    border: `.5px solid ${SS_TOKENS.hairline2}`,
+                    color: SS_TOKENS.fg0,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textAlign: "center",
+                  }}
+                >
+                  {tail}
+                </span>
+              ))}
+            </div>
+          </Section>
+
+          <Section eyebrow="Proximity">
+            <p
+              style={{
+                fontSize: 13,
+                color: SS_TOKENS.fg1,
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              While the app is open and GPS is granted, ping me when a tracked
+              bird gets within range.
+            </p>
+            <div
               style={{
                 display: "flex",
-                gap: 6,
-                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 12,
                 marginTop: 10,
-                fontSize: 10.5,
-                letterSpacing: ".04em",
               }}
-            >
-              <BandPill label="STOP" color={SS_TOKENS.danger} />
-              <BandPill label="SLOW" color={SS_TOKENS.warn} />
-              <BandPill label="Watch" color={SS_TOKENS.sky} />
-            </div>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}
             >
               <label
                 style={{
@@ -502,7 +363,10 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                     setProximityEnabled(next);
                   }}
                 />
-                <span className="ss-mono" style={{ fontSize: 12, letterSpacing: ".04em" }}>
+                <span
+                  className="ss-mono"
+                  style={{ fontSize: 12, letterSpacing: 0 }}
+                >
                   ENABLED
                 </span>
               </label>
@@ -534,76 +398,35 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                   opacity: proximityOn ? 1 : 0.5,
                 }}
               />
-              <span className="ss-mono" style={{ fontSize: 11, color: SS_TOKENS.fg2 }}>
+              <span
+                className="ss-mono"
+                style={{ fontSize: 11, color: SS_TOKENS.fg2 }}
+              >
                 NM
               </span>
             </div>
           </Section>
 
-          {/* Voice readback (NX4) — when an alert fires while the page
-              is open, speak the body via speechSynthesis. iOS needs a
-              user gesture before the first speak() works; the toggle
-              click + the test-notification flow both prime the API. */}
-          <Section eyebrow="Voice">
-            <p style={{ fontSize: 13, color: SS_TOKENS.fg1, margin: 0, lineHeight: 1.45 }}>
-              Read alerts aloud while the page is open. Useful with helmet
-              audio. Closed-tab background pings don't speak.
-            </p>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  cursor: voiceSupported ? "pointer" : "not-allowed",
-                  opacity: voiceSupported ? 1 : 0.5,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={voiceOn}
-                  disabled={!voiceSupported}
-                  onChange={(e) => {
-                    const next = e.target.checked;
-                    setVoiceOn(next);
-                    setVoiceModeEnabled(next);
-                    // Prime the API on first opt-in so iOS allows
-                    // subsequent speak() calls without user gesture.
-                    if (next) speakAlert("Voice readback on.");
-                  }}
-                />
-                <span className="ss-mono" style={{ fontSize: 12, letterSpacing: ".04em" }}>
-                  ENABLED
-                </span>
-              </label>
-              {!voiceSupported && (
-                <span
-                  className="ss-mono"
-                  style={{ fontSize: 11, color: SS_TOKENS.fg2 }}
-                >
-                  UNSUPPORTED
-                </span>
-              )}
-            </div>
-          </Section>
-
-          {/* Quiet hours */}
           <Section eyebrow="Quiet hours">
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <HourInput
                 value={prefs.quiet_start_h}
                 onChange={(h) => persistPrefs({ quiet_start_h: h })}
               />
-              <span className="ss-mono" style={{ color: SS_TOKENS.fg2, fontSize: 12 }}>
-                →
+              <span
+                className="ss-mono"
+                style={{ color: SS_TOKENS.fg2, fontSize: 12 }}
+              >
+                to
               </span>
               <HourInput
                 value={prefs.quiet_end_h}
                 onChange={(h) => persistPrefs({ quiet_end_h: h })}
               />
-              <span className="ss-mono" style={{ color: SS_TOKENS.fg2, fontSize: 11 }}>
+              <span
+                className="ss-mono"
+                style={{ color: SS_TOKENS.fg2, fontSize: 11 }}
+              >
                 {prefs.tz}
               </span>
             </div>
@@ -619,7 +442,6 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
             </p>
           </Section>
 
-          {/* Test button */}
           <Section eyebrow="Test">
             <button
               type="button"
@@ -633,7 +455,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
                 color: SS_TOKENS.fg0,
                 fontFamily: "var(--font-mono)",
                 fontSize: 12,
-                letterSpacing: ".04em",
+                letterSpacing: 0,
                 cursor: permission === "granted" ? "pointer" : "default",
                 opacity: permission === "granted" ? 1 : 0.5,
                 touchAction: "manipulation",
@@ -657,7 +479,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
             bottom: 84,
             padding: "10px 14px",
             borderRadius: 999,
-            background: "rgba(255,255,255,0.92)",
+            background: SS_TOKENS.surface,
             color: SS_TOKENS.fg0,
             border: `.5px solid ${SS_TOKENS.hairline2}`,
             boxShadow: SS_TOKENS.shadowMd,
@@ -665,7 +487,7 @@ export function AlertsSettings({ tails: registry = [] }: { tails?: TailOption[] 
             WebkitBackdropFilter: "blur(18px)",
             fontFamily: "inherit",
             fontSize: 12,
-            letterSpacing: ".04em",
+            letterSpacing: 0,
             zIndex: 30,
             maxWidth: "calc(100% - 32px)",
             textAlign: "center",
@@ -692,7 +514,7 @@ function Section({
         style={{
           fontSize: 9.5,
           color: SS_TOKENS.fg2,
-          letterSpacing: ".12em",
+          letterSpacing: 0,
           textTransform: "uppercase",
           marginBottom: 12,
         }}
@@ -719,61 +541,6 @@ function Card({ children }: { children: React.ReactNode }) {
     >
       {children}
     </section>
-  );
-}
-
-function RadioCard({
-  active,
-  onClick,
-  title,
-  body,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  body: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      style={{
-        textAlign: "left",
-        padding: "10px 12px",
-        borderRadius: 10,
-        background: active ? SS_TOKENS.alertDim : SS_TOKENS.bg2,
-        border: `.5px solid ${active ? `color-mix(in srgb, ${SS_TOKENS.alert} 40%, transparent)` : SS_TOKENS.hairline2}`,
-        color: SS_TOKENS.fg0,
-        cursor: "pointer",
-        touchAction: "manipulation",
-        WebkitTapHighlightColor: "transparent",
-        display: "flex",
-        flexDirection: "column",
-        gap: 3,
-      }}
-    >
-      <span style={{ fontSize: 13.5, fontWeight: 700, color: SS_TOKENS.fg0 }}>
-        {title}
-      </span>
-      <span style={{ fontSize: 12, color: SS_TOKENS.fg1 }}>{body}</span>
-    </button>
-  );
-}
-
-function BandPill({ label, color }: { label: string; color: string }) {
-  return (
-    <span
-      style={{
-        padding: "5px 8px",
-        borderRadius: 999,
-        color,
-        background: `${color}1f`,
-        border: `.5px solid ${color}55`,
-      }}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -815,9 +582,16 @@ function HourInput({
 function UnsupportedCard() {
   return (
     <Card>
-      <p style={{ fontSize: 13.5, color: SS_TOKENS.fg1, margin: 0, lineHeight: 1.5 }}>
-        This browser doesn&rsquo;t support push notifications. Try Chrome,
-        Firefox, or Safari on iOS 16.4+ (after Add to Home Screen).
+      <p
+        style={{
+          fontSize: 13.5,
+          color: SS_TOKENS.fg1,
+          margin: 0,
+          lineHeight: 1.5,
+        }}
+      >
+        This browser doesn't support push notifications. Try Chrome, Firefox,
+        or Safari on iOS 16.4+ after Add to Home Screen.
       </p>
     </Card>
   );
@@ -835,13 +609,20 @@ function IosNotPwaCard({
         style={{
           fontSize: 9.5,
           color: SS_TOKENS.fg2,
-          letterSpacing: ".12em",
+          letterSpacing: 0,
           marginBottom: 8,
         }}
       >
         ON IPHONE
       </div>
-      <p style={{ fontSize: 14, color: SS_TOKENS.fg0, margin: 0, lineHeight: 1.5 }}>
+      <p
+        style={{
+          fontSize: 14,
+          color: SS_TOKENS.fg0,
+          margin: 0,
+          lineHeight: 1.5,
+        }}
+      >
         {reason === "ios-too-old"
           ? "iOS 16.4 or later is required for browser-based push. Update iOS to enable alerts."
           : "Alerts only work after you Add to Home Screen. Tap Share, then Add to Home Screen, then open the app icon."}

@@ -8,7 +8,7 @@ import { ThemeController } from "@/components/ThemeController";
 import { getContrastPref } from "@/lib/user-prefs";
 import "./globals.css";
 
-const TITLE = "Out Of Sight — Is the bird up?";
+const TITLE = "Out Of Sight";
 const DESCRIPTION =
   "Live WSP and sheriff aircraft tracker for Washington state riders.";
 const SOCIAL_DESCRIPTION =
@@ -16,7 +16,7 @@ const SOCIAL_DESCRIPTION =
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: { default: TITLE, template: "%s · Out Of Sight" },
+  title: { default: TITLE, template: "%s - Out Of Sight" },
   description: DESCRIPTION,
   applicationName: "Out Of Sight",
   manifest: "/manifest.json",

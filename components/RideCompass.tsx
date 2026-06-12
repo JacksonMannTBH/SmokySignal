@@ -56,10 +56,6 @@ export function RideCompass({
         }`}
       </style>
       <CompassRing color={color} />
-      <Cardinal label="N" top="7%" left="50%" />
-      <Cardinal label="E" top="50%" left="93%" />
-      <Cardinal label="S" top="93%" left="50%" />
-      <Cardinal label="W" top="50%" left="7%" />
 
       {hasMarker && marker && (
         <>
@@ -172,33 +168,6 @@ function markerPosition(degrees: number): { x: number; y: number } {
     x: 50 + Math.cos(radians) * radius,
     y: 50 + Math.sin(radians) * radius,
   };
-}
-
-function Cardinal({
-  label,
-  top,
-  left,
-}: {
-  label: string;
-  top: string;
-  left: string;
-}) {
-  return (
-    <span
-      aria-hidden
-      style={{
-        position: "absolute",
-        top,
-        left,
-        transform: "translate(-50%, -50%)",
-        color: "#f5f2e8",
-        fontSize: 18,
-        fontWeight: 900,
-      }}
-    >
-      {label}
-    </span>
-  );
 }
 
 function CompassRing({ color }: { color: string }) {

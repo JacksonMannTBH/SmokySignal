@@ -10,6 +10,7 @@ const TABS: { id: string; label: string; href: string; icon: ReactNode }[] = [
   { id: "radar", label: "Radar", href: "/radar", icon: <RadarIcon /> },
   { id: "dash", label: "Dash", href: "/dash", icon: <DashIcon /> },
   { id: "activity", label: "Activity", href: "/activity", icon: <ActivityIcon /> },
+  { id: "alerts", label: "Alerts", href: "/settings/alerts", icon: <AlertsIcon /> },
   { id: "about", label: "About", href: "/about", icon: <InfoIcon /> },
 ];
 
@@ -187,6 +188,27 @@ function RadarIcon() {
       <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67" />
       <circle cx="12" cy="12" r="2" />
       <path d="m13.41 10.59 5.66-5.66" />
+    </svg>
+  );
+}
+
+// Lucide-style "bell-ring" icon for alert settings.
+function AlertsIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10.27 21a2 2 0 0 0 3.46 0" />
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M4 2C2.8 3.1 2 4.7 2 6.5" />
+      <path d="M22 6.5c0-1.8-.8-3.4-2-4.5" />
     </svg>
   );
 }

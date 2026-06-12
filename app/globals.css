@@ -231,6 +231,18 @@ body[data-theme="dark"] .maplibregl-ctrl-attrib {
   color: var(--ss-fg1) !important;
 }
 
+.ss-plane-popup .maplibregl-popup-content {
+  background: var(--ss-surface) !important;
+  color: var(--ss-fg0) !important;
+  border: 0.5px solid var(--ss-hairline-2);
+  border-radius: 8px;
+  box-shadow: var(--ss-shadow-md);
+}
+
+.ss-plane-popup .maplibregl-popup-close-button {
+  color: var(--ss-fg1);
+}
+
 body[data-theme="dark"] [style*="rgba(255,255,255"],
 body[data-theme="dark"] [style*="rgba(255, 255, 255"],
 body[data-theme="dark"] [style*="rgba(246,248,246"],

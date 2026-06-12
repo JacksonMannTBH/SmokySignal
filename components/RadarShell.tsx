@@ -32,13 +32,6 @@ import {
   setRegion,
 } from "@/lib/region-pref";
 import { DEFAULT_REGION, regionForPoint, type RegionId } from "@/lib/regions";
-import {
-  DEFAULT_RADAR_FILTER,
-  RADAR_FILTER_CHANGE_EVENT,
-  passesAircraftFilter,
-  readRadarFilter,
-  type RadarFilter,
-} from "@/lib/radar-filter";
 import type { Aircraft, FleetEntry, Snapshot } from "@/lib/types";
 
 export type RiderPos = { lat: number; lon: number };
@@ -57,7 +50,6 @@ const RadarMap = nextDynamic(() => import("./RadarMap"), {
 });
 
 const TABBAR_HEIGHT = 66;
-const AIRBORNE_BUBBLE_BOOST = 66;
 const GLASS_BG_STRONG = SS_TOKENS.surface;
 
 type Props = {
@@ -75,30 +67,9 @@ export function RadarShell({
     [snap.aircraft],
   );
   const status = useMemo(() => computeStatus(snap, fleetMap), [snap, fleetMap]);
-  // Mirror the heatmap chevron's filter so aircraft markers stay in sync —
-  // tapping "Smokey only" should hide non-smokey markers as well as
-  // non-smokey heat. Read once on mount and subscribe to the shared
-  // change event for cross-component updates.
-  const [radarFilter, setRadarFilter] = useState<RadarFilter>(
-    DEFAULT_RADAR_FILTER,
-  );
-  useEffect(() => {
-    setRadarFilter(readRadarFilter());
-    const onFilterChange = (e: Event) => {
-      const detail = (e as CustomEvent<RadarFilter>).detail;
-      if (detail) setRadarFilter(detail);
-    };
-    window.addEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
-    return () => {
-      window.removeEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
-    };
-  }, []);
   const airborne = useMemo(
-    () =>
-      snap.aircraft.filter(
-        (a) => a.airborne && passesAircraftFilter(a, radarFilter),
-      ),
-    [snap.aircraft, radarFilter],
+    () => snap.aircraft.filter((a) => a.airborne),
+    [snap.aircraft],
   );
   const pillKind = status.kind;
   const pillTooltip =
@@ -106,7 +77,7 @@ export function RadarShell({
       ? `${status.alertCount} alert-class aircraft up.`
       : status.lead
         ? `Nothing alerting. ${status.lead.entry.nickname ?? status.lead.aircraft.tail} is up but classified ${status.lead.entry.role}.`
-        : "Nothing in our 16-tail registry is currently up.";
+        : "Nothing in the tracked aircraft list is currently up.";
 
   const [rider, setRider] = useState<RiderPos | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -114,6 +85,11 @@ export function RadarShell({
   const [showRings, setShowRings] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
+  const [focusRequest, setFocusRequest] = useState<{
+    tail: string;
+    seq: number;
+  } | null>(null);
+  const focusSeqRef = useRef(0);
   // Hydrate the rings pref + region from localStorage on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -208,8 +184,6 @@ export function RadarShell({
     }
   }, [rider, regionId]);
 
-  const airbornePanelBoost = airborne.length > 0 ? AIRBORNE_BUBBLE_BOOST : 0;
-
   return (
     <main
       style={{
@@ -223,40 +197,22 @@ export function RadarShell({
         aircraft={airborne}
         rider={rider}
         showDistanceRings={showRings}
+        showFuelEstimate
         darkMode={darkMode}
         regionId={regionId}
+        focusRequest={focusRequest}
         onMapReady={setMap}
       />
-      <RadarLayerControls bottomBoost={airbornePanelBoost} />
+      <RadarLayerControls />
       <FlightPathLayer map={map} />
       <UserZoneLayer map={map} />
       <AircraftTrailLayer map={map} airborne={airborne} />
       <DistanceRingsToggle
         active={showRings}
         onToggle={() => setShowRings((v) => !v)}
-        bottom={`calc(${
-          TABBAR_HEIGHT + 16 + airbornePanelBoost
-        }px + var(--ss-install-prompt-h, 0px))`}
+        bottom={`calc(${TABBAR_HEIGHT + 16}px + var(--ss-install-prompt-h, 0px))`}
         disabled={!rider}
       />
-      {/* PROMPT_19C diagnostic — sits two rows above the HOT ZONES /
-          FLIGHT PATHS pill row (which is at TABBAR_HEIGHT + 16 +
-          bottomBoost) and one row above DistanceRingsToggle (+44).
-          The calc() adds the iOS install-prompt overlay height so
-          the badge stays visible above the prompt on iOS Safari.
-          Removed in the follow-up PR once trail rendering is
-          confirmed in the wild. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 12,
-          bottom: `calc(${
-            TABBAR_HEIGHT + 16 + airbornePanelBoost + 88
-          }px + var(--ss-install-prompt-h, 0px))`,
-          zIndex: 12,
-        }}
-      >
-      </div>
 
       <header
         style={{
@@ -280,13 +236,17 @@ export function RadarShell({
         />
       </header>
 
-      <CompassN />
-
       {airborne.length > 0 && (
-        <AirborneBubbles airborne={airborne} />
+        <AirborneBubbles
+          airborne={airborne}
+          onSelect={(tail) => {
+            focusSeqRef.current += 1;
+            setFocusRequest({ tail, seq: focusSeqRef.current });
+          }}
+        />
       )}
 
-      {toast && <Toast message={toast} bottomBoost={airbornePanelBoost} />}
+      {toast && <Toast message={toast} bottomBoost={0} />}
     </main>
   );
 }
@@ -335,56 +295,30 @@ function Toast({
   );
 }
 
-function CompassN() {
-  return (
-    <Tooltip side="left" content="Map orientation: north is up.">
-      <div
-        className="ss-mono"
-        tabIndex={0}
-        aria-label="Map north indicator"
-        style={{
-          position: "absolute",
-          top: "calc(env(safe-area-inset-top, 0px) + 128px)",
-          right: 12,
-          width: 34,
-          height: 34,
-          borderRadius: "50%",
-          border: `.5px solid ${SS_TOKENS.hairline2}`,
-          background: GLASS_BG_STRONG,
-          boxShadow: SS_TOKENS.shadowMd,
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          fontWeight: 700,
-          color: SS_TOKENS.fg1,
-          zIndex: 10,
-          cursor: "help",
-        }}
-      >
-        N
-      </div>
-    </Tooltip>
-  );
-}
-
-function AirborneBubbles({ airborne }: { airborne: Aircraft[] }) {
+function AirborneBubbles({
+  airborne,
+  onSelect,
+}: {
+  airborne: Aircraft[];
+  onSelect: (tail: string) => void;
+}) {
   return (
     <nav
       aria-label="Airborne aircraft"
       className="ss-scroll"
       style={{
         position: "absolute",
-        left: 12,
-        right: 84,
-        bottom: `calc(${TABBAR_HEIGHT + 12}px + var(--ss-install-prompt-h, 0px))`,
+        left: 10,
+        top: "50%",
+        transform: "translateY(-50%)",
         zIndex: 14,
         display: "flex",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "flex-start",
         gap: 8,
-        overflowX: "auto",
+        maxHeight: "calc(100dvh - 220px)",
+        overflowY: "auto",
+        padding: "4px 2px",
         WebkitOverflowScrolling: "touch",
       }}
     >
@@ -393,24 +327,23 @@ function AirborneBubbles({ airborne }: { airborne: Aircraft[] }) {
         return (
           <Tooltip
             key={p.tail}
-            side="top"
-            content={`${p.nickname ?? p.tail} - ${p.operator}`}
+            side="right"
+            content={`Center ${p.nickname ?? p.tail} on the map`}
           >
-            <Link
-              href={`/plane/${p.tail}`}
-              prefetch={false}
-              aria-label={`View ${p.nickname ?? p.tail} details`}
+            <button
+              type="button"
+              onClick={() => onSelect(p.tail)}
+              aria-label={`Center ${p.nickname ?? p.tail} on the map`}
               className="ss-mono"
               style={{
                 flex: "0 0 auto",
-                width: 58,
-                height: 58,
+                width: 62,
+                height: 62,
                 borderRadius: "50%",
-                background: "rgba(255,255,255,0.94)",
+                background: SS_TOKENS.surface,
                 border: `1.5px solid ${color}`,
                 boxShadow: SS_TOKENS.shadowMd,
                 color: SS_TOKENS.fg0,
-                textDecoration: "none",
                 display: "inline-flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -419,6 +352,7 @@ function AirborneBubbles({ airborne }: { airborne: Aircraft[] }) {
                 fontSize: 9.5,
                 fontWeight: 800,
                 lineHeight: 1,
+                cursor: "pointer",
                 touchAction: "manipulation",
                 WebkitTapHighlightColor: "transparent",
               }}
@@ -440,7 +374,7 @@ function AirborneBubbles({ airborne }: { airborne: Aircraft[] }) {
                   {p.ground_speed_kt}kt
                 </span>
               )}
-            </Link>
+            </button>
           </Tooltip>
         );
       })}
@@ -693,10 +627,8 @@ function DistanceRingsToggle({
   bottom: number | string;
   disabled?: boolean;
 }) {
-  // Sit just above the hot-zones toggle row so it doesn't compete for the
-  // same horizontal space. Also disabled when there's no rider position to
-  // pin the rings to — the toggle stays visible (so the user knows the
-  // feature exists) but greys out.
+  // Disabled when there's no rider position to pin the rings to. The toggle
+  // stays visible so the rider knows the feature exists.
   return (
     <Tooltip
       side="top"
@@ -704,7 +636,7 @@ function DistanceRingsToggle({
       content={
         disabled
           ? "Distance rings need your location. Allow location access on /radar."
-          : "5 / 10 / 15 nm rings around your position. Tap to toggle."
+          : "1 / 3 / 5 nm rings around your position. Tap to toggle."
       }
     >
       <button
@@ -718,12 +650,11 @@ function DistanceRingsToggle({
         style={{
           position: "absolute",
           left: 12,
-          bottom:
-            typeof bottom === "number"
-              ? bottom + 44
-              : `calc(${bottom} + 44px)`,
+          bottom,
           zIndex: 12,
-          padding: "9px 13px",
+          width: 116,
+          height: 46,
+          padding: "0 12px",
           borderRadius: 999,
           background: GLASS_BG_STRONG,
           border: `.5px solid ${SS_TOKENS.hairline2}`,
@@ -742,6 +673,9 @@ function DistanceRingsToggle({
           touchAction: "manipulation",
           WebkitTapHighlightColor: "transparent",
           opacity: disabled ? 0.6 : 1,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {active ? "Rings on" : "Rings"}

@@ -22,6 +22,12 @@ import {
   aircraftColorIndex,
 } from "@/lib/aircraft-colors";
 import { REGIONS, type RegionId } from "@/lib/regions";
+import {
+  estimateFuelRemaining,
+  normalizeTailNumber,
+  updateFuelObservationHistory,
+  type FuelObservation,
+} from "@/lib/fuel-estimate";
 
 const PUGET_SOUND: [number, number] = [-122.3, 47.6];
 const DEFAULT_ZOOM = 9;
@@ -99,6 +105,7 @@ type StyleLayerLike = {
 
 const CUSTOM_LAYER_PREFIXES = [
   "aircraft",
+  "aircraft-fuel",
   "rider",
   "distance-rings",
   "flight-paths",
@@ -108,6 +115,37 @@ const CUSTOM_LAYER_PREFIXES = [
 
 function isCustomLayer(id: string): boolean {
   return CUSTOM_LAYER_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
+
+function shouldHideMapDetailLayer(layer: StyleLayerLike): boolean {
+  const id = layer.id;
+  const label = `${id} ${layer["source-layer"] ?? ""}`.toLowerCase();
+  const isStructure = /building|structure|address|housenumber/.test(label);
+  if (isStructure) return true;
+
+  const isRoad = /road|street|highway|transport|path/.test(label);
+  if (!isRoad) return false;
+
+  const isArterial =
+    /motorway|trunk|primary|secondary|tertiary|major|highway/.test(label);
+  const isMinor =
+    /minor|service|residential|unclassified|living_street|track|path|footway|cycleway|pedestrian|steps|driveway|alley/.test(
+      label,
+    );
+  return isMinor && !isArterial;
+}
+
+function applyMapDetailBudget(map: MaplibreMap) {
+  const layers = (map.getStyle().layers ?? []) as StyleLayerLike[];
+  for (const layer of layers) {
+    if (isCustomLayer(layer.id)) continue;
+    if (!shouldHideMapDetailLayer(layer)) continue;
+    try {
+      map.setLayoutProperty(layer.id, "visibility", "none");
+    } catch {
+      /* Provider layer may not expose visibility cleanly. */
+    }
+  }
 }
 
 function rememberPaint(
@@ -168,14 +206,14 @@ function applyRadarMapTheme(
 
     try {
       if (type === "background") {
-        setThemedPaint(map, store, id, "background-color", "#111313");
+        setThemedPaint(map, store, id, "background-color", "#262b2c");
       } else if (type === "fill") {
         setThemedPaint(
           map,
           store,
           id,
           "fill-color",
-          isWater ? "#000000" : isGreenSpace ? "#202a22" : "#202426",
+          isWater ? "#000000" : isGreenSpace ? "#3d493e" : "#3b4041",
         );
         if (!isWater) {
           setThemedPaint(map, store, id, "fill-opacity", 1);
@@ -186,10 +224,12 @@ function applyRadarMapTheme(
           store,
           id,
           "line-color",
-          isWater ? "#000000" : isRoad ? "#8ef6c6" : isBoundary ? "#3a3a35" : "#242728",
+          isWater ? "#000000" : isRoad ? "#4ba883" : isBoundary ? "#4b4c46" : "#323637",
         );
-        if (isRoad || isBoundary) {
-          setThemedPaint(map, store, id, "line-opacity", 0.78);
+        if (isRoad) {
+          setThemedPaint(map, store, id, "line-opacity", 0.52);
+        } else if (isBoundary) {
+          setThemedPaint(map, store, id, "line-opacity", 0.7);
         }
       }
 
@@ -218,6 +258,10 @@ function applyCustomRadarLayerTheme(map: MaplibreMap, darkMode: boolean) {
     if (map.getLayer("aircraft")) {
       map.setPaintProperty("aircraft", "text-color", ["get", "color"]);
       map.setPaintProperty("aircraft", "text-halo-color", darkMode ? "#020202" : "#fff7f2");
+    }
+    if (map.getLayer("aircraft-fuel")) {
+      map.setPaintProperty("aircraft-fuel", "text-color", darkMode ? "#f5f2e8" : "#2f2a18");
+      map.setPaintProperty("aircraft-fuel", "text-halo-color", darkMode ? "#020202" : "#fff7f2");
     }
   } catch {
     /* layer may be mid-style reload */
@@ -254,23 +298,28 @@ const FOLLOW_RECENTER_PX = 200;
 const FOLLOW_EDGE_MARGIN_RATIO = 0.2;
 
 type RiderPos = { lat: number; lon: number };
+type FocusRequest = { tail: string; seq: number };
 
 export default function RadarMap({
   aircraft,
   rider,
   showDistanceRings = false,
   darkMode = false,
+  showFuelEstimate = false,
   regionId,
+  focusRequest,
   onMapReady,
 }: {
   aircraft: Aircraft[];
   rider: RiderPos | null;
   showDistanceRings?: boolean;
+  showFuelEstimate?: boolean;
   darkMode?: boolean;
   /** Pivots the map view between Puget Sound / counties / All-WA.
    *  When undefined or "puget_sound", no flyTo — preserves the
    *  existing rider-zoom + auto-recenter behavior. */
   regionId?: RegionId;
+  focusRequest?: FocusRequest | null;
   onMapReady?: (map: MaplibreMap | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -282,8 +331,10 @@ export default function RadarMap({
   const aircraftRef = useRef<Aircraft[]>(aircraft);
   const riderRef = useRef<RiderPos | null>(rider);
   const showDistanceRingsRef = useRef<boolean>(showDistanceRings);
+  const showFuelEstimateRef = useRef<boolean>(showFuelEstimate);
   const darkModeRef = useRef<boolean>(darkMode);
   const originalPaintRef = useRef<ThemePaintStore>(new Map());
+  const fuelHistoryRef = useRef<Map<string, FuelObservation[]>>(new Map());
   // Tracks whether we've done the one-time zoom-to-rider on first
   // geolocation resolve. Subsequent rider changes only recenter
   // (the existing 5s loop), they don't change zoom.
@@ -297,6 +348,8 @@ export default function RadarMap({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onMapReadyRef = useRef(onMapReady);
   onMapReadyRef.current = onMapReady;
+  const focusRequestRef = useRef(focusRequest);
+  focusRequestRef.current = focusRequest;
 
   // Mount the map once.
   useEffect(() => {
@@ -340,6 +393,7 @@ export default function RadarMap({
       iconEntries.forEach(({ key }, i) => {
         map.addImage(key, aircraftImgs[i]!);
       });
+      applyMapDetailBudget(map);
       applyRadarMapTheme(map, darkModeRef.current, originalPaintRef.current);
 
       // Distance rings — sit beneath the rider so the dot stays on top.
@@ -363,7 +417,7 @@ export default function RadarMap({
           "line-dasharray": [4, 4],
         },
       });
-      // Tiny mono labels at the top of each ring ("5nm" / "10nm" / "15nm")
+      // Tiny mono labels at the top of each ring ("1nm" / "3nm" / "5nm")
       // sit on a separate symbol layer so we can keep the line layer pure.
       map.addLayer({
         id: "distance-rings-labels",
@@ -453,12 +507,50 @@ export default function RadarMap({
           "text-halo-width": 2,
         },
       });
+      map.addLayer({
+        id: "aircraft-fuel",
+        type: "symbol",
+        source: "aircraft",
+        layout: {
+          visibility: showFuelEstimateRef.current ? "visible" : "none",
+          "text-field": ["get", "fuelLabel"],
+          "text-font": MAP_LABEL_FONT,
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            6,
+            8.5,
+            10,
+            9.5,
+            14,
+            10.5,
+            18,
+            11.5,
+          ],
+          "text-offset": [0, -3.35],
+          "text-anchor": "bottom",
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+          "text-line-height": 1.05,
+          "text-letter-spacing": 0,
+        },
+        paint: {
+          "text-color": darkModeRef.current ? "#f5f2e8" : "#2f2a18",
+          "text-halo-color": darkModeRef.current ? "#020202" : "#fff7f2",
+          "text-halo-width": 2.2,
+        },
+        filter: ["has", "fuelLabel"],
+      });
       applyCustomRadarLayerTheme(map, darkModeRef.current);
 
       readyRef.current = true;
       applyAircraft(aircraftRef.current);
       applyRider(riderRef.current);
       applyDistanceRings(riderRef.current);
+      if (focusRequestRef.current) {
+        focusTailOnMap(focusRequestRef.current.tail);
+      }
       // Map mounted with rider already known (geolocation resolved
       // before MapLibre finished loading) — do the one-time zoom now.
       if (riderRef.current && !didFirstRiderZoomRef.current) {
@@ -500,39 +592,7 @@ export default function RadarMap({
       const feat = e.features?.[0];
       const tail = feat?.properties?.tail;
       if (typeof tail !== "string") return;
-      const pos = stateRef.current.toByTail.get(tail);
-      if (!pos) return;
-      followedTailRef.current = tail;
-      popupRef.current?.remove();
-      const meta = stateRef.current.metaByTail.get(tail);
-      const label = meta?.nickname ?? tail;
-      const popup = new maplibregl.Popup({
-        closeButton: true,
-        closeOnClick: false,
-        closeOnMove: false,
-        offset: 18,
-        className: "ss-plane-popup",
-      })
-        .setLngLat(pos)
-        .setHTML(
-          `<div style="font:700 12px/1.4 Math Bold,Cambria Math,STIX Two Math,serif;color:${SS_TOKENS.bg0}">` +
-            `<div>${label}</div>` +
-            `<a href="/plane/${tail}" style="color:${SS_TOKENS.sky};text-decoration:underline;font-weight:400">View detail</a>` +
-            `</div>`,
-        )
-        .addTo(map);
-      popup.on("close", () => {
-        if (followedTailRef.current === tail) {
-          followedTailRef.current = null;
-        }
-        if (popupRef.current === popup) popupRef.current = null;
-      });
-      popupRef.current = popup;
-      map.flyTo({
-        center: pos,
-        zoom: Math.max(map.getZoom(), 12),
-        duration: 600,
-      });
+      focusTailOnMap(tail);
     };
     // Click on empty map (no aircraft hit) → exit follow mode.
     const onMapClick = (e: MapMouseEvent) => {
@@ -609,12 +669,34 @@ export default function RadarMap({
   }, [showDistanceRings]);
 
   useEffect(() => {
+    showFuelEstimateRef.current = showFuelEstimate;
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    try {
+      if (map.getLayer("aircraft-fuel")) {
+        map.setLayoutProperty(
+          "aircraft-fuel",
+          "visibility",
+          showFuelEstimate ? "visible" : "none",
+        );
+      }
+    } catch {
+      /* layer not yet attached */
+    }
+  }, [showFuelEstimate]);
+
+  useEffect(() => {
     darkModeRef.current = darkMode;
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     applyRadarMapTheme(map, darkMode, originalPaintRef.current);
     applyCustomRadarLayerTheme(map, darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    focusTailOnMap(focusRequest.tail);
+  }, [focusRequest]);
 
   // When the rider changes region (Puget Sound → Spokane etc), fly the
   // map to the region's centroid + default zoom. Skipped on initial
@@ -658,6 +740,46 @@ export default function RadarMap({
     return () => clearInterval(id);
   }, [rider]);
 
+  function focusTailOnMap(tail: string): boolean {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return false;
+    const pos = stateRef.current.toByTail.get(tail);
+    if (!pos) return false;
+
+    followedTailRef.current = tail;
+    popupRef.current?.remove();
+    const meta = stateRef.current.metaByTail.get(tail);
+    const label = meta?.nickname ?? tail;
+    const popup = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: false,
+      closeOnMove: false,
+      offset: 18,
+      className: "ss-plane-popup",
+    })
+      .setLngLat(pos)
+      .setHTML(
+        `<div style="font:700 12px/1.4 Math Bold,Cambria Math,STIX Two Math,serif;color:var(--ss-fg0)">` +
+          `<div>${label}</div>` +
+          `<a href="/plane/${tail}" style="color:var(--ss-sky);text-decoration:underline;font-weight:400">View detail</a>` +
+          `</div>`,
+      )
+      .addTo(map);
+    popup.on("close", () => {
+      if (followedTailRef.current === tail) {
+        followedTailRef.current = null;
+      }
+      if (popupRef.current === popup) popupRef.current = null;
+    });
+    popupRef.current = popup;
+    map.flyTo({
+      center: pos,
+      zoom: Math.max(map.getZoom(), 12),
+      duration: 600,
+    });
+    return true;
+  }
+
   function startPulse() {
     const map = mapRef.current;
     if (!map) return;
@@ -684,7 +806,7 @@ export default function RadarMap({
       source.setData({ type: "FeatureCollection", features: [] });
       return;
     }
-    const RINGS_NM = [5, 10, 15] as const;
+    const RINGS_NM = [1, 3, 5] as const;
     const features: GeoJSON.Feature[] = [];
     for (const nm of RINGS_NM) {
       features.push({
@@ -741,6 +863,7 @@ export default function RadarMap({
     if (!source) return;
 
     const now = Date.now();
+    updateFuelObservationHistory(fuelHistoryRef.current, list, now);
     const prev = stateRef.current;
     const t = prev.startedAt
       ? Math.min(1, (now - prev.startedAt) / ANIM_MS)
@@ -836,7 +959,7 @@ export default function RadarMap({
         const meta = stateRef.current.metaByTail.get(tail)!;
         const lon = from[0] + (to[0] - from[0]) * tt;
         const lat = from[1] + (to[1] - from[1]) * tt;
-        const props: Record<string, string | number> = {
+      const props: Record<string, string | number> = {
           tail,
           icon: meta.icon,
           track: meta.track,
@@ -844,6 +967,20 @@ export default function RadarMap({
           label: meta.label,
         };
         if (meta.nickname) props.nickname = meta.nickname;
+        if (showFuelEstimateRef.current) {
+          const plane = aircraftRef.current.find((a) => a.tail === tail);
+          const normalizedTail = normalizeTailNumber(tail);
+          const fuel = plane
+            ? estimateFuelRemaining(
+                plane,
+                now,
+                normalizedTail
+                  ? fuelHistoryRef.current.get(normalizedTail)
+                  : undefined,
+              )
+            : null;
+          if (fuel) props.fuelLabel = fuel.label;
+        }
         features.push({
           type: "Feature",
           geometry: { type: "Point", coordinates: [lon, lat] },

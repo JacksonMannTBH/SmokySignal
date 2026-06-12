@@ -49,7 +49,7 @@ export type AlertPrefs = {
 };
 
 export const DEFAULT_PREFS: AlertPrefs = {
-  tier: "alert_only",
+  tier: "all",
   zones: "any",
   quiet_start_h: 23,
   quiet_end_h: 6,

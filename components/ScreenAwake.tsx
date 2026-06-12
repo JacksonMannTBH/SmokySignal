@@ -36,6 +36,7 @@ export function ScreenAwake() {
   const sentinelRef = useRef<WakeLockSentinel | null>(null);
   const pathname = usePathname();
   const onRadar = pathname === "/radar";
+  const onHome = pathname === "/";
 
   // Bootstrap once on mount.
   useEffect(() => {
@@ -138,8 +139,12 @@ export function ScreenAwake() {
         }
         style={{
           position: "fixed",
-          top: onRadar ? "calc(env(safe-area-inset-top, 0px) + 54px)" : 6,
-          ...(onRadar ? { left: 172, right: "auto" } : { right: 6 }),
+          top: onRadar
+            ? "calc(env(safe-area-inset-top, 0px) + 54px)"
+            : onHome
+              ? "calc(env(safe-area-inset-top, 0px) + 48px)"
+              : 16,
+          ...(onRadar ? { left: 172, right: "auto" } : { right: 10 }),
           zIndex: 30,
           width: 44,
           height: 44,

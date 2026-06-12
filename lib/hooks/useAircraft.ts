@@ -10,12 +10,21 @@ import type { Snapshot } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 10_000;
 
+function aircraftUrl(mockOn: boolean): string {
+  if (!mockOn) return "/api/aircraft";
+  if (typeof window !== "undefined") {
+    const mock = new URLSearchParams(window.location.search).get("mock");
+    if (mock) return `/api/aircraft?mock=${encodeURIComponent(mock)}`;
+  }
+  return "/api/aircraft?mock=up";
+}
+
 export function useAircraft(initial: Snapshot, mockOn = false): Snapshot {
   const [snap, setSnap] = useState<Snapshot>(initial);
 
   useEffect(() => {
     let cancelled = false;
-    const url = mockOn ? "/api/aircraft?mock=up" : "/api/aircraft";
+    const url = aircraftUrl(mockOn);
 
     const fetchSnap = async () => {
       if (document.visibilityState === "hidden") return;

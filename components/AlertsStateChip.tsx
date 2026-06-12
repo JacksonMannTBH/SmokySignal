@@ -39,12 +39,13 @@ export function AlertsStateChip() {
     };
   }, []);
 
-  if (state === "loading" || state === "unsupported") return null;
+  if (state === "loading" || state === "unsupported" || state === "armed") {
+    return null;
+  }
 
-  const armed = state === "armed";
   const denied = state === "denied";
-  const color = armed ? SS_TOKENS.clear : denied ? SS_TOKENS.warn : SS_TOKENS.fg2;
-  const label = armed ? "ALERTS ON" : denied ? "ALERTS BLOCKED" : "ALERTS OFF";
+  const color = denied ? SS_TOKENS.warn : SS_TOKENS.fg2;
+  const label = denied ? "ALERTS BLOCKED" : "ALERTS OFF";
 
   return (
     <Link

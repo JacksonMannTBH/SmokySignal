@@ -10,19 +10,12 @@
 // in-panel + bottom-left controls stay in sync.
 //
 // Source: /api/flight-paths returns one GeoJSON LineString per tail-day
-// with ≥ 5 points, filtered by region bbox + operator/role allow-list.
+// with >= 5 points, filtered by the current region bbox.
 // Edge-cached for 5 min so flipping filters is cheap.
 
 import { useEffect, useRef, useState } from "react";
 import type { Map as MaplibreMap, GeoJSONSource } from "maplibre-gl";
 import { aircraftColorForTail } from "@/lib/aircraft-colors";
-import {
-  DEFAULT_RADAR_FILTER,
-  RADAR_FILTER_CHANGE_EVENT,
-  bucketsToRoles,
-  readRadarFilter,
-  type RadarFilter as Filter,
-} from "@/lib/radar-filter";
 import { REGION_CHANGE_EVENT, getRegion } from "@/lib/region-pref";
 import { DEFAULT_REGION, type RegionId } from "@/lib/regions";
 import {
@@ -35,18 +28,9 @@ const SOURCE_ID = "flight-paths";
 const LAYER_ID = "flight-paths-line";
 const AIRCRAFT_LAYER_ID = "aircraft";
 
-function buildQueryString(f: Filter, regionId: RegionId): string {
+function buildQueryString(regionId: RegionId): string {
   const p = new URLSearchParams();
   p.set("region_id", regionId);
-  if (f.buckets.length > 0) {
-    p.set("roles", bucketsToRoles(f.buckets).join(","));
-  }
-  if (f.operatorSet.length > 0) {
-    p.set("operator", f.operatorSet.join(","));
-  }
-  if (f.tailSet.length > 0) {
-    p.set("tails", f.tailSet.join(","));
-  }
   return p.toString();
 }
 
@@ -70,26 +54,18 @@ function colorizeFeatures(features: GeoJSON.Feature[]): GeoJSON.Feature[] {
 
 export function FlightPathLayer({ map }: Props) {
   const [enabled, setEnabled] = useState<boolean>(true);
-  const [filter, setFilter] = useState<Filter>(DEFAULT_RADAR_FILTER);
   const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
   const [features, setFeatures] = useState<GeoJSON.Feature[] | null>(null);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
-  // Mirror persisted state + cross-component change events same as
-  // Keep filter / region / visibility changes in sync with radar controls.
-  // / visibility changes.
+  // Keep region / visibility changes in sync with radar controls.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const v = window.localStorage.getItem(VISIBLE_KEY);
     if (v === "0") setEnabled(false);
     else if (v === "1") setEnabled(true);
-    setFilter(readRadarFilter());
     setRegionId(getRegion());
-    const onFilterChange = (e: Event) => {
-      const detail = (e as CustomEvent<Filter>).detail;
-      if (detail) setFilter(detail);
-    };
     const onRegionChange = (e: Event) => {
       const detail = (e as CustomEvent<{ id: RegionId }>).detail;
       setRegionId(detail?.id ?? getRegion());
@@ -109,12 +85,10 @@ export function FlightPathLayer({ map }: Props) {
         setEnabled(e.newValue !== "0");
       }
     };
-    window.addEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
     window.addEventListener(REGION_CHANGE_EVENT, onRegionChange);
     window.addEventListener(LAYER_VISIBILITY_CHANGE_EVENT, onLayerVisChange);
     window.addEventListener("storage", onStorage);
     return () => {
-      window.removeEventListener(RADAR_FILTER_CHANGE_EVENT, onFilterChange);
       window.removeEventListener(REGION_CHANGE_EVENT, onRegionChange);
       window.removeEventListener(
         LAYER_VISIBILITY_CHANGE_EVENT,
@@ -127,7 +101,7 @@ export function FlightPathLayer({ map }: Props) {
   // Fetch the polyline FeatureCollection on filter / region change.
   useEffect(() => {
     let cancelled = false;
-    const qs = buildQueryString(filter, regionId);
+    const qs = buildQueryString(regionId);
     (async () => {
       try {
         const r = await fetch(`/api/flight-paths?${qs}`, {
@@ -144,7 +118,7 @@ export function FlightPathLayer({ map }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [filter, regionId]);
+  }, [regionId]);
 
   // Add the source + layer once the map is ready. Same retry-on-data
   // pattern used by sibling layers because MapLibre's isStyleLoaded() is

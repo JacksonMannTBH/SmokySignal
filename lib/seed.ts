@@ -37,6 +37,7 @@ export const FLEET: FleetEntry[] = [
   // King County Sheriff — Renton
   { tail: "N422CT", hex: "A50351", operator: "KCSO",         model: "Bell 407GXi",                    nickname: "Guardian One",       roleDescription: "Patrol / pursuit / SAR",       base: "KRNT Renton",                           role: "patrol",    roleConfidence: "confirmed", roleNote: "Guardian One — multi-role" },
   { tail: "N407KS", hex: "A4C794", operator: "KCSO",         model: "Bell 407",                        nickname: "Guardian One (legacy)", roleDescription: "Patrol / pursuit (backup)", base: "KRNT Renton",                       role: "patrol",    roleConfidence: "tentative", roleNote: "Guardian One legacy airframe" },
+  { tail: "N411KS", hex: null,     operator: "KCSO",         model: "Bell 206B JetRanger",             nickname: null,                roleDescription: "Patrol / training",            base: "KRNT Renton",                           role: "patrol",    roleConfidence: "tentative", roleNote: "Former KCSO Bell 206B / JetRanger" },
   { tail: "N790RJ", hex: "AAB985", operator: "KCSO",         model: "Bell UH-1H Iroquois",            nickname: "Guardian Two",       roleDescription: "SAR / SWAT insertion",         base: "KRNT Renton",                           role: "sar",       roleConfidence: "tentative", roleNote: "Guardian Two — likely SAR/SWAT" },
   { tail: "N71KP",  hex: "A97AA3", operator: "KCSO",         model: "Bell UH-1H Iroquois",            nickname: null,                roleDescription: "SAR / SWAT (reserve)",         base: "KRNT Renton",                           role: "sar",       roleConfidence: "tentative", roleNote: "KCSO reserve Huey" },
   { tail: "N67817", hex: null,     operator: "KCSO",         model: "Bell 206B / TH-67A Creek",       nickname: null,                roleDescription: "Patrol / training",            base: "KRNT Renton",                           role: "patrol",    roleConfidence: "tentative", roleNote: "KCSO Bell 206/TH-67" },
@@ -91,11 +92,14 @@ export const FLEET: FleetEntry[] = [
  * Angeles entry (CGNR6594, MH-65E). Pierce One confidence promoted to
  * confirmed. WSP King Air operator note clarified.
  *
+ * v4 (2026-06-12): Adds N411KS so the fixed public tracking list is
+ * complete on seed-only deployments.
+ *
  * Round-2 research (2026-05-07, no version bump): see the notes block
  * below documenting which agencies were investigated and why they
  * couldn't be added in this pass. The FLEET array did not change.
  */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 // Round-2 registry research notes (2026-05-07).
 //

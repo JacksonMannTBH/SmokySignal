@@ -1,7 +1,7 @@
 {
   "name": "Out Of Sight",
   "short_name": "Out Of Sight",
-  "description": "Is the bird up? Live aircraft tracker for King & Pierce County riders.",
+  "description": "Live aircraft tracker for Washington state riders.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

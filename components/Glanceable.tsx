@@ -13,11 +13,9 @@ import { StatusPill } from "./StatusPill";
 import { Card } from "./Card";
 import { PlaneIcon } from "./PlaneIcon";
 import { PredictionCard } from "./PredictionCard";
-import { Tooltip } from "./Tooltip";
 import { Logo } from "./brand/Logo";
 import { FreshnessLabel } from "./FreshnessLabel";
 import { ArmAlertsCallout } from "./ArmAlertsCallout";
-import { AlertsStateChip } from "./AlertsStateChip";
 import { TakeOffButton } from "./TakeOffButton";
 
 // Hide the activity strip when the most recent event is older than this —
@@ -50,7 +48,6 @@ export function Glanceable({
   lastSampleMs = null,
 }: Props) {
   const snap = useAircraft(initial, mockOn);
-  const [updatedAgo, setUpdatedAgo] = useState<number>(0);
   const [activity, setActivity] = useState<ActivityEntry[]>(initialActivity);
 
   // Poll /api/activity every 30s so the strip stays current without
@@ -79,15 +76,6 @@ export function Glanceable({
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
-
-  // "Updated Xs" label.
-  useEffect(() => {
-    setUpdatedAgo(0);
-    const id = setInterval(() => {
-      setUpdatedAgo(Math.floor((Date.now() - snap.fetched_at) / 1000));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [snap.fetched_at]);
 
   const fleetMap = useMemo(
     () => new Map<string, FleetEntry>(snap.aircraft.map((a) => [a.tail, a])),
@@ -118,7 +106,8 @@ export function Glanceable({
         // install prompt overlay (~80) + breathing room. Without this
         // the LearningPanel and last activity row hid behind the
         // fixed-position prompt on /.
-        padding: "12px 18px 180px",
+        padding:
+          "calc(env(safe-area-inset-top, 0px) + 44px) 18px 180px",
         display: "flex",
         flexDirection: "column",
         gap: 16,
@@ -130,15 +119,8 @@ export function Glanceable({
           justifyContent: "space-between",
           alignItems: "flex-start",
           marginTop: 4,
-          // Reserve room for the fixed wake-lock + theme buttons so the
-          // source line never tucks under either icon.
-          paddingRight: 96,
+          paddingRight: 112,
           gap: 8,
-          // Header content can wrap on narrow viewports — the
-          // AlertsStateChip "ALERTS BLOCKED" variant + the source-line
-          // "UPDATED Xs · ADSBFI" together overflow on iPhone widths
-          // when laid out on one line. Wrapping is fine; both rows are
-          // information-only and don't need to share the baseline.
           flexWrap: "wrap",
           rowGap: 6,
         }}
@@ -153,44 +135,7 @@ export function Glanceable({
           }}
         >
           <Logo size={48} markSize={72} wordmark />
-          {/* Removed standalone "LIVE" pill — the "UPDATED Xs · ADSBFI"
-              source line on the right already conveys liveness via the
-              auto-incrementing seconds counter. The redundant pill cost
-              ~36 px of horizontal real-estate that AlertsStateChip
-              needs when it widens to "ALERTS BLOCKED". */}
-          <AlertsStateChip />
         </div>
-        <Tooltip
-          side="bottom"
-          align="end"
-          content={`Time since last successful data pull. ${snap.source === "adsbfi" ? "ADSBFI = adsb.fi (primary feed)." : snap.source === "opensky" ? "OPENSKY = OpenSky Network (fallback)." : "MOCK = synthetic data."}`}
-        >
-          <span
-            className="ss-mono"
-            tabIndex={0}
-            style={{
-              fontSize: 10.5,
-              color: SS_TOKENS.fg2,
-              whiteSpace: "nowrap",
-              cursor: "help",
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                display: "inline-block",
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: SS_TOKENS.clear,
-                marginRight: 6,
-                verticalAlign: "middle",
-                animation: "ss-blink 1.6s infinite",
-              }}
-            />
-            UPDATED {updatedAgo}s · {snap.source.toUpperCase()}
-          </span>
-        </Tooltip>
       </header>
 
       <Hero status={status} />
@@ -331,21 +276,22 @@ function ActivityStrip({ latest }: { latest: ActivityEntry }) {
 
 function Hero({ status }: { status: StatusState }) {
   const isAlert = status.kind === "alert";
-  const accentColor = isAlert ? SS_TOKENS.alert : SS_TOKENS.clear;
-  const halo = isAlert ? SS_TOKENS.alertDim : SS_TOKENS.clearDim;
+  const background = isAlert ? SS_TOKENS.alert : "#15803d";
   return (
     <section
       className="ss-hero-bg"
       style={{
-        background: `radial-gradient(120% 80% at 50% 0%, ${halo}, transparent 70%), ${SS_TOKENS.bg1}`,
-        border: `.5px solid ${SS_TOKENS.hairline}`,
+        background,
+        border: "0",
         borderRadius: 22,
         padding: "32px 22px 26px",
+        color: "#ffffff",
+        textShadow: "0 1px 2px rgba(0,0,0,0.28)",
       }}
     >
       <div
         className="ss-eyebrow"
-        style={{ color: accentColor, animation: "ss-fade 400ms ease-out" }}
+        style={{ color: "#ffffff", animation: "ss-fade 400ms ease-out" }}
       >
         {status.pill}
       </div>
@@ -356,7 +302,7 @@ function Hero({ status }: { status: StatusState }) {
           letterSpacing: "-.04em",
           lineHeight: 1.05,
           marginTop: 10,
-          color: accentColor,
+          color: "#ffffff",
         }}
       >
         {status.headline}
@@ -365,7 +311,7 @@ function Hero({ status }: { status: StatusState }) {
         style={{
           marginTop: 14,
           fontSize: 15,
-          color: SS_TOKENS.fg1,
+          color: "#f7fff7",
           lineHeight: 1.5,
         }}
       >
@@ -377,7 +323,7 @@ function Hero({ status }: { status: StatusState }) {
             marginTop: 8,
             fontSize: 12.5,
             fontStyle: "italic",
-            color: SS_TOKENS.fg2,
+            color: "#e8f7e8",
             lineHeight: 1.45,
           }}
         >
@@ -388,16 +334,10 @@ function Hero({ status }: { status: StatusState }) {
         <>
           <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
             {status.lead.aircraft.time_aloft_min != null && (
-              <StatusPill
-                kind="alert"
-                label={fmtAloft(status.lead.aircraft.time_aloft_min)}
-              />
+              <HeroMetricPill label={fmtAloft(status.lead.aircraft.time_aloft_min)} />
             )}
             {status.lead.aircraft.ground_speed_kt != null && (
-              <StatusPill
-                kind="alert"
-                label={`${status.lead.aircraft.ground_speed_kt} kt`}
-              />
+              <HeroMetricPill label={`${status.lead.aircraft.ground_speed_kt} kt`} />
             )}
           </div>
           <LeadIdentity
@@ -408,6 +348,41 @@ function Hero({ status }: { status: StatusState }) {
         </>
       )}
     </section>
+  );
+}
+
+function HeroMetricPill({ label }: { label: string }) {
+  return (
+    <span
+      className="ss-mono"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 10px",
+        borderRadius: 999,
+        background: "rgba(5, 5, 5, 0.18)",
+        border: "0.5px solid rgba(255, 255, 255, 0.42)",
+        color: "#ffffff",
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: 0,
+        backdropFilter: "blur(18px)",
+        WebkitBackdropFilter: "blur(18px)",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: "#ffffff",
+          boxShadow: "0 0 0 4px rgba(255, 255, 255, 0.18)",
+        }}
+      />
+      <span>{label}</span>
+    </span>
   );
 }
 
@@ -435,7 +410,7 @@ function LeadIdentity({
         display: "inline-block",
         marginTop: 6,
         fontSize: 11.5,
-        color: SS_TOKENS.fg2,
+        color: "#edfbed",
         letterSpacing: ".04em",
         textDecoration: "none",
       }}

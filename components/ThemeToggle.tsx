@@ -14,6 +14,7 @@ export function ThemeToggle() {
   const [dark, setDark] = useState(false);
   const pathname = usePathname();
   const onRadar = pathname === "/radar";
+  const onHome = pathname === "/";
 
   useEffect(() => {
     setDark(readStoredDarkTheme());
@@ -44,8 +45,12 @@ export function ThemeToggle() {
         aria-label={dark ? "Use light mode" : "Use dark mode"}
         style={{
           position: "fixed",
-          top: onRadar ? "calc(env(safe-area-inset-top, 0px) + 54px)" : 6,
-          ...(onRadar ? { left: 128, right: "auto" } : { right: 94 }),
+          top: onRadar
+            ? "calc(env(safe-area-inset-top, 0px) + 54px)"
+            : onHome
+              ? "calc(env(safe-area-inset-top, 0px) + 48px)"
+              : 16,
+          ...(onRadar ? { left: 128, right: "auto" } : { right: 58 }),
           zIndex: 30,
           width: 44,
           height: 44,

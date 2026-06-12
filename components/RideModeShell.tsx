@@ -12,6 +12,12 @@ import {
   type RideContact,
   type RideStatus,
 } from "@/lib/ride-mode";
+import {
+  estimateFuelRemaining,
+  normalizeTailNumber,
+  updateFuelObservationHistory,
+  type FuelObservation,
+} from "@/lib/fuel-estimate";
 import type { Snapshot } from "@/lib/types";
 import { RideCompass } from "./RideCompass";
 
@@ -51,6 +57,7 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
   const { pos, unavailable } = useRiderPos();
   const heading = useDeviceHeading(pos?.heading);
   const [now, setNow] = useState(initial.fetched_at);
+  const fuelHistoryRef = useRef<Map<string, FuelObservation[]>>(new Map());
   const notifyRef = useRef<{
     status: RideStatus;
     tail: string | null;
@@ -65,6 +72,14 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    updateFuelObservationHistory(
+      fuelHistoryRef.current,
+      snap.aircraft,
+      snap.fetched_at,
+    );
+  }, [snap.aircraft, snap.fetched_at]);
 
   const contacts = useMemo<RideContact[]>(() => {
     if (!pos) return [];
@@ -107,6 +122,17 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
     : pos
       ? "No watched aircraft within 5 nm"
       : "Distances show in nm once GPS resolves";
+  const nearestFuelText = useMemo(() => {
+    if (!nearest) return null;
+    const tail = normalizeTailNumber(nearest.plane.tail);
+    return (
+      estimateFuelRemaining(
+        nearest.plane,
+        now,
+        tail ? fuelHistoryRef.current.get(tail) : undefined,
+      )?.label ?? null
+    );
+  }, [nearest, now]);
 
   return (
     <main
@@ -178,8 +204,11 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
 
       <div
         style={{
-          display: "grid",
-          placeItems: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
           minHeight: 0,
         }}
       >
@@ -189,6 +218,27 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
           displayBearingDeg={displayBearing}
           modeLabel={modeLabel}
         />
+        {nearestFuelText && (
+          <div
+            aria-live="polite"
+            style={{
+              width: "min(100%, 420px)",
+              minHeight: 34,
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.16)",
+              background: "rgba(0,0,0,0.38)",
+              color: "#f5f2e8",
+              textAlign: "center",
+              fontSize: 13,
+              fontWeight: 850,
+              lineHeight: 1.25,
+              boxShadow: "0 10px 34px rgba(0,0,0,0.24)",
+            }}
+          >
+            {nearestFuelText}
+          </div>
+        )}
       </div>
 
       <footer

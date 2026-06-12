@@ -79,6 +79,7 @@ function liftAirborne(
 
 export function parseMockState(value: string | null | undefined): MockState | null {
   if (!value) return null;
+  if (value === "smokey") return "up";
   return (MOCK_STATES as readonly string[]).includes(value) ? (value as MockState) : null;
 }
 
