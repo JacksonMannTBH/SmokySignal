@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { SS_TOKENS } from "@/lib/tokens";
 import { haversineNm } from "@/lib/geo";
 import type { Aircraft } from "@/lib/types";
-import { Tooltip } from "./Tooltip";
 
 const STORAGE_KEY = "ss_last_spot";
 const RATE_LIMIT_MS = 30_000;
@@ -131,11 +130,7 @@ export function SpottedButton({ airborne }: { airborne: Aircraft[] }) {
 
   return (
     <>
-      <Tooltip
-        side="left"
-        content="Spotted a watcher? Tap to log your location and time. Helps validate the live feed."
-      >
-        <button
+      <button
         type="button"
         aria-label="Log a spot of an airborne aircraft"
         aria-busy={busy}
@@ -168,8 +163,7 @@ export function SpottedButton({ airborne }: { airborne: Aircraft[] }) {
         }}
       >
         <BinocularsIcon />
-        </button>
-      </Tooltip>
+      </button>
       {toast && (
         <div
           role="status"

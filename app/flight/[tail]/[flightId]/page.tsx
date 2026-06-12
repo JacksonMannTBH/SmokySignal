@@ -147,7 +147,7 @@ export default async function FlightSharePage({ params }: Props) {
           padding: "5px 11px",
           borderRadius: 999,
           background: SS_TOKENS.alertDim,
-          border: `.5px solid ${SS_TOKENS.alert}55`,
+          border: `.5px solid color-mix(in srgb, ${SS_TOKENS.alert} 34%, transparent)`,
           color: SS_TOKENS.alert,
           fontSize: 11,
           fontWeight: 600,

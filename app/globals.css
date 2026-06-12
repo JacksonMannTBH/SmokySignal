@@ -22,6 +22,7 @@
   --ss-alert-dim: rgba(244, 196, 48, 0.18);
   --ss-warn: #d79b00;
   --ss-warn-dim: rgba(215, 155, 0, 0.16);
+  --ss-danger: #050505;
   --ss-clear: #050505;
   --ss-clear-dim: rgba(5, 5, 5, 0.10);
   --ss-sky: #050505;
@@ -37,6 +38,29 @@
   --ss-radius-xl: 28px;
 }
 
+body[data-theme="dark"] {
+  --ss-bg0: #020202;
+  --ss-bg1: rgba(8, 8, 8, 0.96);
+  --ss-bg2: rgba(244, 196, 48, 0.10);
+  --ss-bg3: rgba(244, 196, 48, 0.16);
+  --ss-surface: rgba(10, 10, 10, 0.96);
+  --ss-surface-translucent: rgba(8, 8, 8, 0.84);
+  --ss-fg0: #f5f2e8;
+  --ss-fg1: #d6d1bf;
+  --ss-fg2: #a9a28a;
+  --ss-fg3: #746f5d;
+  --ss-danger: #ff6b6b;
+  --ss-clear: #9ee8b5;
+  --ss-clear-dim: rgba(158, 232, 181, 0.14);
+  --ss-sky: #8bd2ff;
+  --ss-sky-dim: rgba(139, 210, 255, 0.14);
+  --ss-hairline: rgba(245, 242, 232, 0.13);
+  --ss-hairline-2: rgba(245, 242, 232, 0.24);
+  --ss-shadow-sm: 0 5px 18px rgba(0, 0, 0, 0.52);
+  --ss-shadow-md: 0 16px 42px rgba(0, 0, 0, 0.62);
+  --ss-shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.72);
+}
+
 /* High-contrast variant — stays dark, lifts secondary text + hairline
    opacity so meta-lines and dividers stay legible in glare or low-vision
    conditions. Brand alert/clear/sky/warn semantic colors NOT changed —
@@ -49,9 +73,17 @@ body[data-contrast="high"] {
   --ss-hairline-2: rgba(5, 5, 5, 0.36);
 }
 
+body[data-theme="dark"][data-contrast="high"] {
+  --ss-fg1: #fff8e6;
+  --ss-fg2: #e0d8bd;
+  --ss-fg3: #b8ad88;
+  --ss-hairline: rgba(255, 248, 230, 0.24);
+  --ss-hairline-2: rgba(255, 248, 230, 0.38);
+}
+
 html,
 body {
-  background: #ffffff;
+  background: var(--ss-bg0);
   color: var(--ss-fg0);
 }
 
@@ -192,6 +224,26 @@ a:active {
 
 .maplibregl-ctrl-attrib a {
   color: var(--ss-fg0) !important;
+}
+
+body[data-theme="dark"] .maplibregl-ctrl-attrib {
+  background: var(--ss-surface-translucent) !important;
+  color: var(--ss-fg1) !important;
+}
+
+body[data-theme="dark"] [style*="rgba(255,255,255"],
+body[data-theme="dark"] [style*="rgba(255, 255, 255"],
+body[data-theme="dark"] [style*="rgba(246,248,246"],
+body[data-theme="dark"] [style*="rgba(255,247,235"] {
+  background: var(--ss-surface-translucent) !important;
+}
+
+body[data-theme="dark"] input,
+body[data-theme="dark"] select,
+body[data-theme="dark"] textarea {
+  background: var(--ss-surface) !important;
+  color: var(--ss-fg0) !important;
+  border-color: var(--ss-hairline-2) !important;
 }
 
 /* Responsive page-width container — mobile-first 460 px column that

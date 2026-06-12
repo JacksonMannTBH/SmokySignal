@@ -53,7 +53,7 @@ export function roleBadgeStyle(role: FleetRole): React.CSSProperties {
     letterSpacing: ".06em",
     background: isAlert ? SS_TOKENS.alertDim : "rgba(107,115,128,0.13)",
     color: isAlert ? SS_TOKENS.alert : SS_TOKENS.fg1,
-    border: `.5px solid ${isAlert ? `${SS_TOKENS.alert}55` : SS_TOKENS.hairline2}`,
+    border: `.5px solid ${isAlert ? `color-mix(in srgb, ${SS_TOKENS.alert} 34%, transparent)` : SS_TOKENS.hairline2}`,
     cursor: "help",
     whiteSpace: "nowrap",
   };

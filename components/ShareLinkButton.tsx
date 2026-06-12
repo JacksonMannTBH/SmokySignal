@@ -62,7 +62,7 @@ export function ShareLinkButton({
         padding: isSm ? "5px 9px" : "7px 12px",
         borderRadius: 999,
         background: copied ? SS_TOKENS.clearDim : SS_TOKENS.bg2,
-        border: `.5px solid ${copied ? `${SS_TOKENS.clear}55` : SS_TOKENS.hairline2}`,
+        border: `.5px solid ${copied ? `color-mix(in srgb, ${SS_TOKENS.clear} 34%, transparent)` : SS_TOKENS.hairline2}`,
         color: copied ? SS_TOKENS.clear : SS_TOKENS.fg1,
         fontSize: isSm ? 10 : 11,
         letterSpacing: ".04em",

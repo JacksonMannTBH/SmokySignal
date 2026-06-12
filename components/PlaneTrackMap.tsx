@@ -137,7 +137,7 @@ export default function PlaneTrackMap({
         source: "track",
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": SS_TOKENS.alert,
+          "line-color": "#f4c430",
           "line-width": 3,
         },
       });
@@ -158,10 +158,10 @@ export default function PlaneTrackMap({
             "match",
             ["get", "kind"],
             "start",
-            SS_TOKENS.clear,
-            SS_TOKENS.danger,
+            "#9ee8b5",
+            "#ff6b6b",
           ],
-          "circle-stroke-color": SS_TOKENS.bg0,
+          "circle-stroke-color": "#ffffff",
           "circle-stroke-width": 2,
         },
       });

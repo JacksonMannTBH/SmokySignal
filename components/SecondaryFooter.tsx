@@ -1,7 +1,7 @@
 "use client";
 
 // Shared cross-link row — gives every (tabs) page a path to /, /about,
-// /help, /legal without typing a URL. Renders in normal flow as a
+// /legal without typing a URL. Renders in normal flow as a
 // sibling of the page <main>, so it scrolls with content and appears
 // just above the TabBar overlay when the rider reaches the bottom of
 // the page. Each rider page already reserves 180 px bottom padding
@@ -20,7 +20,6 @@ import { SS_TOKENS } from "@/lib/tokens";
 const LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
-  { href: "/help", label: "Help" },
   { href: "/legal", label: "Legal" },
 ] as const;
 

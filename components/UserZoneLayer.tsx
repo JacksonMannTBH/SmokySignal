@@ -10,7 +10,6 @@ import type {
   MapMouseEvent,
   MapGeoJSONFeature,
 } from "maplibre-gl";
-import { SS_TOKENS } from "@/lib/tokens";
 import {
   readUserZones,
   removeUserZone,
@@ -64,14 +63,14 @@ export function UserZoneLayer({ map }: { map: MaplibreMap | null }) {
         id: FILL_LAYER_ID,
         type: "fill",
         source: SOURCE_ID,
-        paint: { "fill-color": SS_TOKENS.sky, "fill-opacity": 0.1 },
+        paint: { "fill-color": "#8bd2ff", "fill-opacity": 0.1 },
       }, beforeId);
       map.addLayer({
         id: LINE_LAYER_ID,
         type: "line",
         source: SOURCE_ID,
         paint: {
-          "line-color": SS_TOKENS.sky,
+          "line-color": "#8bd2ff",
           "line-opacity": 0.55,
           "line-width": 1,
           "line-dasharray": [2, 2],

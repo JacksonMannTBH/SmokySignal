@@ -13,12 +13,12 @@ import { StatusPill } from "./StatusPill";
 import { Card } from "./Card";
 import { PlaneIcon } from "./PlaneIcon";
 import { PredictionCard } from "./PredictionCard";
-import { HelpIcon } from "./HelpIcon";
 import { Tooltip } from "./Tooltip";
 import { Logo } from "./brand/Logo";
 import { FreshnessLabel } from "./FreshnessLabel";
 import { ArmAlertsCallout } from "./ArmAlertsCallout";
 import { AlertsStateChip } from "./AlertsStateChip";
+import { TakeOffButton } from "./TakeOffButton";
 
 // Hide the activity strip when the most recent event is older than this —
 // a stale "Guardian One up · 8 hours ago" looks more like a bug than a
@@ -124,16 +124,14 @@ export function Glanceable({
         gap: 16,
       }}
     >
-      <HelpIcon />
       <header
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
           marginTop: 4,
-          // Reserve room for the fixed wake-lock + help buttons (right:6
-          // and right:50 each 44px hit area) so the source line never
-          // tucks under either icon.
+          // Reserve room for the fixed wake-lock + theme buttons so the
+          // source line never tucks under either icon.
           paddingRight: 96,
           gap: 8,
           // Header content can wrap on narrow viewports — the
@@ -196,6 +194,8 @@ export function Glanceable({
       </header>
 
       <Hero status={status} />
+
+      <TakeOffButton />
 
       {contextLine && (
         <p

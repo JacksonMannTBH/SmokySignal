@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { SS_TOKENS } from "@/lib/tokens";
 import { Tooltip } from "./Tooltip";
 
@@ -33,6 +34,8 @@ export function ScreenAwake() {
   const [enabled, setEnabled] = useState(true);
   const [active, setActive] = useState(false);
   const sentinelRef = useRef<WakeLockSentinel | null>(null);
+  const pathname = usePathname();
+  const onRadar = pathname === "/radar";
 
   // Bootstrap once on mount.
   useEffect(() => {
@@ -135,8 +138,8 @@ export function ScreenAwake() {
         }
         style={{
           position: "fixed",
-          top: 6,
-          right: 6,
+          top: onRadar ? "calc(env(safe-area-inset-top, 0px) + 54px)" : 6,
+          ...(onRadar ? { left: 172, right: "auto" } : { right: 6 }),
           zIndex: 30,
           width: 44,
           height: 44,
@@ -163,8 +166,8 @@ export function ScreenAwake() {
             width: 32,
             height: 32,
             borderRadius: "50%",
-            background: lit ? "rgba(255,247,235,0.88)" : "rgba(255,255,255,0.84)",
-            border: `.5px solid ${lit ? `${SS_TOKENS.alert}55` : SS_TOKENS.hairline}`,
+            background: lit ? SS_TOKENS.alertDim : SS_TOKENS.surfaceTranslucent,
+            border: `.5px solid ${lit ? `color-mix(in srgb, ${SS_TOKENS.alert} 34%, transparent)` : SS_TOKENS.hairline}`,
             boxShadow: SS_TOKENS.shadowSm,
             backdropFilter: "blur(18px)",
             WebkitBackdropFilter: "blur(18px)",

@@ -28,7 +28,7 @@ export function TabBar() {
         maxWidth: 560,
         margin: "0 auto",
         padding: "7px",
-        background: "rgba(255,255,255,0.78)",
+        background: SS_TOKENS.surfaceTranslucent,
         backdropFilter: "blur(24px) saturate(1.15)",
         WebkitBackdropFilter: "blur(24px) saturate(1.15)",
         border: `.5px solid ${SS_TOKENS.hairline2}`,

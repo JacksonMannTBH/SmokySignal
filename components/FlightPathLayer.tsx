@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Map as MaplibreMap, GeoJSONSource } from "maplibre-gl";
-import { SS_TOKENS } from "@/lib/tokens";
+import { aircraftColorForTail } from "@/lib/aircraft-colors";
 import {
   DEFAULT_RADAR_FILTER,
   RADAR_FILTER_CHANGE_EVENT,
@@ -53,6 +53,20 @@ function buildQueryString(f: Filter, regionId: RegionId): string {
 type Props = {
   map: MaplibreMap | null;
 };
+
+function colorizeFeatures(features: GeoJSON.Feature[]): GeoJSON.Feature[] {
+  return features.map((feature) => {
+    const props = feature.properties ?? {};
+    const tail = typeof props.tail === "string" ? props.tail : "";
+    return {
+      ...feature,
+      properties: {
+        ...props,
+        color: aircraftColorForTail(tail),
+      },
+    };
+  });
+}
 
 export function FlightPathLayer({ map }: Props) {
   const [enabled, setEnabled] = useState<boolean>(true);
@@ -122,7 +136,7 @@ export function FlightPathLayer({ map }: Props) {
         if (!r.ok) return;
         const d = (await r.json()) as { features?: GeoJSON.Feature[] };
         if (cancelled) return;
-        setFeatures(Array.isArray(d.features) ? d.features : []);
+        setFeatures(Array.isArray(d.features) ? colorizeFeatures(d.features) : []);
       } catch {
         // best-effort
       }
@@ -165,32 +179,32 @@ export function FlightPathLayer({ map }: Props) {
               "line-join": "round",
             },
             paint: {
-              "line-color": SS_TOKENS.alert,
+              "line-color": ["coalesce", ["get", "color"], "#f4c430"],
               "line-width": [
                 "interpolate",
                 ["linear"],
                 ["zoom"],
                 8,
-                0.5,
+                0.35,
                 12,
-                1.2,
+                0.8,
                 15,
-                1.8,
+                1.15,
                 18,
-                2.5,
+                1.65,
               ],
               "line-opacity": [
                 "interpolate",
                 ["linear"],
                 ["zoom"],
                 8,
-                0.1,
+                0.5,
                 12,
-                0.14,
+                0.62,
                 15,
-                0.18,
+                0.7,
                 18,
-                0.2,
+                0.78,
               ],
             },
           },

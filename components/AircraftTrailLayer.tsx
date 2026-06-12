@@ -25,9 +25,13 @@
 // console.debug lines stay. Both clean up in a follow-up after the
 // rebuild has soaked.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Map as MaplibreMap, GeoJSONSource } from "maplibre-gl";
-import { SS_TOKENS } from "@/lib/tokens";
+import { aircraftColorForTail } from "@/lib/aircraft-colors";
+import {
+  FLIGHT_PATHS_VISIBLE_KEY,
+  LAYER_VISIBILITY_CHANGE_EVENT,
+} from "@/lib/radar-layer-events";
 import type { Aircraft } from "@/lib/types";
 
 const SOURCE_ID = "aircraft-trails";
@@ -38,14 +42,19 @@ const START_DOT_LAYER_ID = "aircraft-trail-start-dot";
 const END_DOT_LAYER_ID = "aircraft-trail-end-dot";
 const AIRCRAFT_LAYER_ID = "aircraft";
 const POLL_MS = 10_000;
-const TRAIL_MINUTES = 30;
 const PULSE_PERIOD_MS = 1600;
+const TRAIL_LAYER_IDS = [
+  HALO_LAYER_ID,
+  LAYER_ID,
+  START_DOT_LAYER_ID,
+  END_DOT_LAYER_ID,
+] as const;
 
 type TrailPoint = { lat: number; lon: number; ts: number };
 type TrailsResponse = { trails: Record<string, TrailPoint[]> };
 
 type EndpointKind = "start" | "end";
-type EndpointProps = { tail: string; kind: EndpointKind };
+type EndpointProps = { tail: string; kind: EndpointKind; color: string };
 
 function buildFeatureCollection(
   trails: Record<string, TrailPoint[]>,
@@ -53,13 +62,14 @@ function buildFeatureCollection(
   const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
   for (const [tail, pts] of Object.entries(trails)) {
     if (pts.length < 2) continue;
+    const color = aircraftColorForTail(tail);
     features.push({
       type: "Feature",
       geometry: {
         type: "LineString",
         coordinates: pts.map((p) => [p.lon, p.lat]),
       },
-      properties: { tail },
+      properties: { tail, color },
     });
   }
   return { type: "FeatureCollection", features };
@@ -71,17 +81,18 @@ function buildEndpointCollection(
   const features: GeoJSON.Feature<GeoJSON.Point, EndpointProps>[] = [];
   for (const [tail, pts] of Object.entries(trails)) {
     if (pts.length < 2) continue;
+    const color = aircraftColorForTail(tail);
     const start = pts[0]!;
     const end = pts[pts.length - 1]!;
     features.push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [start.lon, start.lat] },
-      properties: { tail, kind: "start" },
+      properties: { tail, kind: "start", color },
     });
     features.push({
       type: "Feature",
       geometry: { type: "Point", coordinates: [end.lon, end.lat] },
-      properties: { tail, kind: "end" },
+      properties: { tail, kind: "end", color },
     });
   }
   return { type: "FeatureCollection", features };
@@ -103,12 +114,7 @@ function reorderTrailLayers(map: MaplibreMap): void {
     // chevron exists.
     return;
   }
-  for (const id of [
-    HALO_LAYER_ID,
-    LAYER_ID,
-    START_DOT_LAYER_ID,
-    END_DOT_LAYER_ID,
-  ]) {
+  for (const id of TRAIL_LAYER_IDS) {
     try {
       if (map.getLayer(id)) map.moveLayer(id, AIRCRAFT_LAYER_ID);
     } catch {
@@ -135,6 +141,38 @@ export function AircraftTrailLayer({
   const tailsKeyRef = useRef(tailsKey);
   tailsKeyRef.current = tailsKey;
   const pulseRef = useRef<number | null>(null);
+  const [enabled, setEnabled] = useState<boolean>(true);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(FLIGHT_PATHS_VISIBLE_KEY);
+    if (stored === "0") setEnabled(false);
+    else if (stored === "1") setEnabled(true);
+    const onLayerVisChange = (e: Event) => {
+      const detail = (
+        e as CustomEvent<{ key: string; enabled: boolean }>
+      ).detail;
+      if (detail?.key === FLIGHT_PATHS_VISIBLE_KEY) {
+        setEnabled(detail.enabled);
+      }
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === FLIGHT_PATHS_VISIBLE_KEY) {
+        setEnabled(e.newValue !== "0");
+      }
+    };
+    window.addEventListener(LAYER_VISIBILITY_CHANGE_EVENT, onLayerVisChange);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(
+        LAYER_VISIBILITY_CHANGE_EVENT,
+        onLayerVisChange,
+      );
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   // Layer attachment — once per map instance.
   useEffect(() => {
@@ -171,23 +209,27 @@ export function AircraftTrailLayer({
         id: HALO_LAYER_ID,
         type: "line",
         source: SOURCE_ID,
-        layout: { "line-cap": "round", "line-join": "round" },
+        layout: {
+          visibility: enabledRef.current ? "visible" : "none",
+          "line-cap": "round",
+          "line-join": "round",
+        },
         paint: {
-          "line-color": "rgba(255,255,255,0.92)",
+          "line-color": "#050505",
           "line-width": [
             "interpolate",
             ["linear"],
             ["zoom"],
             8,
-            16,
+            3.5,
             11,
-            22,
+            4.5,
             14,
-            28,
+            5.5,
             18,
-            38,
+            7,
           ],
-          "line-opacity": 0.9,
+          "line-opacity": 0.28,
         },
       });
       // Line — white, max luminance contrast against every heatmap
@@ -197,47 +239,53 @@ export function AircraftTrailLayer({
         id: LAYER_ID,
         type: "line",
         source: SOURCE_ID,
-        layout: { "line-cap": "round", "line-join": "round" },
+        layout: {
+          visibility: enabledRef.current ? "visible" : "none",
+          "line-cap": "round",
+          "line-join": "round",
+        },
         paint: {
-          "line-color": SS_TOKENS.sky,
+          "line-color": ["coalesce", ["get", "color"], "#8bd2ff"],
           "line-width": [
             "interpolate",
             ["linear"],
             ["zoom"],
             8,
-            10,
+            1.6,
             11,
-            16,
+            2.1,
             14,
-            22,
+            2.8,
             18,
-            32,
+            3.6,
           ],
-          "line-opacity": 0.86,
+          "line-opacity": 0.9,
         },
       });
       map.addLayer({
         id: START_DOT_LAYER_ID,
         type: "circle",
         source: ENDPOINTS_SOURCE_ID,
+        layout: { visibility: enabledRef.current ? "visible" : "none" },
         filter: ["==", ["get", "kind"], "start"],
         paint: {
-          "circle-radius": 7,
-          "circle-color": SS_TOKENS.clear,
+          "circle-radius": 5,
+          "circle-color": ["coalesce", ["get", "color"], "#9ee8b5"],
           "circle-stroke-color": "#FFFFFF",
-          "circle-stroke-width": 2,
+          "circle-stroke-width": 1.5,
         },
       });
       map.addLayer({
         id: END_DOT_LAYER_ID,
         type: "circle",
         source: ENDPOINTS_SOURCE_ID,
+        layout: { visibility: enabledRef.current ? "visible" : "none" },
         filter: ["==", ["get", "kind"], "end"],
         paint: {
-          "circle-radius": 9,
-          "circle-color": SS_TOKENS.danger,
+          "circle-radius": 7,
+          "circle-color": ["coalesce", ["get", "color"], "#ff6b6b"],
           "circle-stroke-color": "#FFFFFF",
-          "circle-stroke-width": 2,
+          "circle-stroke-width": 1.5,
         },
       });
       // Move the cluster below the chevron once the aircraft layer
@@ -266,7 +314,7 @@ export function AircraftTrailLayer({
       }
       const phase =
         ((Date.now() - startedAt) % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
-      const radius = 8 + 5 * Math.sin(phase * Math.PI * 2);
+      const radius = 6 + 2 * Math.sin(phase * Math.PI * 2);
       try {
         map.setPaintProperty(END_DOT_LAYER_ID, "circle-radius", radius);
       } catch {
@@ -297,11 +345,26 @@ export function AircraftTrailLayer({
     };
   }, [map]);
 
+  useEffect(() => {
+    if (!map) return;
+    const visibility = enabled ? "visible" : "none";
+    for (const id of TRAIL_LAYER_IDS) {
+      try {
+        if (map.getLayer(id)) {
+          map.setLayoutProperty(id, "visibility", visibility);
+        }
+      } catch {
+        /* layer not yet attached */
+      }
+    }
+  }, [map, enabled]);
+
   // Poll /api/trails whenever the airborne tail set changes, plus every
   // POLL_MS while it's stable. Cancel + restart cleanly if tails change
   // mid-cycle so we never write a stale set to the source.
   useEffect(() => {
     if (!map) return;
+    if (!enabled) return;
     if (!tailsKey) {
       console.debug("[trail] no airborne tails, clearing sources");
       const lineSrc = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
@@ -318,10 +381,9 @@ export function AircraftTrailLayer({
     const fetchOnce = async () => {
       console.debug("[trail] fetchOnce start", { tailsKey });
       try {
-        const r = await fetch(
-          `/api/trails?tails=${tailsKey}&minutes=${TRAIL_MINUTES}`,
-          { cache: "no-store" },
-        );
+        const r = await fetch(`/api/trails?tails=${tailsKey}`, {
+          cache: "no-store",
+        });
         if (!r.ok) {
           console.warn("[trail] fetchOnce: bad response", r.status);
           return;
@@ -371,7 +433,7 @@ export function AircraftTrailLayer({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [map, tailsKey]);
+  }, [map, tailsKey, enabled]);
 
   return null;
 }

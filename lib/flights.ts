@@ -17,8 +17,10 @@ const CACHE_KEY = flightsRecentCacheKey();
 const CACHE_TTL_SECONDS = 30;
 
 const LOOKBACK_DAYS = 7;
-// Two samples more than 5 minutes apart belong to different flights.
-const SESSION_GAP_MS = 5 * 60 * 1000;
+// Split only on a substantial offline/landed gap. A 5-minute gap was too
+// eager for sparse ADS-B/history sampling and chopped current flights into
+// short fragments.
+const SESSION_GAP_MS = 60 * 60 * 1000;
 // Filter out sessions with fewer than this many samples (noise / scratches).
 const MIN_SAMPLES = 3;
 
@@ -44,7 +46,7 @@ function utcDateKey(d: Date): string {
 
 /**
  * Walk a day's chronological samples and emit one FlightSession per
- * uninterrupted run (gap > 5 min splits sessions). Sessions shorter than
+ * uninterrupted run (gap > 60 min splits sessions). Sessions shorter than
  * MIN_SAMPLES samples are dropped as noise.
  */
 function sessionsFromDay(

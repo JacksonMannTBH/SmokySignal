@@ -16,6 +16,11 @@ import {
   glyphRoleFor,
   type GlyphRole,
 } from "@/lib/brand/aircraft-glyphs";
+import {
+  AIRCRAFT_PATH_COLORS,
+  aircraftColorForTail,
+  aircraftColorIndex,
+} from "@/lib/aircraft-colors";
 import { REGIONS, type RegionId } from "@/lib/regions";
 
 const PUGET_SOUND: [number, number] = [-122.3, 47.6];
@@ -55,18 +60,21 @@ function circleRingCoords(
 // 'unknown' maps to 'aircraft-smokey' (see glyphRoleFor — conservative
 // alert default, matches computeStatus()).
 const AIRCRAFT_ICON_SIZE = 40; // bitmap raster size; layer `icon-size` scales it
-const ROLE_ICON_KEY: Record<GlyphRole, string> = {
-  smokey: "aircraft-smokey",
-  patrol: "aircraft-patrol",
-  sar: "aircraft-sar",
-  transport: "aircraft-transport",
-};
+const GLYPH_ROLES: GlyphRole[] = ["smokey", "patrol", "sar", "transport"];
 
-function iconForRole(role: FleetRole | undefined | null): string {
-  return ROLE_ICON_KEY[glyphRoleFor(role)];
+function iconKeyFor(role: GlyphRole, colorIndex: number): string {
+  return `aircraft-${role}-${colorIndex}`;
 }
 
-const RIDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="${SS_TOKENS.sky}" fill-opacity="0.10"/><circle cx="24" cy="24" r="12" fill="${SS_TOKENS.sky}" fill-opacity="0.22"/><circle cx="24" cy="24" r="6" fill="${SS_TOKENS.sky}" stroke="white" stroke-width="2"/></svg>`;
+function iconForAircraft(
+  role: FleetRole | undefined | null,
+  tail: string,
+): string {
+  return iconKeyFor(glyphRoleFor(role), aircraftColorIndex(tail));
+}
+
+const RIDER_COLOR = "#8bd2ff";
+const RIDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="${RIDER_COLOR}" fill-opacity="0.10"/><circle cx="24" cy="24" r="12" fill="${RIDER_COLOR}" fill-opacity="0.22"/><circle cx="24" cy="24" r="6" fill="${RIDER_COLOR}" stroke="white" stroke-width="2"/></svg>`;
 
 async function loadSvgBitmap(svg: string, size: number): Promise<ImageBitmap> {
   const blob = new Blob([svg], { type: "image/svg+xml" });
@@ -81,12 +89,147 @@ async function loadSvgBitmap(svg: string, size: number): Promise<ImageBitmap> {
   }
 }
 
+type ThemePaintStore = Map<string, unknown>;
+type StyleLayerLike = {
+  id: string;
+  type?: string;
+  layout?: Record<string, unknown>;
+  "source-layer"?: string;
+};
+
+const CUSTOM_LAYER_PREFIXES = [
+  "aircraft",
+  "rider",
+  "distance-rings",
+  "flight-paths",
+  "user-zones",
+  "hotzones",
+];
+
+function isCustomLayer(id: string): boolean {
+  return CUSTOM_LAYER_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
+
+function rememberPaint(
+  map: MaplibreMap,
+  store: ThemePaintStore,
+  id: string,
+  prop: string,
+) {
+  const key = `${id}::${prop}`;
+  if (!store.has(key)) store.set(key, map.getPaintProperty(id, prop));
+}
+
+function setThemedPaint(
+  map: MaplibreMap,
+  store: ThemePaintStore,
+  id: string,
+  prop: string,
+  value: unknown,
+) {
+  rememberPaint(map, store, id, prop);
+  map.setPaintProperty(id, prop, value);
+}
+
+function restoreMapTheme(map: MaplibreMap, store: ThemePaintStore) {
+  for (const [key, value] of store.entries()) {
+    const [id, prop] = key.split("::");
+    if (!id || !prop || !map.getLayer(id)) continue;
+    try {
+      map.setPaintProperty(id, prop, value);
+    } catch {
+      /* style changed while toggling */
+    }
+  }
+  store.clear();
+}
+
+function applyRadarMapTheme(
+  map: MaplibreMap,
+  darkMode: boolean,
+  store: ThemePaintStore,
+) {
+  if (!darkMode) {
+    restoreMapTheme(map, store);
+    return;
+  }
+
+  const layers = (map.getStyle().layers ?? []) as StyleLayerLike[];
+  for (const layer of layers) {
+    const id = layer.id;
+    if (isCustomLayer(id)) continue;
+    const type = layer.type;
+    const label = `${id} ${layer["source-layer"] ?? ""}`.toLowerCase();
+    const isWater = /water|ocean|lake|river|bay|marine/.test(label);
+    const isRoad = /road|street|highway|motorway|transport/.test(label);
+    const isBoundary = /boundary|admin|state|county/.test(label);
+    const isGreenSpace = /park|forest|wood|grass|landcover|landuse/.test(label);
+    const hasText = Boolean(layer.layout?.["text-field"]);
+
+    try {
+      if (type === "background") {
+        setThemedPaint(map, store, id, "background-color", "#111313");
+      } else if (type === "fill") {
+        setThemedPaint(
+          map,
+          store,
+          id,
+          "fill-color",
+          isWater ? "#000000" : isGreenSpace ? "#202a22" : "#202426",
+        );
+        if (!isWater) {
+          setThemedPaint(map, store, id, "fill-opacity", 1);
+        }
+      } else if (type === "line") {
+        setThemedPaint(
+          map,
+          store,
+          id,
+          "line-color",
+          isWater ? "#000000" : isRoad ? "#8ef6c6" : isBoundary ? "#3a3a35" : "#242728",
+        );
+        if (isRoad || isBoundary) {
+          setThemedPaint(map, store, id, "line-opacity", 0.78);
+        }
+      }
+
+      if (type === "symbol" && hasText) {
+        setThemedPaint(map, store, id, "text-color", "#e8e0c8");
+        setThemedPaint(map, store, id, "text-halo-color", "#050505");
+        setThemedPaint(map, store, id, "text-halo-width", 1.6);
+      }
+    } catch {
+      /* Some provider layers do not support every paint property. */
+    }
+  }
+}
+
+function applyCustomRadarLayerTheme(map: MaplibreMap, darkMode: boolean) {
+  const ringColor = darkMode ? "#a9a28a" : "#5c5642";
+  const haloColor = darkMode ? "#020202" : "#ffffff";
+  try {
+    if (map.getLayer("distance-rings")) {
+      map.setPaintProperty("distance-rings", "line-color", ringColor);
+    }
+    if (map.getLayer("distance-rings-labels")) {
+      map.setPaintProperty("distance-rings-labels", "text-color", ringColor);
+      map.setPaintProperty("distance-rings-labels", "text-halo-color", haloColor);
+    }
+    if (map.getLayer("aircraft")) {
+      map.setPaintProperty("aircraft", "text-color", ["get", "color"]);
+      map.setPaintProperty("aircraft", "text-halo-color", darkMode ? "#020202" : "#fff7f2");
+    }
+  } catch {
+    /* layer may be mid-style reload */
+  }
+}
+
 type Snapshot = {
   fromByTail: Map<string, [number, number]>;
   toByTail: Map<string, [number, number]>;
   metaByTail: Map<
     string,
-    { icon: string; track: number; nickname: string | null }
+    { icon: string; track: number; nickname: string | null; color: string; label: string }
   >;
   startedAt: number;
 };
@@ -116,12 +259,14 @@ export default function RadarMap({
   aircraft,
   rider,
   showDistanceRings = false,
+  darkMode = false,
   regionId,
   onMapReady,
 }: {
   aircraft: Aircraft[];
   rider: RiderPos | null;
   showDistanceRings?: boolean;
+  darkMode?: boolean;
   /** Pivots the map view between Puget Sound / counties / All-WA.
    *  When undefined or "puget_sound", no flyTo — preserves the
    *  existing rider-zoom + auto-recenter behavior. */
@@ -137,6 +282,8 @@ export default function RadarMap({
   const aircraftRef = useRef<Aircraft[]>(aircraft);
   const riderRef = useRef<RiderPos | null>(rider);
   const showDistanceRingsRef = useRef<boolean>(showDistanceRings);
+  const darkModeRef = useRef<boolean>(darkMode);
+  const originalPaintRef = useRef<ThemePaintStore>(new Map());
   // Tracks whether we've done the one-time zoom-to-rider on first
   // geolocation resolve. Subsequent rider changes only recenter
   // (the existing 5s loop), they don't change zoom.
@@ -168,23 +315,32 @@ export default function RadarMap({
       // Load all four role glyphs in parallel + the rider dot. The map's
       // symbol layer expression picks the right one per feature via
       // properties.icon = "aircraft-${role}".
-      const roleEntries = Object.entries(ROLE_ICON_KEY) as Array<
-        [GlyphRole, string]
-      >;
-      const [riderImg, ...roleImgs] = await Promise.all([
+      const iconEntries = GLYPH_ROLES.flatMap((role) =>
+        AIRCRAFT_PATH_COLORS.map((color, colorIndex) => ({
+          key: iconKeyFor(role, colorIndex),
+          role,
+          color,
+        })),
+      );
+      const [riderImg, ...aircraftImgs] = await Promise.all([
         loadSvgBitmap(RIDER_SVG, 48),
-        ...roleEntries.map(([role]) =>
+        ...iconEntries.map(({ role, color }) =>
           loadSvgBitmap(
-            aircraftSvg(role, { size: AIRCRAFT_ICON_SIZE, tone: "radar" }),
+            aircraftSvg(role, {
+              size: AIRCRAFT_ICON_SIZE,
+              tone: "radar",
+              color,
+            }),
             AIRCRAFT_ICON_SIZE,
           ),
         ),
       ]);
-      if (!mapRef.current) return; // guard — unmounted while loading
+      if (!mapRef.current) return; // guard - unmounted while loading
       map.addImage("rider-dot", riderImg);
-      roleEntries.forEach(([, key], i) => {
-        map.addImage(key, roleImgs[i]!);
+      iconEntries.forEach(({ key }, i) => {
+        map.addImage(key, aircraftImgs[i]!);
       });
+      applyRadarMapTheme(map, darkModeRef.current, originalPaintRef.current);
 
       // Distance rings — sit beneath the rider so the dot stays on top.
       // Toggleable via showDistanceRings prop; visibility flips without
@@ -201,7 +357,7 @@ export default function RadarMap({
           visibility: showDistanceRingsRef.current ? "visible" : "none",
         },
         paint: {
-          "line-color": SS_TOKENS.fg2,
+          "line-color": "#5c5642",
           "line-opacity": 0.4,
           "line-width": 0.75,
           "line-dasharray": [4, 4],
@@ -223,9 +379,9 @@ export default function RadarMap({
           "text-allow-overlap": false,
         },
         paint: {
-          "text-color": SS_TOKENS.fg2,
+          "text-color": "#5c5642",
           "text-opacity": 0.8,
-          "text-halo-color": SS_TOKENS.bg0,
+          "text-halo-color": "#ffffff",
           "text-halo-width": 1.5,
         },
         // Only render labels for the line vertices we tag — the polygon
@@ -266,51 +422,38 @@ export default function RadarMap({
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
           "icon-size": 0.95,
-          // Tail label sits 4-6 px above the chevron. Hidden below z9 so
-          // the regional view doesn't clutter; tail-only at z9-11; tail
-          // plus nickname at z12+ for city zoom. Sky-blue mono matches
-          // the brand info palette and stays distinct from the amber
-          // chevron + heat halo.
-          //
+          // Tail label stays above the aircraft at every zoom. Let it win
+          // placement so a live aircraft never appears nameless.
           // Font stack matches OpenFreeMap's bundled glyphs.
-          "text-field": [
-            "step",
-            ["zoom"],
-            "",
-            9,
-            ["get", "tail"],
-            12,
-            [
-              "case",
-              ["has", "nickname"],
-              ["concat", ["get", "tail"], " (", ["get", "nickname"], ")"],
-              ["get", "tail"],
-            ],
-          ],
+          "text-field": ["get", "label"],
           "text-font": MAP_LABEL_FONT,
           "text-size": [
             "interpolate",
             ["linear"],
             ["zoom"],
-            9,
+            6,
+            9.5,
+            10,
             10,
             14,
             12,
             18,
             13,
           ],
-          "text-offset": [0, -1.6],
+          "text-offset": [0, -1.85],
           "text-anchor": "bottom",
-          "text-allow-overlap": false,
-          "text-ignore-placement": false,
-          "text-letter-spacing": 0.05,
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+          "text-line-height": 1.05,
+          "text-letter-spacing": 0,
         },
         paint: {
-          "text-color": SS_TOKENS.danger,
+          "text-color": ["get", "color"],
           "text-halo-color": "#fff7f2",
           "text-halo-width": 2,
         },
       });
+      applyCustomRadarLayerTheme(map, darkModeRef.current);
 
       readyRef.current = true;
       applyAircraft(aircraftRef.current);
@@ -465,6 +608,14 @@ export default function RadarMap({
     }
   }, [showDistanceRings]);
 
+  useEffect(() => {
+    darkModeRef.current = darkMode;
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    applyRadarMapTheme(map, darkMode, originalPaintRef.current);
+    applyCustomRadarLayerTheme(map, darkMode);
+  }, [darkMode]);
+
   // When the rider changes region (Puget Sound → Spokane etc), fly the
   // map to the region's centroid + default zoom. Skipped on initial
   // mount where regionId starts at "puget_sound" — that's the existing
@@ -513,7 +664,7 @@ export default function RadarMap({
     const start = Date.now();
     const tick = () => {
       const phase = (Date.now() - start) / 1600; // 1.6s loop
-      const sized = 0.5 + 0.15 * (Math.sin(phase * Math.PI * 2) + 1);
+      const sized = 0.86 + 0.14 * (Math.sin(phase * Math.PI * 2) + 1);
       try {
         map.setLayoutProperty("rider", "icon-size", sized);
       } catch {
@@ -607,15 +758,24 @@ export default function RadarMap({
     const newTo = new Map<string, [number, number]>();
     const newMeta = new Map<
       string,
-      { icon: string; track: number; nickname: string | null }
+      {
+        icon: string;
+        track: number;
+        nickname: string | null;
+        color: string;
+        label: string;
+      }
     >();
     for (const a of list) {
       if (a.lat == null || a.lon == null) continue;
+      const color = aircraftColorForTail(a.tail);
       newTo.set(a.tail, [a.lon, a.lat]);
       newMeta.set(a.tail, {
-        icon: iconForRole(a.role),
+        icon: iconForAircraft(a.role, a.tail),
         track: a.heading ?? 0,
         nickname: a.nickname,
+        color,
+        label: a.nickname ? `${a.tail}\n${a.nickname}` : a.tail,
       });
       if (!newFrom.has(a.tail)) {
         // First time we see this plane — render it at its current position
@@ -680,11 +840,9 @@ export default function RadarMap({
           tail,
           icon: meta.icon,
           track: meta.track,
+          color: meta.color,
+          label: meta.label,
         };
-        // Only include nickname when present so the layer's `["has",
-        // "nickname"]` expression cleanly toggles between "tail" and
-        // "tail (nickname)" formats. Empty-string values would still
-        // pass `has`, breaking the conditional.
         if (meta.nickname) props.nickname = meta.nickname;
         features.push({
           type: "Feature",
@@ -710,7 +868,7 @@ export default function RadarMap({
       style={{
         position: "absolute",
         inset: 0,
-        background: SS_TOKENS.bg0,
+        background: darkMode ? "#000000" : SS_TOKENS.bg0,
       }}
     />
   );

@@ -705,7 +705,7 @@ function EditRow({
   return (
     <tr
       style={{
-        borderTop: `1px solid ${SS_TOKENS.alert}55`,
+        borderTop: `1px solid color-mix(in srgb, ${SS_TOKENS.alert} 34%, transparent)`,
         background: "rgba(245,184,64,0.04)",
       }}
     >
@@ -1099,7 +1099,7 @@ const smallButtonStyle: React.CSSProperties = {
 const dangerButtonStyle: React.CSSProperties = {
   ...smallButtonStyle,
   color: SS_TOKENS.danger,
-  borderColor: `${SS_TOKENS.danger}55`,
+  borderColor: `color-mix(in srgb, ${SS_TOKENS.danger} 34%, transparent)`,
 };
 
 const addButtonStyle: React.CSSProperties = {

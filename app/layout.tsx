@@ -4,6 +4,7 @@ import { BASE_URL } from "@/lib/config";
 import { IOSInstallPrompt } from "@/components/IOSInstallPrompt";
 import { SwRegistrar } from "@/components/SwRegistrar";
 import { TooltipProvider } from "@/components/Tooltip";
+import { ThemeController } from "@/components/ThemeController";
 import { getContrastPref } from "@/lib/user-prefs";
 import "./globals.css";
 
@@ -70,11 +71,19 @@ export default function RootLayout({
 }) {
   const contrast = getContrastPref();
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className="ss-app bg-ss-bg0 text-ss-fg0"
+        className="ss-app"
         data-contrast={contrast}
+        suppressHydrationWarning
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var d=localStorage.getItem('ss_radar_dark_mode')==='1'||localStorage.getItem('ss_radar_dark_mode')==='dark';document.documentElement.dataset.theme=d?'dark':'light';document.body.dataset.theme=d?'dark':'light';document.documentElement.style.colorScheme=d?'dark':'light';var m=document.querySelector('meta[name=\"theme-color\"]');if(m)m.setAttribute('content',d?'#020202':'#ffffff')}catch(e){}",
+          }}
+        />
+        <ThemeController />
         <TooltipProvider>
           {children}
           <IOSInstallPrompt />

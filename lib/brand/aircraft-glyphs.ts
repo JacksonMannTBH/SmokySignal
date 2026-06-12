@@ -176,7 +176,13 @@ export function glyphRoleFor(role: FleetRole | undefined | null): GlyphRole {
   return "smokey";
 }
 
-export type AircraftSvgOpts = { size?: number; tone?: "default" | "radar" };
+export type AircraftSvgOpts = {
+  size?: number;
+  tone?: "default" | "radar";
+  color?: string;
+  strokeColor?: string;
+  blipColor?: string;
+};
 
 /** SVG markup for the role's glyph at the requested pixel size (default 24). */
 export function aircraftSvg(
@@ -186,10 +192,13 @@ export function aircraftSvg(
   const r = ROLES[glyphRoleFor(role)];
   const size = opts.size ?? 24;
   if (opts.tone === "radar") {
+    const fill = opts.color ?? RADAR_FILL;
+    const stroke = opts.strokeColor ?? RADAR_STROKE;
+    const blip = opts.blipColor ?? RADAR_BLIP;
     const inner =
       r.family === "plane"
-        ? planeBody(RADAR_FILL, RADAR_STROKE) + planeBlip(RADAR_BLIP)
-        : heliBody(RADAR_FILL, RADAR_STROKE) + heliBlip(RADAR_BLIP);
+        ? planeBody(fill, stroke) + planeBlip(blip)
+        : heliBody(fill, stroke) + heliBlip(blip);
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" data-role="${role}"><filter id="ss-radar-aircraft-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.1" flood-color="#050908" flood-opacity="0.72"/></filter><g filter="url(#ss-radar-aircraft-shadow)">${inner}</g></svg>`;
   }
   const inner =

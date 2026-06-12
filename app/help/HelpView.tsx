@@ -128,7 +128,7 @@ export function HelpMarkdown({ source }: { source: string }) {
                     : {
                         color: SS_TOKENS.alert,
                         textDecoration: "underline",
-                        textDecorationColor: `${SS_TOKENS.alert}55`,
+                        textDecorationColor: `color-mix(in srgb, ${SS_TOKENS.alert} 34%, transparent)`,
                       }
                 }
                 {...rest}

@@ -16,10 +16,9 @@ export function FreshnessLabel({ lastSampleMs, className, style }: Props) {
   // Re-tick every 30s so the label stays honest without requiring a
   // server round-trip. The cookie/cache layer keeps the underlying value
   // current at server-render time; this just ages it gracefully.
-  const [now, setNow] = useState<number>(() =>
-    typeof window === "undefined" ? lastSampleMs ?? 0 : Date.now(),
-  );
+  const [now, setNow] = useState<number>(() => lastSampleMs ?? Date.now());
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);

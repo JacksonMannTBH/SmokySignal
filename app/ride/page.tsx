@@ -1,16 +1,17 @@
-import { RadarShell } from "@/components/RadarShell";
+import { RideModeShell } from "@/components/RideModeShell";
 import { getSnapshot } from "@/lib/snapshot";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
 
 export const metadata = {
-  title: "Radar",
+  title: "Ride Mode",
+  description: "One-glance aircraft awareness while riding.",
 };
 
 export const dynamic = "force-dynamic";
 
 type SP = { mock?: string };
 
-export default async function RadarPage({
+export default async function RidePage({
   searchParams,
 }: {
   searchParams: SP;
@@ -19,5 +20,5 @@ export default async function RadarPage({
   const mockState = parseMockState(searchParams.mock);
   const mockOn = mockState !== null;
   const initial = applyMockState(real, mockState);
-  return <RadarShell initial={initial} mockOn={mockOn} />;
+  return <RideModeShell initial={initial} mockOn={mockOn} />;
 }

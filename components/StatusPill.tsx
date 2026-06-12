@@ -20,7 +20,7 @@ export function StatusPill({
 }: Props) {
   const isAlert = kind === "alert";
   const c = isAlert ? SS_TOKENS.alert : SS_TOKENS.clear;
-  const bg = isAlert ? "rgba(255,247,235,0.88)" : "rgba(240,250,246,0.9)";
+  const bg = isAlert ? SS_TOKENS.alertDim : SS_TOKENS.clearDim;
   const pill = (
     <span
       role="status"
@@ -32,7 +32,11 @@ export function StatusPill({
         padding: big ? "8px 13px" : "5px 10px",
         borderRadius: 999,
         background: bg,
-        border: `.5px solid ${isAlert ? "rgba(244,196,48,0.42)" : "rgba(5,5,5,0.22)"}`,
+        border: `.5px solid ${
+          isAlert
+            ? "color-mix(in srgb, var(--ss-alert) 42%, transparent)"
+            : SS_TOKENS.hairline2
+        }`,
         boxShadow: big ? SS_TOKENS.shadowSm : "none",
         fontSize: big ? 12 : 11,
         fontWeight: 700,

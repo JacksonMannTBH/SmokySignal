@@ -743,7 +743,7 @@ function RadioCard({
         padding: "10px 12px",
         borderRadius: 10,
         background: active ? SS_TOKENS.alertDim : SS_TOKENS.bg2,
-        border: `.5px solid ${active ? `${SS_TOKENS.alert}66` : SS_TOKENS.hairline2}`,
+        border: `.5px solid ${active ? `color-mix(in srgb, ${SS_TOKENS.alert} 40%, transparent)` : SS_TOKENS.hairline2}`,
         color: SS_TOKENS.fg0,
         cursor: "pointer",
         touchAction: "manipulation",
