@@ -1,7 +1,6 @@
 // Canonical "Learning the sky" panel — three variants of the same
-// content. Used wherever a surface depends on hot-zone or forecast data
-// that's still being collected. Single component so the copy + day
-// counter never disagree across home, radar, and forecast.
+// content. Used wherever forecast data is still being collected. Single
+// component so the copy + day counter never disagree across surfaces.
 //
 // Voice rules baked in (design/BRAND.md §3):
 //  - No emoji, no exclamation marks.
@@ -16,10 +15,10 @@ type Variant = "card" | "banner" | "overlay";
 
 type Props = {
   state: LearningState;
-  /** Hot-zones surface: how many zones have been learned so far. */
-  zonesLearned?: number;
   /** Prediction card / forecast: total takeoff events seen. */
   eventsSeen?: number;
+  /** Hot zone learning callers may pass learned-zone counts for their own context. */
+  zonesLearned?: number;
   variant?: Variant;
   className?: string;
   style?: React.CSSProperties;
@@ -27,14 +26,13 @@ type Props = {
 
 export function LearningPanel({
   state,
-  zonesLearned,
   eventsSeen,
   variant = "card",
   className,
   style,
 }: Props) {
   const headline = computeHeadline(state);
-  const body = computeBody(state, eventsSeen, zonesLearned);
+  const body = computeBody(state, eventsSeen);
   const day = state.daysElapsed;
   const cap = LEARNING_THRESHOLD_DAYS;
   const eyebrow = state.stillLearning
@@ -193,22 +191,17 @@ function computeHeadline(state: LearningState): string {
 function computeBody(
   state: LearningState,
   eventsSeen?: number,
-  zonesLearned?: number,
 ): string {
   const events = eventsSeen ?? 0;
-  const zones = zonesLearned ?? 0;
   if (state.daysElapsed < 7) {
-    return `We just got our ears on. Forecasts and hot zones come online once we've watched the sky for ${LEARNING_THRESHOLD_DAYS} days.`;
+    return `We just got our ears on. Forecasts come online once we've watched the sky for ${LEARNING_THRESHOLD_DAYS} days.`;
   }
   if (state.stillLearning) {
     const d = state.daysRemaining;
     const dayWord = d === 1 ? "day" : "days";
-    return `${d} ${dayWord} of listening to go before forecasts get sharp. Hot zones need a month of patrols to settle.`;
+    return `${d} ${dayWord} of listening to go before forecasts get sharp.`;
   }
   // past threshold but data sparse
-  if (zonesLearned !== undefined && zones > 0) {
-    return `${zones} zones learned so far. Sky's been quieter than expected — give it another week and the patterns sharpen.`;
-  }
   return `${events} takeoffs logged. Sky's been quieter than expected — give it another week and the patterns surface.`;
 }
 

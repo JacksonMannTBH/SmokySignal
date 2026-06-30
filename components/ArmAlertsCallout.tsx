@@ -120,7 +120,7 @@ export function ArmAlertsCallout() {
             lineHeight: 1.3,
           }}
         >
-          Get a ping when Smokey&rsquo;s up.
+          Get a ping when Bird&rsquo;s up.
         </div>
       </div>
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>

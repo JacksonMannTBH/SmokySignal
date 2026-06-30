@@ -1,4 +1,5 @@
 import { DashShell } from "@/components/DashShell";
+import { DEFAULT_APP_STATE_ID } from "@/lib/app-regions";
 import { getSnapshot } from "@/lib/snapshot";
 import { getRecentActivity } from "@/lib/activity";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
@@ -18,7 +19,7 @@ export default async function DashPage({
 }) {
   const [real, activity] = await Promise.all([
     getSnapshot(),
-    getRecentActivity(10),
+    getRecentActivity(5, DEFAULT_APP_STATE_ID),
   ]);
   const mockState = parseMockState(searchParams.mock);
   const mockOn = mockState !== null;

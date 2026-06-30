@@ -13,6 +13,9 @@
 
 import { NextResponse } from "next/server";
 import { getSnapshot, invalidateSnapshot } from "@/lib/snapshot";
+import { listSubscriptions } from "@/lib/push/store";
+import { DEFAULT_REGION, isRegionId, type RegionId } from "@/lib/regions";
+import { purgeRetiredHotZoneData } from "@/lib/retired-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,14 +30,35 @@ export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${secret}`) return unauthorized();
 
-  await invalidateSnapshot();
-  const snap = await getSnapshot();
-  const airborne = snap.aircraft.filter((a) => a.airborne).length;
+  const retiredDataPurge = await purgeRetiredHotZoneData();
+  const regionIds = await activeRegionIds();
+  const snaps = [];
+  for (const regionId of regionIds) {
+    await invalidateSnapshot(regionId);
+    snaps.push(await getSnapshot(regionId));
+  }
+  const airborne = snaps.reduce(
+    (sum, snap) => sum + snap.aircraft.filter((a) => a.airborne).length,
+    0,
+  );
+  const snap = snaps[0]!;
 
   return NextResponse.json({
     ok: true,
     fetched_at: snap.fetched_at,
     source: snap.source,
     airborne,
+    regions: regionIds,
+    retired_data_purge: retiredDataPurge,
   });
+}
+
+async function activeRegionIds(): Promise<RegionId[]> {
+  const out = new Set<RegionId>([DEFAULT_REGION]);
+  const subs = await listSubscriptions();
+  for (const sub of subs) {
+    const id = sub.prefs.region_id;
+    if (isRegionId(id)) out.add(id);
+  }
+  return [...out];
 }

@@ -1,5 +1,6 @@
 import type { FleetEntry } from "./types";
 import { nNumberToIcao } from "./icao";
+import { ADDITIONAL_FLEET } from "./aircraft-directory";
 
 // FAA-verified registry. Hexes are baked in where confirmed; entries with
 // `hex: null` (or omitted) are resolved at module load via the FAA N-number
@@ -7,11 +8,11 @@ import { nNumberToIcao } from "./icao";
 // the algorithm produces — typos surface as test failures.
 //
 // `role` drives the home + radar status pill via lib/status.ts. All three
-// alert-tier roles surface as SMOKEY UP under the rider-facing umbrella;
+// alert-tier roles surface as BIRD UP under the rider-facing umbrella;
 // the granular role taxonomy still drives body copy and badge tooltips.
-//   smokey    → SMOKEY UP                  (alert / amber)
-//   patrol    → SMOKEY UP                  (alert / amber)
-//   unknown   → SMOKEY UP                  (alert / amber, conservative)
+//   smokey    → BIRD UP                  (alert / amber)
+//   patrol    → BIRD UP                  (alert / amber)
+//   unknown   → BIRD UP                  (alert / amber, conservative)
 //   sar       → ALL CLEAR + footnote       (clear / green)
 //   transport → ALL CLEAR + footnote       (clear / green)
 // `roleConfidence` ('confirmed' | 'tentative' | 'unknown') is surfaced in
@@ -22,9 +23,9 @@ import { nNumberToIcao } from "./icao";
 // readable mission summary shown on /about and /plane/[tail].
 export const FLEET: FleetEntry[] = [
   // Washington State Patrol — Olympia (all WSP fixed-wing are smokey)
-  { tail: "N305DK", hex: "A3323A", operator: "WSP",          model: "Cessna 206H Stationair (FLIR)", nickname: "Smokey 4",          roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "Smokey 4 — WSP fixed-wing FLIR" },
+  { tail: "N305DK", hex: "A3323A", operator: "WSP",          model: "Cessna 206H Stationair (FLIR)", nickname: "Bird 4",          roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "Bird 4 — WSP fixed-wing FLIR" },
   { tail: "N305RC", hex: "A3335F", operator: "WSP",          model: "Cessna 182T Skylane",            nickname: null,                roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "WSP fixed-wing speed enforcement" },
-  { tail: "N2446X", hex: null,     operator: "WSP",          model: "Cessna 206H Stationair (FLIR)", nickname: "Smokey 3",          roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "Smokey 3 — WSP fixed-wing FLIR" },
+  { tail: "N2446X", hex: null,     operator: "WSP",          model: "Cessna 206H Stationair (FLIR)", nickname: "Bird 3",          roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "Bird 3 — WSP fixed-wing FLIR" },
   { tail: "N102LP", hex: "A00D2A", operator: "WSP",          model: "Cessna 182T Skylane",            nickname: null,                roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "WSP fixed-wing speed enforcement" },
   { tail: "N3532K", hex: null,     operator: "WSP",          model: "Cessna 182T Skylane",            nickname: null,                roleDescription: "Speed enforcement",            base: "KOLM Olympia",                          role: "smokey",    roleConfidence: "confirmed", roleNote: "WSP fixed-wing speed enforcement" },
 
@@ -67,7 +68,7 @@ export const FLEET: FleetEntry[] = [
   // (BAMB), KBLI. Tails + TROY callsigns from RadioReference Wiki. AS350
   // helicopters do interagency support with WCSO + state agencies; the
   // B300C MEA is a fixed-wing Multi-Enforcement Aircraft for surveillance.
-  // All four classified as patrol — federal LE under the Smokey umbrella.
+  // All four classified as patrol — federal LE under the Bird umbrella.
   { tail: "N1977G", hex: null,     operator: "CBP",          model: "Airbus AS350 / H125",            nickname: "TROY 188",          roleDescription: "Federal patrol / interdiction (helicopter)", base: "KBLI Bellingham AMB",            role: "patrol",    roleConfidence: "confirmed", roleNote: "CBP AMO Bellingham AS350 (TROY 188)" },
   { tail: "N2108J", hex: null,     operator: "CBP",          model: "Airbus AS350 / H125",            nickname: "TROY 169",          roleDescription: "Federal patrol / interdiction (helicopter)", base: "KBLI Bellingham AMB",            role: "patrol",    roleConfidence: "confirmed", roleNote: "CBP AMO Bellingham AS350 (TROY 169)" },
   { tail: "N741C",  hex: null,     operator: "CBP",          model: "Airbus AS350 / H125",            nickname: "TROY 170",          roleDescription: "Federal patrol / interdiction (helicopter)", base: "KBLI Bellingham AMB",            role: "patrol",    roleConfidence: "confirmed", roleNote: "CBP AMO Bellingham AS350 (TROY 170)" },
@@ -81,6 +82,7 @@ export const FLEET: FleetEntry[] = [
   // Role = sar (clear-tier) — USCG missions are search & rescue, not
   // enforcement against motorists.
   { tail: "CGNR6594", hex: "AE26B4", operator: "USCG",       model: "Eurocopter MH-65E Dolphin",      nickname: "Dolphin 6594",      roleDescription: "Maritime search and rescue",   base: "KCLM Port Angeles",                     role: "sar",       roleConfidence: "confirmed", roleNote: "CGAS Port Angeles MH-65E (Jan 2021 delivery)" },
+  ...ADDITIONAL_FLEET,
 ];
 
 /**
@@ -99,7 +101,7 @@ export const FLEET: FleetEntry[] = [
  * below documenting which agencies were investigated and why they
  * couldn't be added in this pass. The FLEET array did not change.
  */
-export const SEED_VERSION = 4;
+export const SEED_VERSION = 6;
 
 // Round-2 registry research notes (2026-05-07).
 //

@@ -4,29 +4,25 @@ import { useEffect } from "react";
 import {
   THEME_CHANGE_EVENT,
   THEME_STORAGE_KEY,
-  readStoredDarkTheme,
 } from "@/lib/theme";
 
-function applyTheme(dark: boolean): void {
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-  document.body.dataset.theme = dark ? "dark" : "light";
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
+function applyTheme(): void {
+  document.documentElement.dataset.theme = "dark";
+  document.body.dataset.theme = "dark";
+  document.documentElement.style.colorScheme = "dark";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#020202" : "#ffffff");
+    ?.setAttribute("content", "#050607");
 }
 
 export function ThemeController() {
   useEffect(() => {
-    applyTheme(readStoredDarkTheme());
+    applyTheme();
 
-    const onThemeChange = (event: Event) => {
-      const detail = (event as CustomEvent<{ dark?: boolean }>).detail;
-      applyTheme(detail?.dark ?? readStoredDarkTheme());
-    };
+    const onThemeChange = () => applyTheme();
     const onStorage = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY) {
-        applyTheme(readStoredDarkTheme());
+        applyTheme();
       }
     };
 

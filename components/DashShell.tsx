@@ -2,21 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { filterOpsAircraftByState } from "@/lib/aircraft-directory";
 import { useAircraft } from "@/lib/hooks/useAircraft";
+import { useSelectedRegionStateId } from "@/lib/hooks/useSelectedRegionStateId";
 import { useRiderPos } from "@/lib/hooks/useRiderPos";
 import { SS_TOKENS } from "@/lib/tokens";
 import { SMOKY_TAIL } from "@/lib/seed";
-import { DEFAULT_SPEED_LIMIT_MPH, haversineNm } from "@/lib/geo";
-import { evaluateWarning } from "@/lib/speed-warning";
+import { haversineNm } from "@/lib/geo";
 import { proximityBandForDistance } from "@/lib/proximity-alert";
-import { fmtAgoTs } from "@/lib/time";
-import type { HotZone } from "@/lib/hotzones";
-import { StatusPill } from "./StatusPill";
+import { computeStatus } from "@/lib/status";
 import { Card } from "./Card";
 import { AlertsOptInCard } from "./AlertsOptInCard";
 import { ProximityFlash } from "./ProximityFlash";
 import { TakeOffButton } from "./TakeOffButton";
-import type { Aircraft, Snapshot } from "@/lib/types";
+import { ActivityEventsSection } from "./ActivityFeed";
+import { StatusHero } from "./StatusHero";
+import { SettingsButton } from "./SettingsButton";
+import type { Aircraft, FleetEntry, Snapshot } from "@/lib/types";
 import type { ActivityEntry } from "@/lib/activity";
 
 const TABBAR_HEIGHT = 66;
@@ -34,16 +36,36 @@ type Props = {
 
 export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
   const snap = useAircraft(initial, mockOn);
+  const stateId = useSelectedRegionStateId();
   const { pos } = useRiderPos();
   const [activity, setActivity] = useState<ActivityEntry[]>(initialActivity);
-
-  const airborne = useMemo(
-    () => snap.aircraft.filter((a) => a.airborne),
-    [snap.aircraft],
+  const stateActivity = useMemo(
+    () => filterOpsAircraftByState(activity, stateId),
+    [activity, stateId],
   );
-  const smoky = snap.aircraft.find((a) => a.tail === SMOKY_TAIL);
+
+  const stateAircraft = useMemo(
+    () => filterOpsAircraftByState(snap.aircraft, stateId),
+    [snap.aircraft, stateId],
+  );
+  const stateSnap = useMemo(
+    () => ({ ...snap, aircraft: stateAircraft }),
+    [snap, stateAircraft],
+  );
+  const airborne = useMemo(
+    () => stateAircraft.filter((a) => a.airborne),
+    [stateAircraft],
+  );
+  const fleetMap = useMemo(
+    () => new Map<string, FleetEntry>(stateAircraft.map((a) => [a.tail, a])),
+    [stateAircraft],
+  );
+  const status = useMemo(
+    () => computeStatus(stateSnap, fleetMap),
+    [stateSnap, fleetMap],
+  );
+  const smoky = stateAircraft.find((a) => a.tail === SMOKY_TAIL);
   const smokyUp = Boolean(smoky?.airborne);
-  const up = airborne.length > 0;
 
   // Top-N airborne planes by Haversine distance — sorted ascending so
   // nearestList[0] is the single closest. Drives both the watcher list
@@ -71,72 +93,16 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
     ? proximityBandForDistance(nearest.distanceNm)
     : null;
 
-  // N1a dry-run logging: fetch hot zones once on mount, then on each
-  // rider geolocation tick + airborne refresh, evaluate the warning
-  // condition and POST positives to /api/dryrun-warnings. No UI surface
-  // — that's N1b, gated on this data accumulating.
-  const [hotZones, setHotZones] = useState<HotZone[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/hotzones")
-      .then((r) => (r.ok ? r.json() : { zones: [] }))
-      .then((data) => {
-        if (cancelled) return;
-        const zones = Array.isArray(data?.zones) ? data.zones : [];
-        setHotZones(zones as HotZone[]);
-      })
-      .catch(() => {
-        // best-effort; absent zones just means evaluateWarning returns
-        // wouldFire=false (no zone match)
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  // m/s → mph
-  const MPS_TO_MPH = 2.236936;
-  useEffect(() => {
-    if (!pos) return;
-    if (pos.speedMps == null || pos.speedMps < 0) return;
-    if (hotZones.length === 0 && airborne.length === 0) return;
-    const result = evaluateWarning({
-      riderLat: pos.lat,
-      riderLon: pos.lon,
-      riderSpeedMph: pos.speedMps * MPS_TO_MPH,
-      postedLimitMph: DEFAULT_SPEED_LIMIT_MPH,
-      hotZones,
-      airborneAircraft: airborne,
-    });
-    if (!result.wouldFire) return;
-    const nearestTail = nearest?.plane.tail ?? null;
-    console.log("[dryrun]", result.reason);
-    void fetch("/api/dryrun-warnings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ts: Date.now(),
-        riderLat: pos.lat,
-        riderLon: pos.lon,
-        riderSpeedMph: pos.speedMps * MPS_TO_MPH,
-        postedLimitMph: DEFAULT_SPEED_LIMIT_MPH,
-        riderOverLimitBy: result.riderOverLimitBy,
-        nearestZoneMi: result.nearestZoneMi,
-        nearestBirdMi: result.nearestBirdMi,
-        nearestTail,
-        reason: result.reason,
-      }),
-    }).catch(() => {
-      // best-effort; transient network errors don't matter for dry-run
-    });
-  }, [pos, hotZones, airborne, nearest]);
-
   // Poll /api/activity every 10s.
   useEffect(() => {
     let cancelled = false;
     const fetchActivity = async () => {
       if (document.visibilityState === "hidden") return;
       try {
-        const r = await fetch("/api/activity?limit=10", { cache: "no-store" });
+        const r = await fetch(
+          `/api/activity?limit=5&state_id=${encodeURIComponent(stateId)}`,
+          { cache: "no-store" },
+        );
         if (!r.ok) return;
         const data = (await r.json()) as { entries: ActivityEntry[] };
         if (!cancelled) setActivity(data.entries);
@@ -145,6 +111,7 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
       }
     };
     const id = setInterval(fetchActivity, 10_000);
+    void fetchActivity();
     const onVis = () => {
       if (document.visibilityState === "visible") void fetchActivity();
     };
@@ -154,7 +121,7 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [stateId]);
 
   return (
     <main
@@ -163,31 +130,19 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
         // Bottom padding = tab bar (66) + iOS install prompt overlay
         // (~80) + breathing room. Without this the last dash card
         // hides behind the fixed-position prompt on iOS Safari.
-        padding: `12px 18px ${TABBAR_HEIGHT + 110}px`,
-        maxWidth: 460,
+        boxSizing: "border-box",
+        width: "100%",
+        padding: `clamp(16px, 4vw, 22px) clamp(14px, 5vw, 20px) ${TABBAR_HEIGHT + 136}px`,
+        maxWidth: 430,
         margin: "0 auto",
         display: "flex",
         flexDirection: "column",
-        gap: 14,
+        gap: "clamp(14px, 4vw, 18px)",
       }}
     >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 4,
-        }}
-      >
-        <span className="ss-eyebrow">Out Of Sight · Dash</span>
-        <StatusPill
-          kind={up ? "alert" : "clear"}
-          label={up ? "BIRD UP" : "ALL CLEAR"}
-          sub={`${airborne.length}/${snap.aircraft.length}`}
-        />
-      </header>
+      <StatusHero status={status} lastSampleMs={snap.fetched_at} />
 
-      <TakeOffButton variant="compact" />
+      <TakeOffButton />
 
       <NearestCard
         watcherList={watcherList}
@@ -196,14 +151,18 @@ export function DashShell({ initial, initialActivity, mockOn = false }: Props) {
         airborneCount={airborne.length}
       />
 
-      <ContextLine
-        airborneCount={airborne.length}
-        nearest={nearest}
-      />
+      {airborne.length > 0 && (
+        <ContextLine
+          airborneCount={airborne.length}
+          nearest={nearest}
+        />
+      )}
 
-      <ActivityFeed entries={activity} />
+      <SettingsButton />
 
       <AlertsOptInCard />
+
+      <ActivityEventsSection entries={stateActivity} id="recent-events" />
 
       <ProximityFlash
         active={
@@ -259,6 +218,8 @@ function NearestRow({
   primary: boolean;
 }) {
   const inRange = entry.distanceNm != null && entry.distanceNm <= NEAR_NM;
+  const distanceNm = entry.distanceNm;
+  const isLiveOnly = distanceNm == null;
   return (
     <Link
       href={`/plane/${entry.plane.tail}`}
@@ -307,12 +268,12 @@ function NearestRow({
       <span
         className="ss-mono"
         style={{
-          fontSize: primary ? 18 : 14,
+          fontSize: primary && !isLiveOnly ? 18 : 14,
           fontWeight: 700,
           color: inRange ? SS_TOKENS.alert : SS_TOKENS.fg1,
         }}
       >
-        {entry.distanceNm == null ? "LIVE" : `${entry.distanceNm.toFixed(1)} nm`}
+        {isLiveOnly ? "LIVE" : `${distanceNm.toFixed(1)} nm`}
       </span>
     </Link>
   );
@@ -360,7 +321,7 @@ function NearestEmpty({
           }}
         />
         <span style={{ fontSize: 14, color: SS_TOKENS.fg1 }}>
-          All clear · Smokey&rsquo;s down
+          All clear · Bird&rsquo;s down
         </span>
       </div>
     );
@@ -406,63 +367,6 @@ function ContextLine({
     >
       {text}
     </div>
-  );
-}
-
-function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
-  return (
-    <Card padded={false}>
-      <div style={{ padding: "12px 14px 8px" }}>
-        <span className="ss-eyebrow">Recent activity</span>
-      </div>
-      {entries.length === 0 ? (
-        <div
-          style={{
-            padding: "16px 14px",
-            fontSize: 12.5,
-            color: SS_TOKENS.fg2,
-            borderTop: `.5px solid ${SS_TOKENS.hairline}`,
-          }}
-        >
-          Nothing notable — feed populates as planes take off, land, or change altitude.
-        </div>
-      ) : (
-        entries.map((e, i) => <ActivityRow key={i} entry={e} />)
-      )}
-    </Card>
-  );
-}
-
-function ActivityRow({ entry }: { entry: ActivityEntry }) {
-  return (
-    <Link
-      href={`/plane/${entry.tail}`}
-      prefetch={false}
-      style={{
-        display: "flex",
-        gap: 10,
-        padding: "10px 14px",
-        borderTop: `.5px solid ${SS_TOKENS.hairline}`,
-        alignItems: "flex-start",
-        textDecoration: "none",
-        color: "inherit",
-      }}
-    >
-      <span
-        className="ss-mono"
-        style={{
-          fontSize: 10,
-          color: SS_TOKENS.fg2,
-          minWidth: 56,
-          marginTop: 2,
-        }}
-      >
-        {fmtAgoTs(entry.ts)}
-      </span>
-      <span style={{ flex: 1, fontSize: 12.5, color: SS_TOKENS.fg1, lineHeight: 1.4 }}>
-        {entry.description}
-      </span>
-    </Link>
   );
 }
 

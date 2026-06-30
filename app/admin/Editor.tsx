@@ -15,6 +15,7 @@ import {
   deleteTailAction,
   restoreBackupAction,
   setSpeedWarningFlagAction,
+  syncSeedRegistryAction,
   logoutAction,
 } from "./actions";
 import { Logo } from "@/components/brand/Logo";
@@ -70,6 +71,19 @@ export function Editor({
       <RecentFlights flights={flights} hour12={hour12} />
 
       <Section title="Registry" subtitle={`${registry.length} tails`}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 10,
+          }}
+        >
+          <form action={syncSeedRegistryAction}>
+            <button type="submit" style={smallButtonStyle}>
+              Sync seed tails
+            </button>
+          </form>
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table style={tableStyle}>
             <thead>
@@ -866,7 +880,7 @@ function Field({
 }
 
 const ROLE_OPTIONS: Array<{ value: import("@/lib/types").FleetRole; label: string }> = [
-  { value: "smokey", label: "smokey — fixed-wing speed enforcement" },
+  { value: "smokey", label: "bird — fixed-wing speed enforcement" },
   { value: "patrol", label: "patrol — multi-role helicopter" },
   { value: "sar", label: "sar — search & rescue" },
   { value: "transport", label: "transport — exec / multi-mission" },
@@ -1000,6 +1014,13 @@ function FlashMsg({ kind, code }: { kind: "error" | "ok"; code: string }) {
 }
 
 function savedMessage(code: string): string {
+  if (code.startsWith("seed_sync_")) {
+    const count = Number(code.slice("seed_sync_".length));
+    return count > 0
+      ? `Seed registry synced. Added ${count} tail${count === 1 ? "" : "s"}.`
+      : "Seed registry already matches the live registry.";
+  }
+
   switch (code) {
     case "warn_on":
       return "Speed warning enabled.";

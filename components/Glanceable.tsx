@@ -6,17 +6,19 @@ import type { Aircraft, FleetEntry, Snapshot } from "@/lib/types";
 import type { ActivityEntry } from "@/lib/activity";
 import type { LearningState } from "@/lib/learning";
 import { SS_TOKENS } from "@/lib/tokens";
-import { fmtAgoTs, fmtAloft } from "@/lib/time";
+import { fmtAgoTs } from "@/lib/time";
+import { filterOpsAircraftByState } from "@/lib/aircraft-directory";
 import { useAircraft } from "@/lib/hooks/useAircraft";
-import { computeStatus, type StatusState } from "@/lib/status";
-import { StatusPill } from "./StatusPill";
+import { useSelectedRegionStateId } from "@/lib/hooks/useSelectedRegionStateId";
+import { computeStatus } from "@/lib/status";
 import { Card } from "./Card";
 import { PlaneIcon } from "./PlaneIcon";
 import { PredictionCard } from "./PredictionCard";
-import { Logo } from "./brand/Logo";
 import { FreshnessLabel } from "./FreshnessLabel";
 import { ArmAlertsCallout } from "./ArmAlertsCallout";
 import { TakeOffButton } from "./TakeOffButton";
+import { StatusHero } from "./StatusHero";
+import { SettingsButton } from "./SettingsButton";
 
 // Hide the activity strip when the most recent event is older than this —
 // a stale "Guardian One up · 8 hours ago" looks more like a bug than a
@@ -48,7 +50,12 @@ export function Glanceable({
   lastSampleMs = null,
 }: Props) {
   const snap = useAircraft(initial, mockOn);
+  const stateId = useSelectedRegionStateId();
   const [activity, setActivity] = useState<ActivityEntry[]>(initialActivity);
+  const stateActivity = useMemo(
+    () => filterOpsAircraftByState(activity, stateId),
+    [activity, stateId],
+  );
 
   // Poll /api/activity every 30s so the strip stays current without
   // forcing a full snapshot regen.
@@ -57,7 +64,10 @@ export function Glanceable({
     const tick = async () => {
       if (document.visibilityState === "hidden") return;
       try {
-        const r = await fetch("/api/activity?limit=1", { cache: "no-store" });
+        const r = await fetch(
+          `/api/activity?limit=1&state_id=${encodeURIComponent(stateId)}`,
+          { cache: "no-store" },
+        );
         if (!r.ok) return;
         const d = (await r.json()) as { entries: ActivityEntry[] };
         if (!cancelled) setActivity(d.entries);
@@ -66,6 +76,7 @@ export function Glanceable({
       }
     };
     const id = setInterval(tick, 30_000);
+    void tick();
     const onVis = () => {
       if (document.visibilityState === "visible") void tick();
     };
@@ -75,26 +86,37 @@ export function Glanceable({
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [stateId]);
 
-  const fleetMap = useMemo(
-    () => new Map<string, FleetEntry>(snap.aircraft.map((a) => [a.tail, a])),
-    [snap.aircraft],
+  const stateAircraft = useMemo(
+    () => filterOpsAircraftByState(snap.aircraft, stateId),
+    [snap.aircraft, stateId],
   );
-  const status = useMemo(() => computeStatus(snap, fleetMap), [snap, fleetMap]);
+  const stateSnap = useMemo(
+    () => ({ ...snap, aircraft: stateAircraft }),
+    [snap, stateAircraft],
+  );
+  const fleetMap = useMemo(
+    () => new Map<string, FleetEntry>(stateAircraft.map((a) => [a.tail, a])),
+    [stateAircraft],
+  );
+  const status = useMemo(
+    () => computeStatus(stateSnap, fleetMap),
+    [stateSnap, fleetMap],
+  );
   // Drop the headline plane from the also-up list. Without this filter
   // the lead appears twice — once as the hero, once at the top of the
   // also-up card — and the count in the also-up header disagrees with
   // the "X other watchers up." footnote in lib/status.ts which already
   // excludes the lead.
   const leadTail = status.lead?.aircraft.tail ?? null;
-  const others = snap.aircraft.filter(
+  const others = stateAircraft.filter(
     (a) => a.airborne && a.tail !== leadTail,
   );
   const latestActivity =
-    activity.length > 0 &&
-    Date.now() - activity[0]!.ts < ACTIVITY_STRIP_MAX_AGE_MS
-      ? activity[0]!
+    stateActivity.length > 0 &&
+    Date.now() - stateActivity[0]!.ts < ACTIVITY_STRIP_MAX_AGE_MS
+      ? stateActivity[0]!
       : null;
 
   return (
@@ -106,41 +128,18 @@ export function Glanceable({
         // install prompt overlay (~80) + breathing room. Without this
         // the LearningPanel and last activity row hid behind the
         // fixed-position prompt on /.
-        padding:
-          "calc(env(safe-area-inset-top, 0px) + 44px) 18px 180px",
+        padding: "22px 20px 170px",
         display: "flex",
         flexDirection: "column",
-        gap: 16,
+        gap: 18,
+        maxWidth: 430,
       }}
     >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginTop: 4,
-          paddingRight: 112,
-          gap: 8,
-          flexWrap: "wrap",
-          rowGap: 6,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            minWidth: 0,
-            flexShrink: 1,
-          }}
-        >
-          <Logo size={48} markSize={72} wordmark />
-        </div>
-      </header>
-
-      <Hero status={status} />
+      <StatusHero status={status} lastSampleMs={lastSampleMs ?? snap.fetched_at} />
 
       <TakeOffButton />
+
+      <SettingsButton />
 
       {contextLine && (
         <p
@@ -166,10 +165,9 @@ export function Glanceable({
       <PredictionCard learning={learning} hour12={hour12} />
 
       <div style={{ marginTop: 4, paddingLeft: 4 }}>
-        <FreshnessLabel lastSampleMs={lastSampleMs} />
+        <FreshnessLabel lastSampleMs={lastSampleMs ?? snap.fetched_at} />
       </div>
 
-      <Footer />
     </main>
   );
 }
@@ -233,7 +231,7 @@ const FOOTER_LINK: React.CSSProperties = {
 function ActivityStrip({ latest }: { latest: ActivityEntry }) {
   return (
     <Link
-      href="/activity"
+      href="/dash#recent-events"
       prefetch={false}
       style={{
         display: "flex",
@@ -271,118 +269,6 @@ function ActivityStrip({ latest }: { latest: ActivityEntry }) {
         {fmtAgoTs(latest.ts)}
       </span>
     </Link>
-  );
-}
-
-function Hero({ status }: { status: StatusState }) {
-  const isAlert = status.kind === "alert";
-  const background = isAlert ? SS_TOKENS.alert : "#15803d";
-  return (
-    <section
-      className="ss-hero-bg"
-      style={{
-        background,
-        border: "0",
-        borderRadius: 22,
-        padding: "32px 22px 26px",
-        color: "#ffffff",
-        textShadow: "0 1px 2px rgba(0,0,0,0.28)",
-      }}
-    >
-      <div
-        className="ss-eyebrow"
-        style={{ color: "#ffffff", animation: "ss-fade 400ms ease-out" }}
-      >
-        {status.pill}
-      </div>
-      <h1
-        style={{
-          fontSize: "clamp(40px, 12vw, 64px)",
-          fontWeight: 800,
-          letterSpacing: "-.04em",
-          lineHeight: 1.05,
-          marginTop: 10,
-          color: "#ffffff",
-        }}
-      >
-        {status.headline}
-      </h1>
-      <p
-        style={{
-          marginTop: 14,
-          fontSize: 15,
-          color: "#f7fff7",
-          lineHeight: 1.5,
-        }}
-      >
-        {status.body}
-      </p>
-      {status.footnote && (
-        <p
-          style={{
-            marginTop: 8,
-            fontSize: 12.5,
-            fontStyle: "italic",
-            color: "#e8f7e8",
-            lineHeight: 1.45,
-          }}
-        >
-          {status.footnote}
-        </p>
-      )}
-      {status.lead && status.kind === "alert" && (
-        <>
-          <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {status.lead.aircraft.time_aloft_min != null && (
-              <HeroMetricPill label={fmtAloft(status.lead.aircraft.time_aloft_min)} />
-            )}
-            {status.lead.aircraft.ground_speed_kt != null && (
-              <HeroMetricPill label={`${status.lead.aircraft.ground_speed_kt} kt`} />
-            )}
-          </div>
-          <LeadIdentity
-            tail={status.lead.aircraft.tail}
-            nickname={status.lead.entry.nickname}
-            operator={status.lead.entry.operator}
-          />
-        </>
-      )}
-    </section>
-  );
-}
-
-function HeroMetricPill({ label }: { label: string }) {
-  return (
-    <span
-      className="ss-mono"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "5px 10px",
-        borderRadius: 999,
-        background: "rgba(5, 5, 5, 0.18)",
-        border: "0.5px solid rgba(255, 255, 255, 0.42)",
-        color: "#ffffff",
-        fontSize: 11,
-        fontWeight: 800,
-        letterSpacing: 0,
-        backdropFilter: "blur(18px)",
-        WebkitBackdropFilter: "blur(18px)",
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: "#ffffff",
-          boxShadow: "0 0 0 4px rgba(255, 255, 255, 0.18)",
-        }}
-      />
-      <span>{label}</span>
-    </span>
   );
 }
 

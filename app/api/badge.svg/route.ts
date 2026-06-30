@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 const FG = "#F2F4F7";
 const BG = "#15181D";
 const STROKE = "#262B33";
-const ALERT = "#f4c430";
+const ALERT = "#f6c431";
 const CLEAR = "#5DD9A7";
 const STALE = "#6B7380";
 
@@ -34,16 +34,16 @@ export async function GET() {
   let dot: string;
 
   if (!snap) {
-    label = "SMOKEY ? · — up";
+    label = "BIRD ? · — up";
     dot = STALE;
   } else if (Date.now() - snap.fetched_at > STALE_AFTER_MS) {
-    label = "SMOKEY ? · — up";
+    label = "BIRD ? · — up";
     dot = STALE;
   } else {
     const status = computeStatus(snap, fleetMap);
     const count = status.alertCount;
     if (status.kind === "alert") {
-      // Smokey umbrella: every alert-tier state reads SMOKEY UP on the
+      // BIRD umbrella: every alert-tier state reads BIRD UP on the
       // pill, so the badge label tracks status.pill directly.
       label = `${status.pill} · ${count} up`;
       dot = ALERT;

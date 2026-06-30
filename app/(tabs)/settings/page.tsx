@@ -12,14 +12,26 @@ const HUB_LINKS = [
   {
     href: "/settings/alerts",
     eyebrow: "Alerts",
-    title: "Push, region, voice",
-    body: "Arm push notifications for tails or roles. Pick your time format, contrast, region. Reset every preference.",
+    title: "Alerts, region, wake",
+    body: "Arm notifications, set your region, tune ride ranges, quiet hours, and device wake behavior.",
   },
   {
-    href: "/settings/zones",
-    eyebrow: "Zones",
-    title: "Your geofences",
-    body: "Draw circles around home, work, or favorite roads. Smokey passing through any armed zone gets called out.",
+    href: "/about",
+    eyebrow: "Reference",
+    title: "About and aircraft",
+    body: "Review aircraft, operators, roles, and project notes.",
+  },
+  {
+    href: "/legal",
+    eyebrow: "Reference",
+    title: "Legal",
+    body: "Read the safety, privacy, and data-source notes.",
+  },
+  {
+    href: "/store",
+    eyebrow: "Store",
+    title: "Out Of Sight store",
+    body: "Gear and updates live here as they become available.",
   },
 ] as const;
 
@@ -28,8 +40,8 @@ export default function SettingsHub() {
     <main
       style={{
         minHeight: "100dvh",
-        padding: "12px 18px 180px",
-        maxWidth: 460,
+        padding: "22px 20px 170px",
+        maxWidth: 430,
         margin: "0 auto",
         display: "flex",
         flexDirection: "column",
@@ -40,33 +52,51 @@ export default function SettingsHub() {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 6,
-          marginTop: 4,
-          marginBottom: 4,
+          gap: 10,
+          marginBottom: 6,
         }}
       >
-        <span className="ss-eyebrow">Out Of Sight · Settings</span>
+        <Link
+          href="/dash"
+          style={{
+            width: "fit-content",
+            minHeight: 40,
+            padding: "0 14px",
+            display: "inline-flex",
+            alignItems: "center",
+            borderRadius: 14,
+            border: `1px solid ${SS_TOKENS.hairline}`,
+            background: "rgba(255, 255, 255, 0.04)",
+            color: SS_TOKENS.fg1,
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 800,
+          }}
+        >
+          Home
+        </Link>
+        <span className="ss-eyebrow">Settings</span>
         <h1
           style={{
-            fontSize: 26,
-            fontWeight: 700,
-            letterSpacing: "-.02em",
+            fontSize: 32,
+            fontWeight: 850,
+            letterSpacing: 0,
             margin: 0,
             color: SS_TOKENS.fg0,
           }}
         >
-          Tune Out Of Sight.
+          Tune into Out Of Sight
         </h1>
         <p
           style={{
-            fontSize: 14,
+            fontSize: 15,
             color: SS_TOKENS.fg1,
             margin: 0,
             lineHeight: 1.55,
           }}
         >
-          Every preference lives on your device. Nothing rides home to the
-          server.
+          Display preferences stay on this device. Alert region and range sync
+          to your notification subscription.
         </p>
       </header>
 
@@ -78,13 +108,14 @@ export default function SettingsHub() {
           <Link
             key={link.href}
             href={link.href}
+            prefetch={false}
             style={{
               display: "block",
-              padding: "16px 18px",
-              borderRadius: 24,
-              border: `.5px solid ${SS_TOKENS.hairline2}`,
+              padding: "18px 20px",
+              borderRadius: 16,
+              border: `1px solid ${SS_TOKENS.hairline}`,
               background: SS_TOKENS.surface,
-              boxShadow: SS_TOKENS.shadowSm,
+              boxShadow: "none",
               backdropFilter: "blur(18px)",
               WebkitBackdropFilter: "blur(18px)",
               textDecoration: "none",
@@ -93,16 +124,16 @@ export default function SettingsHub() {
           >
             <div
               className="ss-eyebrow"
-              style={{ marginBottom: 6, color: SS_TOKENS.fg2 }}
+              style={{ marginBottom: 7, color: SS_TOKENS.alert }}
             >
               {link.eyebrow}
             </div>
             <div
               style={{
-                fontSize: 16,
-                fontWeight: 600,
+                fontSize: 17,
+                fontWeight: 800,
                 color: SS_TOKENS.fg0,
-                marginBottom: 4,
+                marginBottom: 5,
               }}
             >
               {link.title}

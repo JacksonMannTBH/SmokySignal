@@ -77,18 +77,14 @@ waiting for a live event.
 
 - `lib/snapshot.ts` — fleet snapshot from adsb.fi (primary) + OpenSky (fallback)
 - `lib/tracks.ts` — per-tail position history, KV-backed, 35-day TTL
-- `lib/hotzones.ts` — 30-day grid aggregate; geo-fenced via `SS_REGION_*` env vars
 - `lib/push/*` — VAPID push pipeline (subscribe / dispatcher / dedupe / quiet hours)
-- `lib/radar-filter.ts` — shared filter state (operator/tail/region) for /radar
 - `lib/user-zones.ts` — rider-defined geofences (localStorage); managed at `/settings/zones`
 - `lib/user-prefs.ts` — cookie-backed display prefs (12/24-hour, normal/high contrast)
 - `lib/voice-mode.ts` — speechSynthesis readback toggle (foreground only)
 - `lib/proximity-alert.ts` — foreground proximity ping when alert-tier tail nearby
-- `lib/speed-warning.ts` — pure `evaluateWarning()` for N1a dryrun pipeline
-- `lib/storage-keys.ts` — canonical KV key formatter (NX7 foundation; route all `tracks:*`/`spots:*`/`hotzones:*`/`flights:*` through this)
-- `components/FilterPanel.tsx` — radar filter UI (extracted from HotZoneLayer P16); multi-select roles supported
+- `lib/storage-keys.ts` — canonical KV key formatter (NX7 foundation; route all `tracks:*`/`spots:*`/`flights:*` through this)
 - `app/(tabs)/` — main app routes (home, radar, dash, plane, settings, etc.)
-- `app/api/cron/` — scheduled refreshes (snapshot, hotzones, predictor)
+- `app/api/cron/` — scheduled refreshes (snapshot, predictor)
 - `public/sw.js` — service worker (push-only, no caching)
 
 ## Privacy posture
@@ -113,7 +109,7 @@ waiting for a live event.
   vars from production. Generate fresh values manually if you need
   push to work in preview deploys.
 - KV key construction: route through `lib/storage-keys.ts` (`trackKey()`,
-  `spotKey()`, `hotzonesCurrentKey()`, etc.) instead of inlining
+  `spotKey()`, `flightsRecentCacheKey()`, etc.) instead of inlining
   string literals like `\`tracks:\${tail}:\${date}\``. The default-region
   shape is byte-for-byte identical to the prior literals; the
   formatter is the only knob for future regional namespacing.

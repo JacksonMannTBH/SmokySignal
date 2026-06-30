@@ -41,7 +41,7 @@ export default function SpotsMap({ spots }: { spots: StoredSpot[] }) {
         source: "spots",
         paint: {
           "circle-radius": 5,
-          "circle-color": "#f4c430",
+          "circle-color": "#f6c431",
           "circle-stroke-color": "#fff",
           "circle-stroke-width": 1.5,
         },

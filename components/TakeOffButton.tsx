@@ -3,56 +3,23 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SS_TOKENS } from "@/lib/tokens";
-import { useDeviceHeading } from "@/lib/hooks/useDeviceHeading";
+import { useRideLaunchPreflight } from "@/lib/hooks/useRideLaunchPreflight";
 
 type Props = {
   variant?: "hero" | "compact";
 };
 
-function requestLocationOnce(): Promise<boolean> {
-  if (typeof navigator === "undefined" || !navigator.geolocation) {
-    return Promise.resolve(false);
-  }
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      () => resolve(true),
-      () => resolve(false),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 8000 },
-    );
-  });
-}
-
-async function requestNotificationOnce(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  if (typeof Notification === "undefined") return false;
-  if (!("serviceWorker" in navigator)) return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
-  try {
-    const permission = await Notification.requestPermission();
-    return permission === "granted";
-  } catch {
-    return false;
-  }
-}
-
 export function TakeOffButton({ variant = "hero" }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const heading = useDeviceHeading();
+  const runRideLaunchPreflight = useRideLaunchPreflight();
   const [busy, setBusy] = useState(false);
   const compact = variant === "compact";
+  const iconSize = compact ? 18 : 23;
 
   const onTakeOff = async () => {
     setBusy(true);
-    const locationPromise = requestLocationOnce();
-    const headingPromise = heading.requestPermission();
-    const notificationPromise = requestNotificationOnce();
-    await Promise.allSettled([
-      locationPromise,
-      headingPromise,
-      notificationPromise,
-    ]);
+    await runRideLaunchPreflight();
     const mock = searchParams.get("mock");
     router.push(mock ? `/ride?mock=${encodeURIComponent(mock)}` : "/ride");
   };
@@ -64,34 +31,38 @@ export function TakeOffButton({ variant = "hero" }: Props) {
       disabled={busy}
       aria-label="Take Off and enter Riding Mode"
       style={{
-        width: compact ? "auto" : "100%",
-        minHeight: compact ? 44 : 58,
-        padding: compact ? "0 16px" : "0 22px",
-        borderRadius: compact ? 999 : 18,
-        border: `.5px solid color-mix(in srgb, ${SS_TOKENS.alert} 52%, transparent)`,
-        background: busy
-          ? SS_TOKENS.bg2
-          : `linear-gradient(135deg, ${SS_TOKENS.alert}, #ffe58a)`,
-        color: "#050505",
-        boxShadow: compact ? SS_TOKENS.shadowSm : SS_TOKENS.shadowMd,
+        boxSizing: "border-box",
+        width: compact ? "auto" : "min(100%, 360px)",
+        minHeight: compact ? 48 : "clamp(60px, 16vw, 70px)",
+        padding: compact ? "0 18px" : "0 clamp(22px, 6vw, 28px)",
+        borderRadius: compact ? 999 : 16,
+        border: compact
+          ? "1px solid rgba(246, 196, 49, 0.34)"
+          : "1px solid #ffe28a",
+        background: busy ? "#1b1608" : "#f6c431",
+        color: busy ? "#f6c431" : "#050505",
+        boxShadow: compact
+          ? SS_TOKENS.shadowSm
+          : `0 0 34px rgba(246, 196, 49, 0.24), 0 18px 36px rgba(0, 0, 0, 0.42)`,
         cursor: busy ? "wait" : "pointer",
         opacity: busy ? 0.72 : 1,
-        fontFamily: "inherit",
-        fontSize: compact ? 13 : 18,
+        fontFamily: compact ? "inherit" : "var(--font-brand)",
+        fontSize: compact ? 14 : "clamp(24px, 6.7vw, 26px)",
         fontWeight: 800,
         letterSpacing: 0,
         display: "inline-flex",
         alignItems: "center",
+        alignSelf: compact ? undefined : "center",
         justifyContent: "center",
-        gap: 8,
+        gap: compact ? 8 : "clamp(14px, 4.5vw, 18px)",
         touchAction: "manipulation",
         WebkitTapHighlightColor: "transparent",
       }}
     >
       <svg
         aria-hidden
-        width="17"
-        height="17"
+        width={iconSize}
+        height={iconSize}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"

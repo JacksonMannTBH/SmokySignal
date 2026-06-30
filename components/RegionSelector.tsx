@@ -1,12 +1,9 @@
 "use client";
 
-// Compact dropdown that lets the rider pivot the radar viewport
-// between Puget Sound (default) / Pierce / Snohomish / Spokane / All
-// Washington. Persists to localStorage; other components subscribe to
-// the same CustomEvent so the map flies on change.
-
 import { useEffect, useState } from "react";
-import { REGIONS, type RegionId } from "@/lib/regions";
+import type { CSSProperties } from "react";
+import { APP_STATES, APP_REGIONS_BY_ID } from "@/lib/app-regions";
+import { type RegionId } from "@/lib/regions";
 import {
   REGION_CHANGE_EVENT,
   getRegion,
@@ -16,7 +13,7 @@ import { SS_TOKENS } from "@/lib/tokens";
 
 type Props = {
   className?: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 };
 
 export function RegionSelector({ className, style }: Props) {
@@ -52,10 +49,18 @@ export function RegionSelector({ className, style }: Props) {
         ...style,
       }}
     >
-      {Object.values(REGIONS).map((r) => (
-        <option key={r.id} value={r.id}>
-          {r.label}
-        </option>
+      {APP_STATES.map((state) => (
+        <optgroup key={state.id} label={state.label}>
+          {state.regions.map((tuple) => {
+            const id = tuple[0];
+            const region = APP_REGIONS_BY_ID[id];
+            return (
+              <option key={id} value={id}>
+                {region.label}
+              </option>
+            );
+          })}
+        </optgroup>
       ))}
     </select>
   );

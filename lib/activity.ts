@@ -17,7 +17,13 @@
 // pre-existing entries written by the previous activity-detection
 // implementation; we no longer emit it.
 
+import {
+  filterOpsAircraftByState,
+  stateIdForOpsAircraftTail,
+} from "./aircraft-directory";
+import { APP_STATES, type AppStateId } from "./app-regions";
 import { getRedis, cacheGet, cacheSet } from "./cache";
+import { DEFAULT_REGION, stateIdForRegion, type RegionId } from "./regions";
 import type { Aircraft, FleetRole, Snapshot } from "./types";
 
 const FEED_KEY = "activity:feed";
@@ -28,6 +34,7 @@ const PREV_TTL_SECONDS = 24 * 60 * 60;
 const READ_CACHE_TTL = 8;
 
 const EMERGENCY_SQUAWKS = new Set(["7500", "7600", "7700"]);
+const APP_STATE_IDS = new Set<string>(APP_STATES.map((state) => state.id));
 
 export type ActivityKind =
   | "takeoff"
@@ -44,6 +51,8 @@ export type ActivityEntry = {
   /** FleetRole at the time the event was recorded — used to color the
    *  event icon in the activity feed. Older entries may not have this. */
   role?: FleetRole;
+  /** App state containing this tail. Older entries may not have this. */
+  stateId?: AppStateId;
   kind: ActivityKind;
   squawk?: string | null;
   lat?: number | null;
@@ -69,7 +78,7 @@ export function describeEvent(
 
   if (kind === "takeoff") {
     if (role === "smokey") {
-      if (nickname === "Smokey 4") return "Smokey off the deck";
+      if (nickname === "Bird 4") return "Bird off the deck";
       return `${name} off the deck`;
     }
     if (role === "patrol") {
@@ -86,7 +95,7 @@ export function describeEvent(
 
   if (kind === "landing") {
     if (role === "sar") return `${name} back on the ground`;
-    if (role === "smokey" && nickname === "Smokey 4") return "Smokey down";
+    if (role === "smokey" && nickname === "Bird 4") return "Bird down";
     return `${name} down`;
   }
 
@@ -218,13 +227,17 @@ function diffEvents(prev: Snapshot | null, curr: Snapshot): ActivityEntry[] {
  * Diff current snapshot vs previous, append events to the feed, persist
  * current as the new "previous" for next call. Best-effort; never throws.
  */
-export async function recordActivity(curr: Snapshot): Promise<void> {
+export async function recordActivity(
+  curr: Snapshot,
+  regionId: RegionId = DEFAULT_REGION,
+): Promise<void> {
   const redis = await getRedis();
+  const prevKey = previousSnapshotKey(regionId);
 
   let prev: Snapshot | null = null;
   if (redis) {
     try {
-      const raw = await redis.get(PREV_KEY);
+      const raw = await redis.get(prevKey);
       if (raw) {
         prev =
           typeof raw === "string"
@@ -235,10 +248,14 @@ export async function recordActivity(curr: Snapshot): Promise<void> {
       console.warn("[activity] read prev failed:", e);
     }
   } else {
-    prev = await cacheGet<Snapshot>(PREV_KEY);
+    prev = await cacheGet<Snapshot>(prevKey);
   }
 
-  const events = diffEvents(prev, curr);
+  const fallbackStateId = stateIdForRegion(regionId);
+  const events = diffEvents(prev, curr).map((entry) => ({
+    ...entry,
+    stateId: stateIdForOpsAircraftTail(entry.tail) ?? fallbackStateId,
+  }));
   if (events.length > 0) {
     if (redis) {
       try {
@@ -257,48 +274,23 @@ export async function recordActivity(curr: Snapshot): Promise<void> {
         FEED_TTL_SECONDS,
       );
     }
-
-    // Fan out push notifications for each takeoff. Best-effort; the
-    // dispatcher's own try/catch + dedupe key keep this from breaking
-    // the snapshot pipeline. Fire all in parallel since the dispatcher
-    // already de-duplicates per (tail, minute).
-    const takeoffs = events.filter((e) => e.kind === "takeoff");
-    if (takeoffs.length > 0) {
-      try {
-        const { dispatchTakeoff } = await import("./push/dispatcher");
-        await Promise.all(
-          takeoffs.map((e) =>
-            dispatchTakeoff({
-              tail: e.tail,
-              role: e.role ?? "unknown",
-              roleConfidence: "unknown",
-              nickname:
-                curr.aircraft.find((a) => a.tail === e.tail)?.nickname ?? null,
-              lat: e.lat ?? null,
-              lon: e.lon ?? null,
-              alt_ft: e.alt_ft ?? null,
-              ts_iso: new Date(e.ts).toISOString(),
-            }).catch((err) => {
-              console.warn("[activity] dispatchTakeoff failed:", err);
-              return null;
-            }),
-          ),
-        );
-      } catch (e) {
-        console.warn("[activity] push dispatch import/init failed:", e);
-      }
-    }
+    // Takeoff events remain feed-only. Browser notifications are reserved for
+    // explicit local experiences such as proximity and ride-mode alerts.
   }
 
   try {
     if (redis) {
-      await redis.set(PREV_KEY, JSON.stringify(curr), { ex: PREV_TTL_SECONDS });
+      await redis.set(prevKey, JSON.stringify(curr), { ex: PREV_TTL_SECONDS });
     } else {
-      await cacheSet(PREV_KEY, curr, PREV_TTL_SECONDS);
+      await cacheSet(prevKey, curr, PREV_TTL_SECONDS);
     }
   } catch (e) {
     console.warn("[activity] write prev failed:", e);
   }
+}
+
+function previousSnapshotKey(regionId: RegionId): string {
+  return regionId === DEFAULT_REGION ? PREV_KEY : `${PREV_KEY}:${regionId}`;
 }
 
 /**
@@ -306,12 +298,19 @@ export async function recordActivity(curr: Snapshot): Promise<void> {
  * shape (no icao24/squawk/lat/lon/alt_ft, ts in seconds) by leaving
  * those fields undefined.
  */
-export async function getRecentActivity(limit = 50): Promise<ActivityEntry[]> {
-  const cacheKey = `ss:activity-recent:${limit}`;
+export async function getRecentActivity(
+  limit = 50,
+  stateId?: AppStateId,
+): Promise<ActivityEntry[]> {
+  const cacheKey = `ss:activity-recent:${stateId ?? "all"}:${limit}`;
   const redis = await getRedis();
+  const readLimit = stateId ? FEED_LIMIT : limit;
   if (!redis) {
     const feed = (await cacheGet<ActivityEntry[]>(FEED_KEY)) ?? [];
-    return normalizeActivityEntries(feed.slice(-limit));
+    return filterActivityByState(
+      normalizeActivityEntries(feed.slice(-readLimit)),
+      stateId,
+    ).slice(0, limit);
   }
 
   const cached = await cacheGet<ActivityEntry[]>(cacheKey);
@@ -319,15 +318,42 @@ export async function getRecentActivity(limit = 50): Promise<ActivityEntry[]> {
 
   let raw: unknown[] = [];
   try {
-    raw = (await redis.lrange(FEED_KEY, -limit, -1)) as unknown[];
+    raw = (await redis.lrange(FEED_KEY, -readLimit, -1)) as unknown[];
   } catch {
     return [];
   }
 
-  const entries = normalizeActivityEntries(raw);
+  const entries = filterActivityByState(
+    normalizeActivityEntries(raw),
+    stateId,
+  ).slice(0, limit);
 
   await cacheSet(cacheKey, entries, READ_CACHE_TTL);
   return entries;
+}
+
+function filterActivityByState(
+  entries: ActivityEntry[],
+  stateId?: AppStateId,
+): ActivityEntry[] {
+  if (!stateId) return entries;
+  return entries.filter((entry) => {
+    const entryStateId = normalizeActivityStateId(
+      (entry as { stateId?: string }).stateId,
+    );
+    if (entryStateId) return entryStateId === stateId;
+    return filterOpsAircraftByState([entry], stateId).length === 1;
+  });
+}
+
+function normalizeActivityStateId(
+  stateId: string | null | undefined,
+): AppStateId | null {
+  if (stateId === "north_california" || stateId === "south_california") {
+    return "california";
+  }
+  if (stateId && APP_STATE_IDS.has(stateId)) return stateId as AppStateId;
+  return null;
 }
 
 function normalizeActivityEntries(raw: unknown[]): ActivityEntry[] {
@@ -346,5 +372,13 @@ function normalizeActivityEntries(raw: unknown[]): ActivityEntry[] {
     .filter((e): e is ActivityEntry => e !== null)
     // Normalize: if ts looks like seconds (10-digit unix), promote to ms.
     .map((e) => (e.ts < 1e12 ? { ...e, ts: e.ts * 1000 } : e))
+    .map((entry) => {
+      const stateId = normalizeActivityStateId(
+        (entry as { stateId?: string }).stateId,
+      );
+      return stateId && stateId !== entry.stateId
+        ? { ...entry, stateId }
+        : entry;
+    })
     .reverse(); // newest first
 }

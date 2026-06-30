@@ -1,9 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" role="img" aria-label="Washington state eye logo with transparent outside">
-  <title>Washington Eye Logo - Transparent Outside</title>
-  <desc>Vector logo with transparent area outside Washington, black Washington state fill, sharp white outline, white sclera, saffron iris, and black pupil.</desc>
-  <path id="washington-fill" d="M 212 427 L 218 426 L 251 447 L 268 454 L 285 467 L 297 467 L 313 470 L 334 470 L 355 479 L 364 477 L 375 479 L 383 476 L 391 487 L 394 494 L 398 494 L 407 486 L 413 495 L 421 495 L 427 501 L 428 514 L 435 514 L 440 504 L 444 500 L 445 495 L 437 483 L 431 477 L 430 471 L 422 462 L 422 442 L 410 426 L 412 419 L 422 412 L 421 408 L 427 400 L 427 397 L 423 391 L 422 379 L 418 376 L 406 373 L 401 367 L 396 352 L 396 343 L 1016 345 L 1016 783 L 1027 798 L 1024 819 L 1033 830 L 1033 838 L 786 838 L 762 854 L 734 850 L 666 879 L 639 870 L 631 869 L 588 888 L 574 875 L 548 868 L 541 868 L 503 874 L 477 893 L 443 891 L 433 887 L 415 883 L 404 870 L 406 849 L 401 832 L 399 813 L 397 806 L 388 798 L 368 787 L 353 790 L 344 789 L 330 772 L 307 773 L 302 770 L 299 770 L 289 775 L 281 776 L 270 770 L 263 769 L 266 757 L 266 745 L 264 741 L 266 724 L 268 723 L 270 725 L 275 725 L 278 723 L 275 709 L 273 707 L 274 701 L 267 696 L 267 685 L 263 676 L 271 676 L 273 674 L 272 668 L 277 665 L 282 659 L 279 653 L 272 651 L 265 643 L 256 642 L 257 630 L 254 625 L 254 604 L 243 586 L 243 572 L 239 566 L 239 560 L 241 557 L 241 547 L 238 532 L 236 528 L 227 521 L 228 512 L 217 496 L 217 483 L 215 480 L 215 456 L 217 442 Z" fill="#000000" stroke="#FFFFFF" stroke-width="7" stroke-linejoin="miter"/>
-  <path id="eye-sclera" d="M 494 618 C 545 548, 617 518, 690 518 C 763 518, 833 549, 887 619 C 833 689, 763 717, 690 717 C 617 717, 545 688, 494 618 Z" fill="#FFFFFF"/>
-  <circle id="iris" cx="689" cy="618" r="92" fill="#F4A000"/>
-  <circle id="pupil" cx="689" cy="618" r="41" fill="#000000"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Out Of Sight logo">
+  <path fill="#000000" d="M512 326c-176 0-300 82-384 186 84 104 208 186 384 186s300-82 384-186c-84-104-208-186-384-186Zm0 312c-116 0-215-43-295-126 80-83 179-126 295-126s215 43 295 126c-80 83-179 126-295 126Z"/>
+  <circle cx="512" cy="512" r="118" fill="#000000"/>
 </svg>

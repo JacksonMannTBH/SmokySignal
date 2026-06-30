@@ -11,15 +11,16 @@ import {
   USER_ZONES_CHANGE_EVENT,
   type UserZone,
 } from "@/lib/user-zones";
-import { REGIONS } from "@/lib/regions";
+import { DEFAULT_REGION, REGIONS } from "@/lib/regions";
 
 const DEFAULT_RADIUS_NM = 5;
 const MIN_RADIUS_NM = 1;
 const MAX_RADIUS_NM = 25;
 
-export function UserZonesManager() {
+export function UserZonesManager({ embedded = false }: { embedded?: boolean }) {
   const [zones, setZones] = useState<UserZone[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const HeadingTag = embedded ? "h2" : "h1";
 
   useEffect(() => {
     setZones(readUserZones());
@@ -73,9 +74,9 @@ export function UserZonesManager() {
             marginBottom: 6,
           }}
         >
-          Settings · Zones
+          Settings / Zones
         </div>
-        <h1
+        <HeadingTag
           style={{
             fontSize: 22,
             fontWeight: 700,
@@ -85,7 +86,7 @@ export function UserZonesManager() {
           }}
         >
           Your zones
-        </h1>
+        </HeadingTag>
         <p
           style={{
             fontSize: 13,
@@ -95,7 +96,7 @@ export function UserZonesManager() {
             marginBottom: 0,
           }}
         >
-          Push alerts route through these. A Smokey takes off near a zone, you
+          Push alerts route through these. A Bird takes off near a zone, you
           get pinged. Zones live on this device only — no account needed.
         </p>
       </header>
@@ -146,17 +147,19 @@ export function UserZonesManager() {
         />
       ))}
 
-      <Link
-        href="/settings/alerts"
-        style={{
-          color: SS_TOKENS.fg1,
-          fontSize: 13,
-          textDecoration: "none",
-          padding: "8px 0",
-        }}
-      >
-        ← Alerts settings
-      </Link>
+      {!embedded && (
+        <Link
+          href="/settings/alerts"
+          style={{
+            color: SS_TOKENS.fg1,
+            fontSize: 13,
+            textDecoration: "none",
+            padding: "8px 0",
+          }}
+        >
+          Back to settings
+        </Link>
+      )}
     </div>
   );
 }
@@ -176,13 +179,26 @@ function ZoneCard({
 }) {
   const [label, setLabel] = useState(zone.label);
   const [radius, setRadius] = useState(zone.radiusNm);
+  const [radiusInput, setRadiusInput] = useState(formatNm(zone.radiusNm));
 
   useEffect(() => {
     if (editing) {
       setLabel(zone.label);
       setRadius(zone.radiusNm);
+      setRadiusInput(formatNm(zone.radiusNm));
     }
   }, [editing, zone.label, zone.radiusNm]);
+
+  const commitRadiusInput = () => {
+    const n = Number(radiusInput);
+    if (!Number.isFinite(n) || n <= 0) {
+      setRadiusInput(formatNm(radius));
+      return;
+    }
+    const next = normalizeRadiusNm(n);
+    setRadius(next);
+    setRadiusInput(formatNm(next));
+  };
 
   return (
     <section
@@ -232,23 +248,65 @@ function ZoneCard({
               textTransform: "uppercase",
             }}
           >
-            Radius {radius.toFixed(0)}nm
+            Radius {formatNm(radius)}nm
           </label>
-          <input
-            type="range"
-            min={MIN_RADIUS_NM}
-            max={MAX_RADIUS_NM}
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            style={{ accentColor: SS_TOKENS.alert }}
-          />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) 86px",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <input
+              type="range"
+              min={MIN_RADIUS_NM}
+              max={MAX_RADIUS_NM}
+              step={0.1}
+              value={radius}
+              onChange={(e) => {
+                const next = normalizeRadiusNm(Number(e.target.value));
+                setRadius(next);
+                setRadiusInput(formatNm(next));
+              }}
+              style={{ accentColor: SS_TOKENS.alert }}
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*[.]?[0-9]*"
+              value={radiusInput}
+              onChange={(e) => setRadiusInput(e.target.value)}
+              onBlur={commitRadiusInput}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              aria-label="Zone radius in nautical miles"
+              style={{
+                minHeight: 38,
+                padding: "6px 8px",
+                borderRadius: 8,
+                background: SS_TOKENS.bg2,
+                border: `.5px solid ${SS_TOKENS.hairline2}`,
+                color: SS_TOKENS.fg0,
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+                textAlign: "center",
+              }}
+            />
+          </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               type="button"
               onClick={() => {
+                const parsed = Number(radiusInput);
+                const nextRadius =
+                  Number.isFinite(parsed) && parsed > 0
+                    ? normalizeRadiusNm(parsed)
+                    : radius;
                 updateUserZone(zone.id, {
                   label: label.trim() || zone.label,
-                  radiusNm: radius,
+                  radiusNm: nextRadius,
                 });
                 onSave();
               }}
@@ -287,7 +345,7 @@ function ZoneCard({
                 color: SS_TOKENS.fg1,
               }}
             >
-              {zone.radiusNm.toFixed(0)}nm
+              {formatNm(zone.radiusNm)}nm
             </div>
           </div>
           <div
@@ -321,7 +379,7 @@ function ZoneCard({
 }
 
 function addAtPugetSound() {
-  const ps = REGIONS.puget_sound;
+  const ps = REGIONS[DEFAULT_REGION];
   addUserZone({
     lat: ps.centerLat,
     lon: ps.centerLon,
@@ -364,3 +422,11 @@ const dangerBtn: React.CSSProperties = {
   color: SS_TOKENS.danger,
   border: `.5px solid ${SS_TOKENS.hairline2}`,
 };
+
+function normalizeRadiusNm(value: number): number {
+  return Math.round(Math.max(MIN_RADIUS_NM, Math.min(MAX_RADIUS_NM, value)) * 10) / 10;
+}
+
+function formatNm(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}

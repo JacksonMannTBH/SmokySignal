@@ -1,8 +1,8 @@
 "use client";
 
 // Wipes every rider-side preference back to defaults — both the
-// localStorage keys (region, voice, proximity, zones, hot-zone
-// filter, install-prompt dismiss flags, distance-rings visibility)
+// localStorage keys (region, voice, proximity, zones, install-prompt
+// dismiss flags, distance-rings visibility)
 // and the server-readable cookies (time format, contrast). Confirms
 // before firing because the wipe is irreversible.
 //
@@ -16,12 +16,13 @@ import { resetPreferenceCookiesAction } from "@/app/(tabs)/settings/alerts/actio
 
 const LOCAL_STORAGE_KEYS = [
   "ss_voice_mode_enabled",
+  "ss_wake_lock",
   "ss_proximity_enabled",
   "ss_proximity_threshold_nm",
+  "ss_ride_status_thresholds",
+  "ss_ride_status_notifications",
   "ss_user_zones",
   "ss_region_pref",
-  "ss_hotzones_filter",
-  "ss_hotzones_visible",
   "ss_flight_paths_visible",
   "ss_install_dismissed",
   "ss_post_install_dismissed",

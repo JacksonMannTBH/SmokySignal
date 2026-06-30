@@ -13,9 +13,9 @@ export function Card({ children, padded = true, raised = false, style }: Props) 
     <div
       style={{
         background: raised ? SS_TOKENS.bg2 : SS_TOKENS.surface,
-        border: `.5px solid ${SS_TOKENS.hairline}`,
-        borderRadius: raised ? 24 : 20,
-        boxShadow: raised ? SS_TOKENS.shadowMd : SS_TOKENS.shadowSm,
+        border: `1px solid ${raised ? SS_TOKENS.hairline2 : SS_TOKENS.hairline}`,
+        borderRadius: raised ? 18 : 16,
+        boxShadow: raised ? SS_TOKENS.shadowMd : "none",
         backdropFilter: "blur(18px)",
         WebkitBackdropFilter: "blur(18px)",
         padding: padded ? 16 : 0,

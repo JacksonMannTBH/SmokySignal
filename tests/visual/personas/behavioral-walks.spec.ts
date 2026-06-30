@@ -171,7 +171,7 @@ test.describe("behavioral persona walks", () => {
       });
     }
     const aboutText = await page.locator("main").innerText();
-    const mentionsLore = /Smokey|Channel 19|campaign hat/i.test(aboutText);
+    const mentionsLore = /Bird|Channel 19|campaign hat/i.test(aboutText);
     log.goalReached = mentionsLore;
     log.finalState = mentionsLore
       ? "lurker would install — lore landed in <90s"

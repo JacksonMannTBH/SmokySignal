@@ -1,6 +1,6 @@
-// One-shot (idempotent) migration that merges the seed table's
-// role / roleConfidence / roleNote into any KV registry rows missing
-// them. Safe to re-run.
+// One-shot (idempotent) migration that imports seed tails missing from the
+// KV registry and merges seed role / roleConfidence / roleNote into any
+// existing KV rows missing them. Safe to re-run.
 //
 // Auth: same admin cookie as the rest of /admin. Returns a small JSON
 // summary of what changed so it's easy to confirm in the deploy log.
@@ -23,6 +23,7 @@ export async function POST() {
     FLEET.map((f) => [f.tail, f]),
   );
   const current = await getRegistry();
+  const currentTails = new Set(current.map((entry) => entry.tail));
   const merged: FleetEntry[] = [];
   let changed = 0;
   const summary: Array<{ tail: string; before: string; after: string }> = [];
@@ -56,6 +57,18 @@ export async function POST() {
     merged.push(next);
   }
 
+  for (const seed of FLEET) {
+    if (currentTails.has(seed.tail)) continue;
+    currentTails.add(seed.tail);
+    merged.push(seed);
+    changed++;
+    summary.push({
+      tail: seed.tail,
+      before: "missing",
+      after: `${seed.role}/${seed.roleConfidence}`,
+    });
+  }
+
   if (changed === 0) {
     return NextResponse.json({
       ok: true,
@@ -70,7 +83,7 @@ export async function POST() {
   await appendAudit({
     ts: new Date().toISOString(),
     op: "update",
-    tail: "(migrate-roles)",
+    tail: "(sync-seed-registry)",
     prev: null,
     next: null,
   });

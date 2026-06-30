@@ -42,7 +42,7 @@ export default function TracksMap({ samples }: { samples: TrackPoint[] }) {
         source: "track",
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#f4c430",
+          "line-color": "#f6c431",
           "line-width": 3,
         },
       });
@@ -81,7 +81,7 @@ export default function TracksMap({ samples }: { samples: TrackPoint[] }) {
             "#9ee8b5",
             "end",
             "#ff6b6b",
-            "#f4c430",
+            "#f6c431",
           ],
         },
       });

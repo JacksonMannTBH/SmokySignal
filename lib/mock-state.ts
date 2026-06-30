@@ -103,7 +103,7 @@ export function applyMockState(snap: Snapshot, state: MockState | null): Snapsho
       return liftAirborne(snap, (r) => r === "smokey");
     case "eyes-up": {
       // Patrol or unknown airborne, no smokey. Drives the alert-tier
-      // pill (which reads SMOKEY UP under the umbrella relabel) with
+      // pill (which reads BIRD UP under the umbrella relabel) with
       // patrol/unknown body copy. State name kept for back-compat with
       // existing QA flows.
       //
@@ -207,7 +207,7 @@ export function applyMockForecastGrid(
           probability,
           sample_count,
           common_tails: [
-            { tail: "N305DK", nickname: "Smokey 4", count: sample_count },
+            { tail: "N305DK", nickname: "Bird 4", count: sample_count },
           ],
         });
       }

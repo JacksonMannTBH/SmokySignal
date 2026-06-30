@@ -66,7 +66,7 @@ The off-duty trooper does not regularly use the app. They might encounter it onc
 - **Comments by the operator on social media that are anti-cop.** The brand cannot drift. If the operator tweets "ACAB" they will note it and the union will note it. (Unlikely, but the point is durable: brand drift kills the trooper's tolerance.)
 - **A "founder donates 10% to ACLU" line.** Even a positive-sounding civic donation can read as taking sides. The operator should be neutral in their public posture; donations are private.
 - **A "leaderboard of speeders avoided"** or any gamification that celebrates rule-breaking. Hard pass.
-- **A "hot zone" map that doubles as a "where to speed safely" map.** The current "learning your sky" framing is close to right but the trooper would prefer the language emphasize "where the bird tends to operate" rather than "where to be careful." A subtle distinction; subtle distinctions matter.
+- **Any map that doubles as a "where to speed safely" map.** Proximity and track history should emphasize situational awareness, not where to evade enforcement.
 
 ## What they value vs ignore
 

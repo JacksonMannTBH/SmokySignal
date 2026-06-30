@@ -1,19 +1,18 @@
 // Flight-path overlay endpoint. Returns one GeoJSON LineString per
 // tail-day with > 5 points, filtered by region bbox + optional
-// operator / role allow-list. Powers the polyline layer that sits
-// beneath the hot-zone heatmap on /radar — corridors render as thin
-// amber threads under the density blob.
+// operator / role allow-list. Powers the polyline layer on /radar —
+// corridors render as thin amber threads behind live aircraft.
 //
 // The endpoint walks lib/tracks.ts:listTrackKeys() + getTracksForDay()
-// across the registry. Same data source as the daily hot-zone
-// aggregation cron, but composed per-request and per-region. Edge
-// cached for 5 min to keep the round-trip cost contained when riders
-// flip filters or regions in quick succession.
+// across the registry, composed per-request and per-region. Edge cached
+// for 5 min to keep the round-trip cost contained when riders flip
+// filters or regions in quick succession.
 
 import { NextResponse } from "next/server";
 import { getRegistry } from "@/lib/registry";
 import { listTrackKeys, getTracksForDay } from "@/lib/tracks";
 import {
+  DEFAULT_REGION,
   REGIONS,
   type RegionBbox,
   type RegionId,
@@ -38,7 +37,7 @@ function resolveBbox(url: URL): { regionId: RegionId; bbox: RegionBbox } {
   }
   // Fallback matches lib/regions.ts:DEFAULT_REGION so a malformed query
   // renders the same scope as a fresh-install client.
-  return { regionId: "all_wa", bbox: REGIONS.all_wa.bbox };
+  return { regionId: DEFAULT_REGION, bbox: REGIONS[DEFAULT_REGION].bbox };
 }
 
 function parseList(raw: string | null): string[] {

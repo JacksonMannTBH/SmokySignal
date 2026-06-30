@@ -146,32 +146,23 @@ test.describe("p14 live-prod audit", () => {
     });
   });
 
-  test("4. heatmap layer registered on /radar", async ({ page, context }) => {
+  test("4. radar paths control registered on /radar", async ({ page, context }) => {
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation(TACOMA);
     await page.goto("/radar", { waitUntil: "networkidle" });
     await page.waitForTimeout(4000);
-    const screenshot = await shot(page, "04-radar-heat");
-    // Try the API directly — if /api/hotzones returns 200, the pipeline
-    // is alive. Empty zones array = correct learning state, not bug.
-    const apiRes = await page.request.get(
-      "https://smokysignal.app/api/hotzones?region_id=puget_sound",
-    );
-    const apiOk = apiRes.ok();
-    const body = apiOk ? await apiRes.json() : null;
-    const zoneCount = Array.isArray(body?.zones) ? body.zones.length : 0;
+    const screenshot = await shot(page, "04-radar-paths");
+    const pathToggle = await page
+      .locator('button[aria-label*="flight paths" i]')
+      .count();
     record({
-      claim: "Heatmap layer registered + API alive on /radar",
-      category:
-        apiOk && zoneCount === 0
-          ? "working_as_designed"
-          : apiOk
-            ? "working_as_designed"
-            : "confirmed_bug",
-      pass: apiOk,
-      evidence: apiOk
-        ? `/api/hotzones 200, ${zoneCount} zones (Day-X learning state)`
-        : `/api/hotzones ${apiRes.status()}`,
+      claim: "Flight-path control registered on /radar",
+      category: pathToggle > 0 ? "working_as_designed" : "confirmed_bug",
+      pass: pathToggle > 0,
+      evidence:
+        pathToggle > 0
+          ? `flight-path toggle present (${pathToggle})`
+          : "flight-path toggle missing",
       screenshot,
     });
   });
@@ -366,44 +357,29 @@ test.describe("p14 live-prod audit", () => {
     });
   });
 
-  test("10. hot-zones filter terminology", async ({ page, context }) => {
+  test("10. hot-zone controls are retired", async ({ page, context }) => {
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation(TACOMA);
     await page.goto("/radar", { waitUntil: "networkidle" });
     await page.waitForTimeout(2500);
-    // Open the chevron filter panel — find the filter button (aria-label).
-    const filterBtn = page.locator(
-      'button[aria-label*="filter" i], button[aria-label*="hot zone" i]',
-    );
-    const found = await filterBtn.count();
-    if (found === 0) {
-      record({
-        claim: 'Hot-zones filter has "Smokey" option mapping to roles',
-        category: "indeterminate",
-        pass: false,
-        evidence: "no filter button discoverable in DOM",
-      });
-      return;
-    }
-    await filterBtn.first().click();
-    await page.waitForTimeout(500);
-    const screenshot = await shot(page, "10-hotzones-filter");
-    // Post-PROMPT_17 P1, the filter chevron exposes 3 rider-facing
-    // categories — Smokey / Search & Rescue / Transport — that map onto
-    // the granular FleetRole taxonomy via lib/radar-filter.ts:RIDER_BUCKETS.
-    // The Smokey bucket → {smokey, patrol, unknown} (umbrella set per
-    // P16.5). SMOKY_TAILS is now an empty array; classification is
-    // entirely role-based. This assertion just confirms the Smokey label
-    // is rendered in the panel.
-    const hasSmokey = (await page.locator("text=/^Smokey$/i").count()) > 0;
+    const screenshot = await shot(page, "10-layer-controls");
+    const hotZoneControls = await page
+      .locator('button[aria-label*="hot zone" i], text=/hot\\s*zones?/i')
+      .count();
+    const filterControls = await page
+      .locator('button[aria-label*="filter" i]')
+      .count();
     record({
-      claim:
-        'Hot-zones filter exposes "Smokey" category (role-based: smokey + patrol + unknown)',
-      category: hasSmokey ? "working_as_designed" : "confirmed_bug",
-      pass: hasSmokey,
-      evidence: hasSmokey
-        ? "filter panel opened, Smokey category chip rendered"
-        : "filter panel opened but Smokey label not found",
+      claim: "Hot-zone controls and filter panel are not present on /radar",
+      category:
+        hotZoneControls === 0 && filterControls === 0
+          ? "working_as_designed"
+          : "confirmed_bug",
+      pass: hotZoneControls === 0 && filterControls === 0,
+      evidence:
+        hotZoneControls === 0 && filterControls === 0
+          ? "no hot-zone or filter controls found"
+          : `found ${hotZoneControls} hot-zone controls and ${filterControls} filter controls`,
       screenshot,
     });
   });
@@ -565,7 +541,7 @@ test.describe("p14 live-prod audit", () => {
     }
     record({
       claim:
-        "?mock=eyes-up forces a patrol/unknown-class plane airborne with no smokey-class — drives the alert-tier pill (SMOKEY UP under the umbrella relabel)",
+        "?mock=eyes-up forces a patrol/unknown-class plane airborne with no smokey-class — drives the alert-tier pill (BIRD UP under the umbrella relabel)",
       category: pass ? "working_as_designed" : "confirmed_bug",
       pass,
       evidence,

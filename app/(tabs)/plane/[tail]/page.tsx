@@ -4,7 +4,11 @@ import { fleetHex } from "@/lib/seed";
 import { getRegistry } from "@/lib/registry";
 import { getSnapshot } from "@/lib/snapshot";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
-import { getMostRecentFlightForTail, flightIdFromTs } from "@/lib/flights";
+import {
+  averageGroundSpeedKt,
+  getMostRecentFlightForTail,
+  flightIdFromTs,
+} from "@/lib/flights";
 import { SS_TOKENS } from "@/lib/tokens";
 import { StatusPill } from "@/components/StatusPill";
 import { Card } from "@/components/Card";
@@ -32,16 +36,6 @@ const PlaneTrackMap = nextDynamic(() => import("@/components/PlaneTrackMap"), {
     />
   ),
 });
-
-const PerPlaneHeatLayer = nextDynamic(
-  () => import("@/components/PerPlaneHeatLayer"),
-  {
-    ssr: false,
-    loading: () => (
-      <div style={{ height: 220, background: SS_TOKENS.bg0 }} />
-    ),
-  },
-);
 
 type Props = {
   params: { tail: string };
@@ -185,24 +179,6 @@ export default async function PlanePage({ params, searchParams }: Props) {
           isAirborne={up}
           hour12={hour12}
         />
-      </section>
-
-      <section>
-        <Card padded={false}>
-          <div style={{ padding: "12px 14px 8px" }}>
-            <div className="ss-eyebrow">Where this plane patrols</div>
-            <div
-              style={{
-                fontSize: 11.5,
-                color: SS_TOKENS.fg2,
-                marginTop: 2,
-              }}
-            >
-              30-day heatmap of recorded positions
-            </div>
-          </div>
-          <PerPlaneHeatLayer tail={entry.tail} />
-        </Card>
       </section>
 
       <FleetMeta tail={entry.tail} hex={fleetHex(entry).toUpperCase()} role={entry.roleDescription} />
@@ -472,6 +448,7 @@ function RecentTrackStats({
   hour12: boolean;
 }) {
   const { session, inProgress } = flight;
+  const avgGroundSpeed = averageGroundSpeedKt(flight.points);
   return (
     <>
       <Card>
@@ -489,6 +466,13 @@ function RecentTrackStats({
           />
           <KV label="DURATION" value={fmtSessionDuration(session.duration_s)} />
           <KV label="SAMPLES" value={String(session.sample_count)} />
+          <KV
+            label="AVG GS"
+            value={
+              avgGroundSpeed != null ? `${Math.round(avgGroundSpeed)} kt` : "—"
+            }
+            tooltip="Time-weighted average ground speed from the available track samples."
+          />
           <KV
             label="MAX ALT"
             value={

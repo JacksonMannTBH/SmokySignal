@@ -10,12 +10,9 @@
 // One deviation from PROMPT_22's "decisions locked" section, on the
 // strength of the live visual feedback after #119 deployed:
 //   - Line color is WHITE, not SS_TOKENS.sky. The cyan brand token
-//     (#5BB6FF) read as a desaturated yellow against amber/red
-//     heat density — likely simultaneous-contrast color shift since
-//     cyan and amber are near-opponent hues. White has maximum
-//     luminance contrast against every heatmap stop and against the
-//     dark basemap, and can't be perceptually mistaken for any
-//     existing rider-facing element.
+//     (#5BB6FF) read too close to the map's warm road highlights.
+//     White has strong luminance contrast against the dark basemap and
+//     can't be perceptually mistaken for any existing rider-facing element.
 //   - Widths bumped well past the prompt's spec because Alex
 //     reported the strip-back's flat 16 px still read skinny on
 //     prod. Going wider so a glance-at-a-stoplight rider can
@@ -141,7 +138,7 @@ export function AircraftTrailLayer({
   const tailsKeyRef = useRef(tailsKey);
   tailsKeyRef.current = tailsKey;
   const pulseRef = useRef<number | null>(null);
-  const [enabled, setEnabled] = useState<boolean>(true);
+  const [enabled, setEnabled] = useState<boolean>(false);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
@@ -232,9 +229,8 @@ export function AircraftTrailLayer({
           "line-opacity": 0.28,
         },
       });
-      // Line — white, max luminance contrast against every heatmap
-      // stop AND the dark basemap. Wider than every prior iteration
-      // so a glance-at-a-stoplight rider can't miss it.
+      // Line — high contrast against the dark basemap. Wider than every
+      // prior iteration so a glance-at-a-stoplight rider can't miss it.
       map.addLayer({
         id: LAYER_ID,
         type: "line",
@@ -420,8 +416,8 @@ export function AircraftTrailLayer({
         console.debug("[trail] fetchOnce: setData complete", {
           featureCount: fc.features.length,
         });
-        // Re-run reorder so a sibling layer that mounted between
-        // attach and now (heatmap, flight-paths) can't bury us.
+        // Re-run reorder so a sibling layer that mounted between attach
+        // and now can't bury us.
         reorderTrailLayers(map);
       } catch (e) {
         console.warn("[trail] fetchOnce: threw", e);

@@ -55,7 +55,7 @@ These are inferred from common funnel failure modes in PWAs:
 - **No clear "what is this app" moment in the first viewport.** They want one sentence: "Live tracking of WSP aviation. No account, dark mode, glance-able." If the home screen is a status pill with no context, half of them bounce. (The hero copy on `/` should pass this test — currently it largely does.)
 - **iOS Add-to-Home-Screen is confusing.** The IOSInstallPrompt helps, but it is still a multi-step flow that depends on the user knowing what the share button looks like. A persistent fraction of iOS lurkers never get past this.
 - **They cannot tell if the bird is up "right now" or "in general."** If the status copy is ambiguous, they assume the worst.
-- **They do not understand the "learning your sky" empty state.** If the radar shows a sparse heatmap because we do not have 30 days of data yet (post-OpenSky-lockout), they read it as "broken" not "learning."
+- **They do not understand the "learning your sky" empty state.** If the forecast is sparse because we do not have enough takeoff history yet, they read it as "broken" not "learning."
 - **The push permission prompt scared them off.** If we ask for it on cold start, they deny and they leave.
 - **The dark theme reads as unfinished to a non-tech taste.** A specific subset of lurkers — older, less tech-y — sees a dark UI and thinks "unstyled" rather than "designed." There is no fix; we accept this loss in service of the rider.
 - **The about page tells the story but is two clicks away.** Some lurkers needed the lore on the home screen, even just one line, to understand what they were looking at.

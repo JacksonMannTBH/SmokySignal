@@ -22,7 +22,7 @@ export const alt = "Out Of Sight flight track";
 const SS_BG = "#0b0d10";
 const SS_FG = "#eef0f3";
 const SS_FG2 = "#a8adb6";
-const SS_ALERT = "#f4c430";
+const SS_ALERT = "#f6c431";
 
 const MAX_PATH_POINTS = 200;
 const TRACK_PAD = 80;

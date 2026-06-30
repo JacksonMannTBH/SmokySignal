@@ -4,6 +4,7 @@
 import { fleetHex } from "./seed";
 import { getRegistry } from "./registry";
 import { fetchOpenSky } from "./opensky";
+import { DEFAULT_REGION, REGIONS, type RegionId } from "./regions";
 import type {
   Aircraft,
   AircraftLive,
@@ -16,15 +17,15 @@ import type {
 // ~190 nm. adsb.fi v2 caps the radius at 250 nm (501+ returns HTTP 400),
 // so this is the largest single-circle query the API allows. Registry-tail
 // filtering downstream drops any non-fleet leakage from BC / OR / ID.
-const REGION = {
+const ENV_REGION = {
   lat: Number(process.env.SS_REGION_LAT ?? 47.4),
   lon: Number(process.env.SS_REGION_LON ?? -120.8),
   nm: Number(process.env.SS_REGION_NM ?? 250),
 };
 
-// In-memory state across requests — tracks first-seen timestamps so we can
-// derive "minutes aloft" without a track-history table yet.
-type SeenState = { firstSeenAt: number; lastSeenAt: number };
+// In-memory state across requests for a soft "last seen" label only.
+// Current flight duration is derived from persisted track samples.
+type SeenState = { lastSeenAt: number };
 const seenByIcao = new Map<string, SeenState>();
 
 const FETCH_OPTS: RequestInit = {
@@ -40,8 +41,9 @@ const FETCH_OPTS: RequestInit = {
 // classify as airborne:false from launch through 2026-04-30.
 type AdsbFiResp = { aircraft?: NormalizedAc[]; now?: number };
 
-async function fetchAdsbFi(): Promise<NormalizedAc[]> {
-  const url = `https://opendata.adsb.fi/api/v2/lat/${REGION.lat}/lon/${REGION.lon}/dist/${REGION.nm}`;
+async function fetchAdsbFi(regionId: RegionId = DEFAULT_REGION): Promise<NormalizedAc[]> {
+  const region = searchRegion(regionId);
+  const url = `https://opendata.adsb.fi/api/v2/lat/${region.lat}/lon/${region.lon}/dist/${region.nm}`;
   const r = await fetch(url, FETCH_OPTS);
   if (!r.ok) throw new Error(`adsb.fi ${r.status}`);
   const j = (await r.json()) as AdsbFiResp;
@@ -50,7 +52,7 @@ async function fetchAdsbFi(): Promise<NormalizedAc[]> {
 
 // ─── Normalize + merge ─────────────────────────────────────────────────────
 
-export async function buildSnapshot(): Promise<Snapshot> {
+export async function buildSnapshot(regionId: RegionId = DEFAULT_REGION): Promise<Snapshot> {
   // Resolve the registry once per snapshot regen — getRegistry caches in
   // memory for 5s so this isn't a hot path on KV.
   const fleet = await getRegistry();
@@ -64,7 +66,7 @@ export async function buildSnapshot(): Promise<Snapshot> {
   let raw: NormalizedAc[] = [];
   let source: Snapshot["source"] = "adsbfi";
   try {
-    raw = await fetchAdsbFi();
+    raw = await fetchAdsbFi(regionId);
   } catch (e) {
     console.warn("[adsb] primary failed, falling back to OpenSky:", e);
     try {
@@ -85,15 +87,10 @@ export async function buildSnapshot(): Promise<Snapshot> {
     if (fleetByIcao.has(hex)) liveByIcao.set(hex, ac);
   }
 
-  // Update first-seen state
+  // Update last-seen state.
   for (const [hex, _] of liveByIcao) {
     const prev = seenByIcao.get(hex);
-    if (!prev || now - prev.lastSeenAt > 10 * 60 * 1000) {
-      // new sighting (or > 10 min gap = treat as a new flight)
-      seenByIcao.set(hex, { firstSeenAt: now, lastSeenAt: now });
-    } else {
-      seenByIcao.set(hex, { ...prev, lastSeenAt: now });
-    }
+    seenByIcao.set(hex, { ...prev, lastSeenAt: now });
   }
 
   const aircraft: Aircraft[] = fleet.map((entry) => {
@@ -115,10 +112,6 @@ export async function buildSnapshot(): Promise<Snapshot> {
     }
 
     const grounded = ac.alt_baro === "ground";
-    const time_aloft_min = seen
-      ? Math.max(0, Math.floor((now - seen.firstSeenAt) / 60_000))
-      : 0;
-
     const live: AircraftLive = {
       tail: entry.tail,
       icao24: hex,
@@ -130,7 +123,6 @@ export async function buildSnapshot(): Promise<Snapshot> {
       ground_speed_kt: ac.gs,
       heading: ac.track,
       squawk: ac.squawk ?? null,
-      time_aloft_min: grounded ? undefined : time_aloft_min,
       last_seen_min: 0,
     };
     return { ...entry, ...live };
@@ -141,6 +133,16 @@ export async function buildSnapshot(): Promise<Snapshot> {
     source,
     aircraft,
     live_seen_count: raw.length,
+  };
+}
+
+function searchRegion(regionId: RegionId): { lat: number; lon: number; nm: number } {
+  const region = REGIONS[regionId];
+  if (!region) return ENV_REGION;
+  return {
+    lat: region.centerLat,
+    lon: region.centerLon,
+    nm: Math.min(250, Math.max(1, region.searchNm)),
   };
 }
 

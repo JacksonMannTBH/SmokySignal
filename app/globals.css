@@ -4,61 +4,51 @@
 
 :root {
   --font-brand: "Math Bold", "Cambria Math", "STIX Two Math", "Noto Sans Math", "Times New Roman", serif;
-  --font-mono: var(--font-brand);
-  --ss-bg0: #ffffff;
-  --ss-bg1: rgba(255, 255, 255, 0.94);
-  --ss-bg2: rgba(244, 196, 48, 0.12);
-  --ss-bg3: rgba(244, 196, 48, 0.20);
-  --ss-surface: rgba(255, 255, 255, 0.96);
-  --ss-surface-translucent: rgba(255, 255, 255, 0.82);
-  --ss-fg0: #050505;
-  --ss-fg1: #2a2a2a;
-  --ss-fg2: #5c5642;
-  --ss-fg3: #8b846b;
-  /* SEMANTIC: speed-enforcement plane up. Matches the icon files in
-     Design/ - alert saffron is #f4c430.
-     #FF7A1A is reserved as --ss-warn for future speed-warning UX. */
-  --ss-alert: #f4c430;
-  --ss-alert-dim: rgba(244, 196, 48, 0.18);
-  --ss-warn: #d79b00;
-  --ss-warn-dim: rgba(215, 155, 0, 0.16);
-  --ss-danger: #050505;
-  --ss-clear: #050505;
-  --ss-clear-dim: rgba(5, 5, 5, 0.10);
-  --ss-sky: #050505;
-  --ss-sky-dim: rgba(5, 5, 5, 0.10);
-  --ss-hairline: rgba(5, 5, 5, 0.12);
-  --ss-hairline-2: rgba(5, 5, 5, 0.22);
-  --ss-shadow-sm: 0 4px 14px rgba(5, 5, 5, 0.08);
-  --ss-shadow-md: 0 12px 34px rgba(5, 5, 5, 0.13);
-  --ss-shadow-lg: 0 22px 60px rgba(5, 5, 5, 0.18);
-  --ss-radius-sm: 10px;
-  --ss-radius-md: 16px;
-  --ss-radius-lg: 22px;
-  --ss-radius-xl: 28px;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  --ss-bg0: #050607;
+  --ss-bg1: rgba(13, 14, 11, 0.94);
+  --ss-bg2: rgba(246, 196, 49, 0.10);
+  --ss-bg3: rgba(246, 196, 49, 0.16);
+  --ss-surface: rgba(17, 18, 14, 0.94);
+  --ss-surface-translucent: rgba(15, 15, 15, 0.70);
+  --ss-fg0: #f5f1e6;
+  --ss-fg1: #b7b2a7;
+  --ss-fg2: #77736a;
+  --ss-fg3: #5c574e;
+  --ss-alert: #f6c431;
+  --ss-alert-dim: rgba(246, 196, 49, 0.14);
+  --ss-warn: #ff7a1a;
+  --ss-warn-dim: rgba(255, 122, 26, 0.16);
+  --ss-danger: #dc2626;
+  --ss-clear: #5ade87;
+  --ss-clear-dim: rgba(90, 222, 135, 0.14);
+  --ss-sky: #8bd2ff;
+  --ss-sky-dim: rgba(139, 210, 255, 0.14);
+  --ss-hairline: rgba(255, 255, 255, 0.10);
+  --ss-hairline-2: rgba(246, 196, 49, 0.25);
+  --ss-shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --ss-shadow-md: 0 14px 36px rgba(0, 0, 0, 0.38);
+  --ss-shadow-lg: 0 24px 54px rgba(0, 0, 0, 0.48);
+  --ss-radius-sm: 8px;
+  --ss-radius-md: 14px;
+  --ss-radius-lg: 18px;
+  --ss-radius-xl: 24px;
 }
 
 body[data-theme="dark"] {
-  --ss-bg0: #020202;
-  --ss-bg1: rgba(8, 8, 8, 0.96);
-  --ss-bg2: rgba(244, 196, 48, 0.10);
-  --ss-bg3: rgba(244, 196, 48, 0.16);
-  --ss-surface: rgba(10, 10, 10, 0.96);
-  --ss-surface-translucent: rgba(8, 8, 8, 0.84);
-  --ss-fg0: #f5f2e8;
-  --ss-fg1: #d6d1bf;
-  --ss-fg2: #a9a28a;
-  --ss-fg3: #746f5d;
-  --ss-danger: #ff6b6b;
-  --ss-clear: #9ee8b5;
-  --ss-clear-dim: rgba(158, 232, 181, 0.14);
-  --ss-sky: #8bd2ff;
-  --ss-sky-dim: rgba(139, 210, 255, 0.14);
-  --ss-hairline: rgba(245, 242, 232, 0.13);
-  --ss-hairline-2: rgba(245, 242, 232, 0.24);
-  --ss-shadow-sm: 0 5px 18px rgba(0, 0, 0, 0.52);
-  --ss-shadow-md: 0 16px 42px rgba(0, 0, 0, 0.62);
-  --ss-shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.72);
+  --ss-bg0: #050607;
+  --ss-bg1: rgba(13, 14, 11, 0.94);
+  --ss-bg2: rgba(246, 196, 49, 0.10);
+  --ss-bg3: rgba(246, 196, 49, 0.16);
+  --ss-surface: rgba(17, 18, 14, 0.94);
+  --ss-surface-translucent: rgba(15, 15, 15, 0.70);
+  --ss-fg0: #f5f1e6;
+  --ss-fg1: #b7b2a7;
+  --ss-fg2: #77736a;
+  --ss-fg3: #5c574e;
+  --ss-hairline: rgba(255, 255, 255, 0.10);
+  --ss-hairline-2: rgba(246, 196, 49, 0.25);
 }
 
 /* High-contrast variant — stays dark, lifts secondary text + hairline
@@ -85,28 +75,29 @@ html,
 body {
   background: var(--ss-bg0);
   color: var(--ss-fg0);
+  color-scheme: dark;
 }
 
 body {
-  font-family: var(--font-brand);
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-weight: 600;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 .ss-mono {
-  font-family: var(--font-brand);
+  font-family: var(--font-mono);
   font-feature-settings: "zero", "ss20", "cv01", "tnum";
   letter-spacing: 0;
 }
 
 .ss-eyebrow {
-  font-family: var(--font-brand);
+  font-family: var(--font-ui);
   font-feature-settings: "zero";
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: none;
-  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 800;
   color: var(--ss-fg2);
 }
 
@@ -229,6 +220,19 @@ a:active {
 body[data-theme="dark"] .maplibregl-ctrl-attrib {
   background: var(--ss-surface-translucent) !important;
   color: var(--ss-fg1) !important;
+}
+
+body[data-ride-mode="true"] .maplibregl-ctrl-attrib {
+  display: none !important;
+}
+
+body[data-radar-mode="true"] .maplibregl-ctrl-attrib {
+  height: 2px !important;
+  min-height: 2px !important;
+  max-height: 2px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  line-height: 2px !important;
 }
 
 .ss-plane-popup .maplibregl-popup-content {

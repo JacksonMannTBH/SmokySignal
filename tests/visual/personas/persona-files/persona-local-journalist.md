@@ -72,7 +72,7 @@ The journalist does not encounter SmokySignal often. When they do, it is one of:
 - The brand voice. They will quote it. The "the app *informs*, it does not *evade*" line is **the** quotable sentence in the project.
 - The privacy posture, if it is on a page they can link to.
 - The data sourcing transparency — "primary: adsb.fi, fallback: OpenSky" is a sentence they will paraphrase in a story.
-- The hot zones. They will use the heatmap to anchor a "where does WSP fly" piece.
+- The recent flight paths. They will use live/recent tracks to anchor a "where does WSP fly" piece.
 - Operator quotes that are calm, not crusading.
 - The dark theme. (They are tired of bright apps.)
 

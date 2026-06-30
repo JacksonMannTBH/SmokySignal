@@ -18,6 +18,8 @@ import {
   type StoredSubscription,
   type UserZoneSpec,
 } from "./types";
+import { isRegionId } from "../regions";
+import { clampRegionProximityNm } from "../proximity-limits";
 
 // Re-export so server-side callers can keep their existing import sites.
 export {
@@ -74,12 +76,23 @@ function mergePrefs(partial?: Partial<AlertPrefs>): AlertPrefs {
     quiet_start_h: clampHour(partial.quiet_start_h, DEFAULT_PREFS.quiet_start_h),
     quiet_end_h: clampHour(partial.quiet_end_h, DEFAULT_PREFS.quiet_end_h),
     tz: typeof partial.tz === "string" && partial.tz ? partial.tz : DEFAULT_PREFS.tz,
+    proximity_enabled: partial.proximity_enabled === true,
+    proximity_nm: sanitizeRadiusNm(partial.proximity_nm),
   };
+  if (typeof partial.region_id === "string" && isRegionId(partial.region_id)) {
+    merged.region_id = partial.region_id;
+  }
   const userZones = sanitizeUserZones(partial.userZones);
   if (userZones !== undefined) merged.userZones = userZones;
   const tails = sanitizeTails(partial.tails);
   if (tails !== undefined) merged.tails = tails;
   return merged;
+}
+
+function sanitizeRadiusNm(v: unknown): number | undefined {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return clampRegionProximityNm(n);
 }
 
 function sanitizeTails(v: unknown): string[] | undefined {

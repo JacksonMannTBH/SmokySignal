@@ -1,7 +1,6 @@
 // /admin/fleet-health — per-tail capture audit. Cross-references the
-// registry against the tracks aggregate and the hot-zones cache so an
-// admin can see at a glance which tails are silent, which are flying
-// but their points aren't reaching the heatmap, and which are healthy.
+// registry against recorded track samples so an admin can see at a glance
+// which tails are silent and which are healthy.
 //
 // Read-only. No writes, no API. Same auth gate as /admin/tracks.
 
@@ -11,7 +10,6 @@ import {
 } from "@/lib/admin-auth";
 import { getRegistry } from "@/lib/registry";
 import { getTrackSummary } from "@/lib/tracks";
-import { getHotZonesCached } from "@/lib/hotzones";
 import { getLearningState } from "@/lib/learning";
 import { SS_TOKENS } from "@/lib/tokens";
 import { LoginForm } from "../LoginForm";
@@ -35,8 +33,7 @@ type Row = {
   daysWithData: number;
   firstSampleTs: number | null;
   lastSampleTs: number | null;
-  hotZoneCells: number;
-  flag: "silent" | "dropped" | "ok";
+  flag: "silent" | "ok";
 };
 
 const SYSTEM_FIRST_SAMPLE_30D_THRESHOLD_MS = 30 * 86_400_000;
@@ -53,20 +50,10 @@ export default async function FleetHealthPage({
     return <LoginForm error={searchParams.error} next="fleet-health" />;
   }
 
-  const [fleet, hotZones, learning] = await Promise.all([
+  const [fleet, learning] = await Promise.all([
     getRegistry(),
-    getHotZonesCached(),
     getLearningState(),
   ]);
-
-  // Pre-compute hot-zone contribution per tail in a single pass — cheaper
-  // than O(fleet × zones) inside the per-tail map below.
-  const cellsByTail = new Map<string, number>();
-  for (const z of hotZones) {
-    for (const t of z.tails) {
-      cellsByTail.set(t, (cellsByTail.get(t) ?? 0) + 1);
-    }
-  }
 
   const systemFirstSampleMs = learning.firstSampleIso
     ? new Date(learning.firstSampleIso).getTime()
@@ -78,13 +65,10 @@ export default async function FleetHealthPage({
   const rows: Row[] = await Promise.all(
     fleet.map(async (f): Promise<Row> => {
       const summary = await getTrackSummary(f.tail);
-      const hotZoneCells = cellsByTail.get(f.tail) ?? 0;
-      // Two flags worth surfacing in the admin view:
-      //   "dropped"  — points exist but never made it into the aggregate
-      //   "silent"   — system has been running 30+ days yet zero sightings
+      // Surface tails with zero sightings once the system is mature enough
+      // that silence is likely meaningful.
       let flag: Row["flag"] = "ok";
-      if (summary.totalSamples > 0 && hotZoneCells === 0) flag = "dropped";
-      else if (summary.totalSamples === 0 && systemAge30DPlus) flag = "silent";
+      if (summary.totalSamples === 0 && systemAge30DPlus) flag = "silent";
       return {
         tail: f.tail,
         operator: f.operator,
@@ -94,18 +78,15 @@ export default async function FleetHealthPage({
         daysWithData: summary.daysWithData,
         firstSampleTs: summary.firstSampleTs,
         lastSampleTs: summary.lastSampleTs,
-        hotZoneCells,
         flag,
       };
     }),
   );
 
-  // Sort: flagged rows surface first (silent then dropped), then healthy
-  // rows by last-seen descending.
+  // Sort: flagged rows surface first, then healthy rows by last-seen descending.
   const flagOrder: Record<Row["flag"], number> = {
     silent: 0,
-    dropped: 1,
-    ok: 2,
+    ok: 1,
   };
   rows.sort((a, b) => {
     if (a.flag !== b.flag) return flagOrder[a.flag] - flagOrder[b.flag];
@@ -118,7 +99,6 @@ export default async function FleetHealthPage({
   const counts = {
     total: rows.length,
     silent: rows.filter((r) => r.flag === "silent").length,
-    dropped: rows.filter((r) => r.flag === "dropped").length,
     ok: rows.filter((r) => r.flag === "ok").length,
   };
 
@@ -144,9 +124,8 @@ export default async function FleetHealthPage({
           marginBottom: 8,
         }}
       >
-        Per-tail capture audit — cross-references the registry against the
-        tracks aggregate and the hot-zones cache. Flagged rows surface at
-        the top.
+        Per-tail capture audit — cross-references the registry against recorded
+        track samples. Flagged rows surface at the top.
       </p>
       <p
         className="ss-mono"
@@ -157,8 +136,7 @@ export default async function FleetHealthPage({
           marginBottom: 16,
         }}
       >
-        {counts.total} TAILS · {counts.silent} SILENT · {counts.dropped} DROPPED ·{" "}
-        {counts.ok} OK · SYSTEM AGE{" "}
+        {counts.total} TAILS · {counts.silent} SILENT · {counts.ok} OK · SYSTEM AGE{" "}
         {systemFirstSampleMs != null
           ? `${Math.floor(
               (Date.now() - systemFirstSampleMs) / 86_400_000,
@@ -177,7 +155,6 @@ export default async function FleetHealthPage({
               <Th>NICKNAME</Th>
               <Th align="right">30D POINTS</Th>
               <Th align="right">DAYS</Th>
-              <Th align="right">HOT-ZONE CELLS</Th>
               <Th>LAST SEEN</Th>
               <Th align="right">DAYS SINCE FIRST</Th>
             </tr>
@@ -210,9 +187,6 @@ export default async function FleetHealthPage({
                   <Td mono dim={r.daysWithData === 0} align="right">
                     {r.daysWithData}
                   </Td>
-                  <Td mono dim={r.hotZoneCells === 0} align="right">
-                    {r.hotZoneCells}
-                  </Td>
                   <Td mono dim={r.lastSampleTs == null}>
                     {fmtAgoFromTs(r.lastSampleTs) ?? "never"}
                   </Td>
@@ -233,7 +207,7 @@ function FlagPill({ flag }: { flag: Row["flag"] }) {
   if (flag === "ok") {
     return <span style={{ color: SS_TOKENS.fg2 }}>—</span>;
   }
-  const color = flag === "silent" ? SS_TOKENS.alert : SS_TOKENS.warn;
+  const color = SS_TOKENS.alert;
   return (
     <span
       className="ss-mono"

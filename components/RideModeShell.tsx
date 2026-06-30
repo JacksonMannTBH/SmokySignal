@@ -7,16 +7,25 @@ import { useRiderPos } from "@/lib/hooks/useRiderPos";
 import { useDeviceHeading } from "@/lib/hooks/useDeviceHeading";
 import {
   classifyRideStatus,
+  DEFAULT_RIDE_STATUS_THRESHOLDS,
   getRideContacts,
+  isSameCardinalTrack,
+  rideStatusLabel,
   rideStatusSeverity,
   type RideContact,
   type RideStatus,
+  type RideStatusThresholds,
 } from "@/lib/ride-mode";
 import {
+  DEFAULT_RIDE_STATUS_NOTIFICATIONS,
+  getRideStatusNotificationPrefs,
+  getRideStatusThresholds,
+  RIDE_STATUS_NOTIFICATIONS_KEY,
+  RIDE_STATUS_THRESHOLDS_KEY,
+  type RideStatusNotificationPrefs,
+} from "@/lib/ride-settings";
+import {
   estimateFuelRemaining,
-  normalizeTailNumber,
-  updateFuelObservationHistory,
-  type FuelObservation,
 } from "@/lib/fuel-estimate";
 import type { Snapshot } from "@/lib/types";
 import { RideCompass } from "./RideCompass";
@@ -43,7 +52,7 @@ type ServiceWorkerNotificationOptions = NotificationOptions & {
 const STATUS_COLORS: Record<RideStatus, string> = {
   clear: "#39d98a",
   watch: "#60a5fa",
-  warning: "#f4c430",
+  warning: "#f6c431",
   danger: "#ff4d4f",
 };
 
@@ -57,7 +66,11 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
   const { pos, unavailable } = useRiderPos();
   const heading = useDeviceHeading(pos?.heading);
   const [now, setNow] = useState(initial.fetched_at);
-  const fuelHistoryRef = useRef<Map<string, FuelObservation[]>>(new Map());
+  const [rideThresholds, setRideThresholds] = useState<RideStatusThresholds>(
+    DEFAULT_RIDE_STATUS_THRESHOLDS,
+  );
+  const [rideNotifications, setRideNotifications] =
+    useState<RideStatusNotificationPrefs>(DEFAULT_RIDE_STATUS_NOTIFICATIONS);
   const notifyRef = useRef<{
     status: RideStatus;
     tail: string | null;
@@ -69,17 +82,25 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
   useRideWakeLock();
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    setRideThresholds(getRideStatusThresholds());
+    setRideNotifications(getRideStatusNotificationPrefs());
+
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === RIDE_STATUS_THRESHOLDS_KEY) {
+        setRideThresholds(getRideStatusThresholds());
+      }
+      if (!event.key || event.key === RIDE_STATUS_NOTIFICATIONS_KEY) {
+        setRideNotifications(getRideStatusNotificationPrefs());
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   useEffect(() => {
-    updateFuelObservationHistory(
-      fuelHistoryRef.current,
-      snap.aircraft,
-      snap.fetched_at,
-    );
-  }, [snap.aircraft, snap.fetched_at]);
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const contacts = useMemo<RideContact[]>(() => {
     if (!pos) return [];
@@ -87,9 +108,12 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
   }, [snap.aircraft, pos, heading.headingDeg]);
 
   const nearest = contacts[0] ?? null;
-  const status = classifyRideStatus(nearest?.distanceNm ?? null);
+  const status = classifyRideStatus(nearest?.distanceNm ?? null, rideThresholds);
+  const statusLabel = rideStatusLabel(status);
   const statusColor = STATUS_COLORS[status];
-  const modeLabel = heading.headingDeg == null ? "North-up" : "Relative";
+  const shouldHighlightTrackingArrow =
+    status === "danger" &&
+    isSameCardinalTrack(nearest?.plane.heading, heading.headingDeg);
   const displayBearing =
     nearest == null
       ? null
@@ -104,35 +128,38 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
         ? "lagging"
         : "fresh";
 
-  useRideNotifications(status, nearest, notifyRef);
+  useRideNotifications(
+    status,
+    nearest,
+    notifyRef,
+    rideNotifications,
+    rideThresholds,
+  );
 
-  const aircraftName = nearest
-    ? nearest.plane.nickname ?? nearest.plane.tail
+  const aircraftLabel = nearest ? formatAircraftLabel(nearest.plane) : null;
+  const nearestSpeedText = nearest
+    ? formatGroundSpeed(nearest.plane.ground_speed_kt)
     : null;
-  const withinFive = nearest != null && nearest.distanceNm <= 5;
+  const nearestSummary = nearest ? formatNearestAircraftSummary(nearest) : null;
+  const withinRideRange =
+    nearest != null && nearest.distanceNm <= rideThresholds.watchNm;
+  const watchRangeText = formatNm(rideThresholds.watchNm);
   const primaryCopy = !pos
     ? unavailable
       ? "Location unavailable"
       : "Waiting for rider location"
-    : withinFive && nearest
-      ? `${aircraftName}: ${nearest.distanceNm.toFixed(1)} nm ${nearest.cardinal}`
-      : "No watched aircraft within 5 nm";
+    : withinRideRange && nearest
+      ? `${aircraftLabel}: ${nearest.distanceNm.toFixed(1)} nm ${nearest.cardinal}${nearestSpeedText ? ` - GS ${nearestSpeedText}` : ""}`
+      : `No tracked aircraft within ${watchRangeText} nm`;
   const secondaryCopy = nearest
-    ? `Nearest watched aircraft: ${nearest.distanceNm.toFixed(1)} nm ${nearest.cardinal}`
+    ? nearestSummary
     : pos
-      ? "No watched aircraft within 5 nm"
+      ? `No tracked aircraft within ${watchRangeText} nm`
       : "Distances show in nm once GPS resolves";
   const nearestFuelText = useMemo(() => {
     if (!nearest) return null;
-    const tail = normalizeTailNumber(nearest.plane.tail);
-    return (
-      estimateFuelRemaining(
-        nearest.plane,
-        now,
-        tail ? fuelHistoryRef.current.get(tail) : undefined,
-      )?.label ?? null
-    );
-  }, [nearest, now]);
+    return estimateFuelRemaining(nearest.plane)?.label ?? null;
+  }, [nearest]);
 
   return (
     <main
@@ -140,17 +167,20 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
         position: "fixed",
         inset: 0,
         zIndex: 60,
+        boxSizing: "border-box",
+        height: "100dvh",
         minHeight: "100dvh",
         padding:
-          "max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom))",
+          "calc(env(safe-area-inset-top, 0px) + clamp(10px, 2.8dvh, 22px)) 18px calc(env(safe-area-inset-bottom, 0px) + clamp(16px, 3.2dvh, 30px))",
         background:
           status === "danger"
             ? "radial-gradient(circle at 50% 20%, rgba(255,77,79,.24), transparent 32%), #020202"
             : "radial-gradient(circle at 50% 18%, rgba(244,196,48,.10), transparent 34%), #020202",
         color: "#f5f2e8",
         display: "grid",
-        gridTemplateRows: "auto 1fr auto",
-        overflow: "hidden",
+        gridTemplateRows: "auto minmax(0, 1fr) auto",
+        overflowY: "auto",
+        overscrollBehavior: "contain",
       }}
     >
       <header
@@ -160,14 +190,14 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
           flexDirection: "column",
           alignItems: "center",
           gap: 8,
-          paddingTop: 6,
+          paddingTop: "clamp(18px, 5.8dvh, 54px)",
         }}
       >
         <div
           aria-live="polite"
           style={{
             color: statusColor,
-            fontSize: "clamp(56px, 17vw, 112px)",
+            fontSize: "clamp(48px, 16vw, 96px)",
             lineHeight: 0.92,
             fontWeight: 950,
             letterSpacing: 0,
@@ -177,12 +207,12 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
                 : `0 0 18px color-mix(in srgb, ${statusColor} 24%, transparent)`,
           }}
         >
-          {status.toUpperCase()}
+          {statusLabel.toUpperCase()}
         </div>
         <div
           style={{
             color: "#f5f2e8",
-            fontSize: "clamp(18px, 5vw, 28px)",
+            fontSize: "clamp(15px, 4.5vw, 18px)",
             lineHeight: 1.12,
             fontWeight: 850,
             maxWidth: 420,
@@ -192,8 +222,8 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
         </div>
         <div
           style={{
-            color: staleLevel === "fresh" ? "#a9a28a" : "#f4c430",
-            fontSize: 13,
+            color: staleLevel === "fresh" ? "#a9a28a" : "#f6c431",
+            fontSize: "clamp(13px, 3.8vw, 16px)",
             fontWeight: 800,
           }}
         >
@@ -208,7 +238,11 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 12,
+          gap: 10,
+          width: "min(100%, 500px)",
+          height: "min(430px, 42dvh)",
+          alignSelf: "center",
+          justifySelf: "center",
           minHeight: 0,
         }}
       >
@@ -216,7 +250,8 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
           status={status}
           contact={nearest}
           displayBearingDeg={displayBearing}
-          modeLabel={modeLabel}
+          clearDistanceNm={rideThresholds.watchNm}
+          highlightTrackingArrow={shouldHighlightTrackingArrow}
         />
         {nearestFuelText && (
           <div
@@ -246,14 +281,14 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 12,
-          paddingBottom: 2,
+          gap: 10,
+          paddingBottom: 0,
         }}
       >
         <div
           style={{
             width: "min(100%, 460px)",
-            padding: "12px 14px",
+            padding: "10px 12px",
             borderRadius: 16,
             border: "1px solid rgba(255,255,255,0.12)",
             background: "rgba(255,255,255,0.06)",
@@ -261,18 +296,14 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
             boxShadow: "0 16px 50px rgba(0,0,0,0.28)",
           }}
         >
-          <div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1.2 }}>
-            {secondaryCopy}
-          </div>
           <div
             style={{
-              marginTop: 5,
-              color: "#a9a28a",
-              fontSize: 12,
-              fontWeight: 800,
+              fontSize: "clamp(17px, 5vw, 20px)",
+              fontWeight: 900,
+              lineHeight: 1.2,
             }}
           >
-            {modeLabel} - ADS-B awareness only
+            {secondaryCopy}
           </div>
         </div>
         <button
@@ -281,11 +312,11 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
           aria-label="End Ride and return to the main app"
           style={{
             width: "min(100%, 460px)",
-            minHeight: 56,
+            minHeight: 54,
             borderRadius: 18,
-            border: "1px solid #ffffff",
-            background: "#ffffff",
-            color: "#050505",
+            border: "1px solid #f6c431",
+            background: "#050505",
+            color: "#f6c431",
             fontFamily: "inherit",
             fontSize: 18,
             fontWeight: 900,
@@ -366,6 +397,8 @@ function useRideNotifications(
     distanceNm: number | null;
     ts: number;
   } | null>,
+  notificationPrefs: RideStatusNotificationPrefs,
+  thresholds: RideStatusThresholds,
 ) {
   useEffect(() => {
     const now = Date.now();
@@ -393,18 +426,21 @@ function useRideNotifications(
       (severityChanged || tailChanged || distanceChanged) &&
       (severity > 0 || prevSeverity > 0)
     ) {
-      void postRideNotification(status, nearest);
+      if (notificationPrefs[status]) {
+        void postRideNotification(status, nearest, thresholds);
+      }
       ref.current = { status, tail, distanceNm, ts: now };
       return;
     }
 
     ref.current = { status, tail, distanceNm, ts: prev.ts };
-  }, [nearest, ref, status]);
+  }, [nearest, notificationPrefs, ref, status, thresholds]);
 }
 
 async function postRideNotification(
   status: RideStatus,
   nearest: RideContact | null,
+  thresholds: RideStatusThresholds,
 ) {
   if (typeof window === "undefined") return;
   if (typeof Notification === "undefined") return;
@@ -413,15 +449,15 @@ async function postRideNotification(
   const reg = await navigator.serviceWorker.getRegistration();
   if (!reg) return;
 
-  const label = status.toUpperCase();
+  const label = rideStatusLabel(status).toUpperCase();
   const title =
     status === "clear" || !nearest
-      ? "Clear - No watched aircraft within 5 nm"
-      : `${label} - ${nearest.plane.nickname ?? nearest.plane.tail} ${nearest.distanceNm.toFixed(1)} nm ${nearest.cardinal}`;
+      ? `Clear - No tracked aircraft within ${formatNm(thresholds.watchNm)} nm`
+      : `${label} - ${formatAircraftLabel(nearest.plane)} ${nearest.distanceNm.toFixed(1)} nm ${nearest.cardinal}`;
   const options: ServiceWorkerNotificationOptions = {
     body: "ADS-B awareness only.",
-    icon: "/icons/washington-eye-logo.svg",
-    badge: "/icons/favicon.svg",
+    icon: "/icons/out-of-sight-icon-192.png",
+    badge: "/icons/out-of-sight-favicon-96.png",
     tag: "ride-mode-status",
     renotify: status === "warning" || status === "danger",
     data: { url: "/ride", kind: "ride-mode", status },
@@ -433,10 +469,49 @@ async function postRideNotification(
   }
 }
 
+function formatNm(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatAircraftLabel(plane: { tail: string; nickname?: string | null }): string {
+  return plane.nickname ? `${plane.tail} - ${plane.nickname}` : plane.tail;
+}
+
+function formatNearestAircraftSummary(contact: RideContact): string {
+  const aircraftType = aircraftTypeLabel(contact.plane.model);
+  const direction = cardinal4FromDeg(contact.bearingDeg);
+  const speed = formatGroundSpeed(contact.plane.ground_speed_kt) ?? "-- kt";
+  return `${aircraftType}: ${contact.plane.tail} - ${contact.distanceNm.toFixed(1)} nm ${direction} - GS ${speed}`;
+}
+
+function aircraftTypeLabel(model: string | null | undefined): "Helicopter" | "Plane" {
+  if (!model) return "Plane";
+  return /\b(Bell|UH-|Hughes|Eurocopter|Airbus AS|AS350|H125|H135|H145|MD|JetRanger|Iroquois|Dolphin)\b/i.test(
+    model,
+  )
+    ? "Helicopter"
+    : "Plane";
+}
+
+function cardinal4FromDeg(deg: number): "N" | "E" | "S" | "W" {
+  const normalized = ((deg % 360) + 360) % 360;
+  if (normalized >= 45 && normalized < 135) return "E";
+  if (normalized >= 135 && normalized < 225) return "S";
+  if (normalized >= 225 && normalized < 315) return "W";
+  return "N";
+}
+
 function formatAge(ageMs: number): string {
   const seconds = Math.max(0, Math.floor(ageMs / 1000));
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   return `${Math.floor(minutes / 60)}h ago`;
+}
+
+function formatGroundSpeed(value: number | null | undefined): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return `${Math.round(value)} kt`;
 }

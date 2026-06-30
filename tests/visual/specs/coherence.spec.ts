@@ -91,34 +91,34 @@ test("coherence: home pill tier matches /api/aircraft", async ({ page }, testInf
   await page.waitForTimeout(1500);
   const heroText = (await page.locator("h1").first().innerText().catch(() => "")).toUpperCase();
   const fleet = snap?.aircraft ?? [];
-  const anySmokeyUp = fleet.some((a) => a.airborne && a.role === "smokey");
+  const anyBirdUp = fleet.some((a) => a.airborne && a.role === "smokey");
   const anyAlertUp = fleet.some(
     (a) => a.airborne && (a.role === "patrol" || a.role === "unknown"),
   );
   const violations: unknown[] = [];
-  if (anySmokeyUp && !/SMOKEY/i.test(heroText)) {
+  if (anyBirdUp && !/BIRD/i.test(heroText)) {
     violations.push({
       bug: `smokey is airborne but home headline reads "${heroText}"`,
-      expected: "SMOKEY UP / Smokey's up",
+      expected: "BIRD UP / Eye In The Sky",
     });
   } else if (
-    !anySmokeyUp &&
+    !anyBirdUp &&
     anyAlertUp &&
-    !/SMOKEY/i.test(heroText)
+    !/BIRD/i.test(heroText)
   ) {
-    // Smokey umbrella: patrol/unknown alert-tier also reads SMOKEY UP.
+    // Bird umbrella: patrol/unknown alert-tier also reads BIRD UP.
     violations.push({
       bug: `patrol/unknown is airborne but home headline reads "${heroText}"`,
-      expected: "SMOKEY UP",
+      expected: "BIRD UP",
     });
   } else if (
-    !anySmokeyUp &&
+    !anyBirdUp &&
     !anyAlertUp &&
     !/CLEAR|DOWN|QUIET/i.test(heroText)
   ) {
     violations.push({
       bug: `nothing alert-tier is airborne but headline reads "${heroText}"`,
-      expected: "ALL CLEAR / Smokey's down",
+      expected: "ALL CLEAR / No Eyes",
     });
   }
   writeViolations("home-pill-tier", violations);
@@ -194,8 +194,8 @@ test("coherence: time-ago labels are non-negative", async ({ page }, testInfo) =
   writeViolations("time-coherence", violations);
 });
 
-// ASSERT 6: hot-zone toggle is present + interactive on /radar
-test("coherence: radar hot-zone toggle reflects state", async ({ page }, testInfo) => {
+// ASSERT 6: radar layer controls are present + interactive on /radar
+test("coherence: radar layer controls reflect state", async ({ page }, testInfo) => {
   if (testInfo.project.name !== "chromium-desktop") test.skip();
   try {
     await page.goto("/radar", { waitUntil: "networkidle" });
@@ -204,11 +204,12 @@ test("coherence: radar hot-zone toggle reflects state", async ({ page }, testInf
     return;
   }
   await page.waitForTimeout(3000);
-  const buttons = await page.locator("button").allTextContents();
-  const hasHotZone = buttons.some((b) => /hot\s*zone/i.test(b));
-  const violations = hasHotZone
-    ? []
-    : [{ bug: "hot-zone toggle button not found on /radar" }];
+  const rings = await page.locator('button[aria-label*="distance rings" i]').count();
+  const paths = await page.locator('button[aria-label*="flight paths" i]').count();
+  const violations = [
+    ...(rings > 0 ? [] : [{ bug: "distance-rings toggle not found on /radar" }]),
+    ...(paths > 0 ? [] : [{ bug: "flight-paths toggle not found on /radar" }]),
+  ];
   writeViolations("radar-toggle", violations);
 });
 
@@ -227,8 +228,8 @@ test("coherence: /api/badge.svg matches home pill", async ({ request, page }, te
   }
   const svg = await r.text();
   const violations: unknown[] = [];
-  if (/SMOKEY/i.test(heroText) && !/SMOKEY/i.test(svg)) {
-    violations.push({ bug: "home shows SMOKEY but badge.svg does not" });
+  if (/BIRD/i.test(heroText) && !/BIRD/i.test(svg)) {
+    violations.push({ bug: "home shows BIRD but badge.svg does not" });
   } else if (
     /CLEAR|DOWN/i.test(heroText) &&
     !/(CLEAR|DOWN|QUIET|UP)/i.test(svg)

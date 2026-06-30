@@ -117,7 +117,7 @@ export function AlertsOptInCard() {
           margin: 0,
         }}
       >
-        Want a ping when Smokey&rsquo;s up?
+        Want a ping when Bird&rsquo;s up?
       </h3>
       <p
         style={{

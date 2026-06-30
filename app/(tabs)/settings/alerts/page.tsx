@@ -2,8 +2,8 @@ import { AlertsSettings } from "@/components/AlertsSettings";
 import { ResetPreferencesButton } from "@/components/ResetPreferencesButton";
 
 export const metadata = {
-  title: "Alerts",
-  description: "Get a ping when the bird's up.",
+  title: "Settings",
+  description: "Tune Out Of Sight alerts, zones, and device preferences.",
 };
 
 export const dynamic = "force-dynamic";
@@ -14,13 +14,17 @@ const SECTION_WRAP = {
   padding: "0 18px",
 } as const;
 
+const PAGE_WRAP = {
+  minHeight: "calc(100dvh + 1228px)",
+} as const;
+
 export default async function AlertsPage() {
   return (
-    <>
+    <div style={PAGE_WRAP}>
       <AlertsSettings />
       <div style={{ ...SECTION_WRAP, marginBottom: 80 }}>
         <ResetPreferencesButton />
       </div>
-    </>
+    </div>
   );
 }

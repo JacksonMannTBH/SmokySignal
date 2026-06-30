@@ -15,8 +15,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Out Of Sight";
   const options = {
     body: payload.body || "",
-    icon: "/icons/washington-eye-logo.svg",
-    badge: "/icons/favicon.svg",
+    icon: "/icons/out-of-sight-icon-192.png",
+    badge: "/icons/out-of-sight-favicon-96.png",
     tag: payload.tag || "smokey",
     renotify: false,
     data: payload.data || {},

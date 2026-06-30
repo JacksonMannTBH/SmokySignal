@@ -137,6 +137,48 @@ export type RecentFlightForTail = {
 };
 
 /**
+ * Average ground speed for a flight's available track samples, in knots.
+ * Uses time-weighted trapezoids when consecutive samples have speed + time;
+ * falls back to a plain sample average for sparse/partial data.
+ */
+export function averageGroundSpeedKt(points: TrackPoint[]): number | null {
+  const validSpeeds = points
+    .map((p) => p.spd)
+    .filter(
+      (spd): spd is number =>
+        typeof spd === "number" && Number.isFinite(spd) && spd >= 0,
+    );
+  if (validSpeeds.length === 0) return null;
+
+  let weightedSpeedSeconds = 0;
+  let totalSeconds = 0;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]!;
+    const curr = points[i]!;
+    if (
+      typeof prev.spd !== "number" ||
+      typeof curr.spd !== "number" ||
+      !Number.isFinite(prev.spd) ||
+      !Number.isFinite(curr.spd) ||
+      prev.spd < 0 ||
+      curr.spd < 0
+    ) {
+      continue;
+    }
+    const dt = curr.ts - prev.ts;
+    if (!Number.isFinite(dt) || dt <= 0) continue;
+    weightedSpeedSeconds += ((prev.spd + curr.spd) / 2) * dt;
+    totalSeconds += dt;
+  }
+
+  if (totalSeconds > 0) {
+    return weightedSpeedSeconds / totalSeconds;
+  }
+
+  return validSpeeds.reduce((sum, spd) => sum + spd, 0) / validSpeeds.length;
+}
+
+/**
  * Most recent flight session for a single tail, with its track points
  * for rendering. Walks back through the daily track keys and returns
  * the last session found. The newest session of the newest day with

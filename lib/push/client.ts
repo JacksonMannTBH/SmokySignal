@@ -187,9 +187,9 @@ export async function showLocalTestNotification(): Promise<boolean> {
     if (!reg) return false;
     if (Notification.permission !== "granted") return false;
     await reg.showNotification("Out Of Sight · test", {
-      body: "Channel 19. Test ping. 10-4.",
-      icon: "/icons/washington-eye-logo.svg",
-      badge: "/icons/favicon.svg",
+      body: "",
+      icon: "/icons/out-of-sight-icon-192.png",
+      badge: "/icons/out-of-sight-favicon-96.png",
       tag: "smokey-test",
       data: { url: "/settings/alerts" },
     });

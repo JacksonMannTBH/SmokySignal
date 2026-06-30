@@ -1,214 +1,228 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import type { MouseEvent, ReactNode } from "react";
+import { useRideLaunchPreflight } from "@/lib/hooks/useRideLaunchPreflight";
 import { SS_TOKENS } from "@/lib/tokens";
-import type { ReactNode } from "react";
 
-const TABS: { id: string; label: string; href: string; icon: ReactNode }[] = [
-  { id: "home", label: "Home", href: "/", icon: <HomeIcon /> },
-  { id: "radar", label: "Radar", href: "/radar", icon: <RadarIcon /> },
-  { id: "dash", label: "Dash", href: "/dash", icon: <DashIcon /> },
-  { id: "activity", label: "Activity", href: "/activity", icon: <ActivityIcon /> },
-  { id: "alerts", label: "Alerts", href: "/settings/alerts", icon: <AlertsIcon /> },
-  { id: "about", label: "About", href: "/about", icon: <InfoIcon /> },
+type TabItem = {
+  id: string;
+  label: string;
+  href: string;
+  activePaths: string[];
+  icon: ReactNode;
+};
+
+const TABS: TabItem[] = [
+  {
+    id: "home",
+    label: "Home",
+    href: "/dash",
+    activePaths: ["/", "/dash"],
+    icon: <HomeIcon />,
+  },
+  {
+    id: "radar",
+    label: "Radar",
+    href: "/radar",
+    activePaths: ["/radar"],
+    icon: <RadarIcon />,
+  },
+  {
+    id: "ride",
+    label: "Ride",
+    href: "/ride",
+    activePaths: ["/ride"],
+    icon: <RideIcon />,
+  },
 ];
 
 export function TabBar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const runRideLaunchPreflight = useRideLaunchPreflight();
+  const [rideBusy, setRideBusy] = useState(false);
+  const rideHref = useMemo(() => {
+    const mock = searchParams.get("mock");
+    return mock ? `/ride?mock=${encodeURIComponent(mock)}` : "/ride";
+  }, [searchParams]);
+
+  const onRideClick = async (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    if (rideBusy) return;
+    setRideBusy(true);
+    await runRideLaunchPreflight();
+    router.push(rideHref);
+  };
+
   return (
-    <nav
-      aria-label="Main"
-      style={{
-        position: "fixed",
-        left: "max(12px, env(safe-area-inset-left))",
-        right: "max(12px, env(safe-area-inset-right))",
-        bottom: "max(12px, env(safe-area-inset-bottom))",
-        display: "flex",
-        justifyContent: "space-around",
-        maxWidth: 560,
-        margin: "0 auto",
-        padding: "7px",
-        background: SS_TOKENS.surfaceTranslucent,
-        backdropFilter: "blur(24px) saturate(1.15)",
-        WebkitBackdropFilter: "blur(24px) saturate(1.15)",
-        border: `.5px solid ${SS_TOKENS.hairline2}`,
-        borderRadius: 28,
-        boxShadow: SS_TOKENS.shadowLg,
-        zIndex: 50,
-      }}
-    >
-      {TABS.map((t) => {
-        const active = isActive(pathname, t.href);
-        return (
-          <Link
-            key={t.id}
-            href={t.href}
-            prefetch
-            aria-current={active ? "page" : undefined}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              padding: "7px 10px",
-              minWidth: 56,
-              minHeight: 44,
-              color: active ? SS_TOKENS.fg0 : SS_TOKENS.fg2,
-              background: active ? "rgba(244,196,48,0.18)" : "transparent",
-              borderRadius: 22,
-              textDecoration: "none",
-              touchAction: "manipulation",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            <span style={{ fontSize: 18, lineHeight: 1, display: "flex" }}>
-              {t.icon}
-            </span>
-            <span
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: "calc(96px + env(safe-area-inset-bottom, 0px))",
+          background:
+            "linear-gradient(180deg, rgba(5,6,7,0), rgba(5,6,7,0.94) 34%, #050607 100%)",
+          pointerEvents: "none",
+          zIndex: 49,
+        }}
+      />
+      <nav
+        aria-label="Main"
+        style={{
+          position: "fixed",
+          left: "max(12px, env(safe-area-inset-left))",
+          right: "max(12px, env(safe-area-inset-right))",
+          bottom: "max(8px, env(safe-area-inset-bottom))",
+          boxSizing: "border-box",
+          maxWidth: 390,
+          margin: "0 auto",
+          minHeight: "clamp(60px, 15vw, 66px)",
+          padding: "6px clamp(8px, 2.8vw, 12px)",
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          alignItems: "center",
+          gap: 6,
+          background: "rgba(9, 10, 10, 0.96)",
+          border: "1px solid rgba(255, 255, 255, 0.18)",
+          borderRadius: "clamp(18px, 5vw, 22px)",
+          boxShadow: "0 14px 38px rgba(0, 0, 0, 0.52)",
+          backdropFilter: "blur(18px) saturate(1.1)",
+          WebkitBackdropFilter: "blur(18px) saturate(1.1)",
+          zIndex: 50,
+        }}
+      >
+        {TABS.map((tab) => {
+          const href = tab.id === "ride" ? rideHref : tab.href;
+          const active = tab.activePaths.some((path) =>
+            path === "/"
+              ? pathname === "/"
+              : pathname === path || pathname.startsWith(`${path}/`),
+          );
+          return (
+            <Link
+              key={tab.id}
+              href={href}
+              prefetch={tab.id === "ride" ? false : undefined}
+              onClick={tab.id === "ride" ? onRideClick : undefined}
+              aria-label={tab.label}
+              aria-current={active ? "page" : undefined}
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 0,
+                minHeight: "clamp(44px, 11.5vw, 48px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+                color: active ? SS_TOKENS.alert : SS_TOKENS.fg3,
+                textDecoration: "none",
+                touchAction: "manipulation",
+                WebkitTapHighlightColor: "transparent",
+                opacity: tab.id === "ride" && rideBusy ? 0.72 : 1,
               }}
             >
-              {t.label}
-            </span>
-          </Link>
-        );
-      })}
-    </nav>
+              <span
+                aria-hidden
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  background: active ? SS_TOKENS.alert : "transparent",
+                  boxShadow: active ? `0 0 10px ${SS_TOKENS.alert}` : undefined,
+                }}
+              />
+              <span
+                style={{
+                  display: "flex",
+                  color: "currentColor",
+                  lineHeight: 1,
+                }}
+              >
+                {tab.icon}
+              </span>
+              <span
+                style={{
+                  fontSize: "clamp(10px, 2.8vw, 11px)",
+                  fontWeight: 700,
+                  letterSpacing: 0,
+                  lineHeight: 1,
+                }}
+              >
+                {tab.label}
+              </span>
+              <span
+                aria-hidden
+                style={{
+                  width: active ? 18 : 0,
+                  height: 2,
+                  borderRadius: 999,
+                  background: active ? SS_TOKENS.alert : "transparent",
+                }}
+              />
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 }
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(href + "/");
-}
-
-// Lucide-style "home" icon — house outline.
 function HomeIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="24"
+      height="24"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="currentColor"
+      aria-hidden
     >
-      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <path d="M9 22V12h6v10" />
+      <path d="M3.2 11.2 12 3.6l8.8 7.6v8.3c0 .8-.7 1.5-1.5 1.5h-4.5v-6.2H9.2V21H4.7c-.8 0-1.5-.7-1.5-1.5v-8.3Z" />
     </svg>
   );
 }
 
-// Lucide-style "activity" icon — stack of horizontal lines (changelog feel).
-function ActivityIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 6H8" />
-      <path d="M21 12H8" />
-      <path d="M21 18H8" />
-      <circle cx="4" cy="6" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="4" cy="12" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="4" cy="18" r="1.4" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-// Lucide-style "info" icon — circle with i.
-function InfoIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 16v-4" />
-      <path d="M12 8h.01" />
-    </svg>
-  );
-}
-
-// Lucide-style "gauge" icon — at-a-glance dashboard summary.
-function DashIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m12 14 4-4" />
-      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
-    </svg>
-  );
-}
-
-// Lucide-style "radar" icon — concentric arcs + sweep.
 function RadarIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="25"
+      height="25"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden
     >
-      <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34" />
-      <path d="M4 6h.01" />
-      <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35" />
-      <path d="M16.24 7.76A6 6 0 1 0 17.91 12" />
-      <path d="M12 18h.01" />
-      <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67" />
-      <circle cx="12" cy="12" r="2" />
-      <path d="m13.41 10.59 5.66-5.66" />
+      <circle cx="12" cy="12" r="9" opacity="0.55" />
+      <circle cx="12" cy="12" r="5.2" opacity="0.75" />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <path d="M12 12 19.2 5.6" />
     </svg>
   );
 }
 
-// Lucide-style "bell-ring" icon for alert settings.
-function AlertsIcon() {
+function RideIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="25"
+      height="25"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.9"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden
     >
-      <path d="M10.27 21a2 2 0 0 0 3.46 0" />
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-      <path d="M4 2C2.8 3.1 2 4.7 2 6.5" />
-      <path d="M22 6.5c0-1.8-.8-3.4-2-4.5" />
+      <path d="m21 3-7.1 18-3.5-7.4L3 10.1 21 3Z" />
     </svg>
   );
 }

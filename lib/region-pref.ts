@@ -14,9 +14,16 @@ export const REGION_CHANGE_EVENT = "ss-region-change";
 // into East WA. Returning riders with persisted legacy values get
 // transparently migrated on read.
 const LEGACY_MAP: Record<string, RegionId> = {
-  pierce: "puget_sound",
-  snohomish: "puget_sound",
-  spokane: "east_wa",
+  pierce: "wa_puget_sound",
+  snohomish: "wa_puget_sound",
+  spokane: "wa_east",
+  puget_sound: "wa_puget_sound",
+  north_sound: "wa_puget_sound",
+  olympic: "wa_olympic",
+  sw_wa: "wa_sw",
+  central_wa: "wa_central",
+  east_wa: "wa_east",
+  all_wa: "wa_puget_sound",
 };
 
 export function getRegion(): RegionId {
@@ -56,7 +63,21 @@ export function setRegion(id: RegionId): void {
     window.dispatchEvent(
       new CustomEvent(REGION_CHANGE_EVENT, { detail: { id } }),
     );
+    void syncPushRegionPreference(id);
   } catch {
     /* localStorage may be disabled in some contexts (private mode) */
+  }
+}
+
+async function syncPushRegionPreference(id: RegionId): Promise<void> {
+  try {
+    const { getCurrentSubscriptionId, updatePushPrefs } = await import(
+      "./push/client"
+    );
+    const subId = await getCurrentSubscriptionId();
+    if (!subId) return;
+    await updatePushPrefs(subId, { region_id: id });
+  } catch {
+    /* best-effort: local region changes should never fail because push sync did */
   }
 }

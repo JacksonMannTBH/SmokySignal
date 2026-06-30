@@ -3,6 +3,12 @@ import type { Aircraft, FleetRole } from "./types";
 
 export type RideStatus = "clear" | "watch" | "warning" | "danger";
 
+export type RideStatusThresholds = {
+  watchNm: number;
+  warningNm: number;
+  stopNm: number;
+};
+
 export type RideContact = {
   plane: Aircraft;
   distanceNm: number;
@@ -16,6 +22,23 @@ export const RIDE_ALERT_ROLES: ReadonlySet<FleetRole> = new Set([
   "patrol",
   "unknown",
 ]);
+
+export const DEFAULT_RIDE_STATUS_THRESHOLDS: RideStatusThresholds = {
+  watchNm: 5,
+  warningNm: 3,
+  stopNm: 1,
+};
+
+export const RIDE_STATUS_LABELS: Record<RideStatus, string> = {
+  clear: "Clear",
+  watch: "Watch",
+  warning: "Warning",
+  danger: "Stop",
+};
+
+const MIN_RIDE_NM = 0.1;
+const MAX_RIDE_NM = 50;
+const MIN_RIDE_GAP_NM = 0.1;
 
 export function normalizeDeg(degrees: number): number {
   return ((degrees % 360) + 360) % 360;
@@ -50,11 +73,60 @@ export function cardinalFromDeg(degrees: number): string {
   return labels[index]!;
 }
 
-export function classifyRideStatus(distanceNm: number | null): RideStatus {
-  if (distanceNm == null || distanceNm > 5) return "clear";
-  if (distanceNm <= 1) return "danger";
-  if (distanceNm <= 3) return "warning";
+export function cardinalTrackFromDeg(degrees: number | null | undefined): "N" | "E" | "S" | "W" | null {
+  if (typeof degrees !== "number" || !Number.isFinite(degrees)) return null;
+  const labels = ["N", "E", "S", "W"] as const;
+  const index = Math.round(normalizeDeg(degrees) / 90) % labels.length;
+  return labels[index]!;
+}
+
+export function isSameCardinalTrack(
+  aircraftHeadingDeg: number | null | undefined,
+  riderHeadingDeg: number | null | undefined,
+): boolean {
+  const aircraftTrack = cardinalTrackFromDeg(aircraftHeadingDeg);
+  const riderTrack = cardinalTrackFromDeg(riderHeadingDeg);
+  return aircraftTrack != null && aircraftTrack === riderTrack;
+}
+
+export function normalizeRideStatusThresholds(
+  thresholds?: Partial<RideStatusThresholds> | null,
+): RideStatusThresholds {
+  const stopNm = clampNm(
+    thresholds?.stopNm,
+    DEFAULT_RIDE_STATUS_THRESHOLDS.stopNm,
+    MIN_RIDE_NM,
+    MAX_RIDE_NM - MIN_RIDE_GAP_NM * 2,
+  );
+  const warningNm = clampNm(
+    thresholds?.warningNm,
+    DEFAULT_RIDE_STATUS_THRESHOLDS.warningNm,
+    stopNm + MIN_RIDE_GAP_NM,
+    MAX_RIDE_NM - MIN_RIDE_GAP_NM,
+  );
+  const watchNm = clampNm(
+    thresholds?.watchNm,
+    DEFAULT_RIDE_STATUS_THRESHOLDS.watchNm,
+    warningNm + MIN_RIDE_GAP_NM,
+    MAX_RIDE_NM,
+  );
+
+  return { watchNm, warningNm, stopNm };
+}
+
+export function classifyRideStatus(
+  distanceNm: number | null,
+  thresholds: RideStatusThresholds = DEFAULT_RIDE_STATUS_THRESHOLDS,
+): RideStatus {
+  const t = normalizeRideStatusThresholds(thresholds);
+  if (distanceNm == null || distanceNm > t.watchNm) return "clear";
+  if (distanceNm <= t.stopNm) return "danger";
+  if (distanceNm <= t.warningNm) return "warning";
   return "watch";
+}
+
+export function rideStatusLabel(status: RideStatus): string {
+  return RIDE_STATUS_LABELS[status];
 }
 
 export function rideStatusSeverity(status: RideStatus): number {
@@ -68,6 +140,18 @@ export function rideStatusSeverity(status: RideStatus): number {
     case "clear":
       return 0;
   }
+}
+
+function clampNm(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const raw = typeof value === "number" ? value : Number(value);
+  const n = Number.isFinite(raw) ? raw : fallback;
+  const clamped = Math.max(min, Math.min(max, n));
+  return Math.round(clamped * 10) / 10;
 }
 
 export function isRideRelevantAircraft(

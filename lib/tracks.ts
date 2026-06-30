@@ -1,6 +1,5 @@
-// Position-history time-series in Upstash KV. Internal-only — there's no
-// public endpoint surfacing this yet. Foundation for Phase 4 hot-zone
-// learning and the orbit glyph on the plane detail screen.
+// Position-history time-series in Upstash KV. Powers recent aircraft
+// trails, flight details, and forecast learning.
 //
 // Storage shape:
 //   tracks:{tail}:{YYYYMMDD}  →  Redis list of compact JSON strings
@@ -11,7 +10,7 @@
 import { getRedis } from "./cache";
 import { recordFirstSampleIfMissing } from "./learning";
 import { recordLastSample } from "./freshness";
-import { trackKey, trackScanPattern } from "./storage-keys";
+import { liveTrackKey, trackKey, trackScanPattern } from "./storage-keys";
 import type { Snapshot } from "./types";
 
 export type TrackPoint = {
@@ -24,8 +23,30 @@ export type TrackPoint = {
 };
 
 const TTL_SECONDS = 35 * 24 * 60 * 60; // 35 days
+const LIVE_TRACK_WINDOW_SECONDS = 60 * 60;
+const LIVE_TRACK_TTL_SECONDS = 70 * 60;
+const LIVE_TRACK_MAX_POINTS = 140;
+export const CURRENT_FLIGHT_GAP_SECONDS = 60 * 60;
+const CURRENT_FLIGHT_LOOKBACK_DAYS = 3;
+
+export type CurrentFlightDuration = {
+  elapsedMinutes: number;
+  startedAtMs: number;
+  lastSampleMs: number;
+  sampleCount: number;
+};
+
+export type CurrentFlightTrack = {
+  points: TrackPoint[];
+  startedAtMs: number;
+  lastSampleMs: number;
+};
 
 const memoryTracks = new Map<
+  string,
+  { points: TrackPoint[]; expiresAt: number }
+>();
+const memoryLiveTracks = new Map<
   string,
   { points: TrackPoint[]; expiresAt: number }
 >();
@@ -65,44 +86,86 @@ export async function logTracks(snap: Snapshot): Promise<void> {
   if (!redis) {
     for (const a of points) {
       const key = trackKey(a.tail, date);
+      const point = trackPointForAircraft(a, tsSec);
       const entry = memoryTracks.get(key) ?? {
         points: [],
         expiresAt: Date.now() + TTL_SECONDS * 1000,
       };
-      entry.points.push({
-        lat: a.lat as number,
-        lon: a.lon as number,
-        alt: a.altitude_ft ?? null,
-        spd: a.ground_speed_kt ?? null,
-        trk: a.heading ?? null,
-        ts: tsSec,
-      });
+      entry.points.push(point);
       entry.expiresAt = Date.now() + TTL_SECONDS * 1000;
       memoryTracks.set(key, entry);
+      appendMemoryLiveTrack(a.tail, point);
     }
     pruneMemoryTracks();
+    pruneMemoryLiveTracks();
     return;
   }
 
   const writes = points.map(async (a) => {
     const key = trackKey(a.tail, date);
-    const point: TrackPoint = {
-      lat: a.lat as number,
-      lon: a.lon as number,
-      alt: a.altitude_ft ?? null,
-      spd: a.ground_speed_kt ?? null,
-      trk: a.heading ?? null,
-      ts: tsSec,
-    };
+    const point = trackPointForAircraft(a, tsSec);
     try {
       await redis.rpush(key, JSON.stringify(point));
       await redis.expire(key, TTL_SECONDS);
+      await appendRedisLiveTrack(redis, a.tail, point);
     } catch (e) {
       console.warn(`[tracks] rpush failed for ${a.tail}:`, e);
     }
   });
 
   await Promise.allSettled(writes);
+}
+
+function trackPointForAircraft(
+  aircraft: Snapshot["aircraft"][number],
+  tsSec: number,
+): TrackPoint {
+  return {
+    lat: aircraft.lat as number,
+    lon: aircraft.lon as number,
+    alt: aircraft.altitude_ft ?? null,
+    spd: aircraft.ground_speed_kt ?? null,
+    trk: aircraft.heading ?? null,
+    ts: tsSec,
+  };
+}
+
+function appendMemoryLiveTrack(tail: string, point: TrackPoint): void {
+  const key = liveTrackKey(tail);
+  const cutoff = point.ts - LIVE_TRACK_WINDOW_SECONDS;
+  const entry = memoryLiveTracks.get(key) ?? {
+    points: [],
+    expiresAt: Date.now() + LIVE_TRACK_TTL_SECONDS * 1000,
+  };
+  entry.points = [...entry.points, point]
+    .filter((p) => p.ts >= cutoff)
+    .slice(-LIVE_TRACK_MAX_POINTS);
+  entry.expiresAt = Date.now() + LIVE_TRACK_TTL_SECONDS * 1000;
+  memoryLiveTracks.set(key, entry);
+}
+
+async function appendRedisLiveTrack(
+  redis: NonNullable<Awaited<ReturnType<typeof getRedis>>>,
+  tail: string,
+  point: TrackPoint,
+): Promise<void> {
+  const key = liveTrackKey(tail);
+  const cutoff = point.ts - LIVE_TRACK_WINDOW_SECONDS;
+  await redis.rpush(key, JSON.stringify(point));
+  const raw = (await redis.lrange(key, 0, -1)) as unknown[];
+  const kept = raw
+    .map((s) => safeParse(s))
+    .filter((p): p is TrackPoint => p !== null && p.ts >= cutoff)
+    .sort((a, b) => a.ts - b.ts)
+    .slice(-LIVE_TRACK_MAX_POINTS);
+
+  if (kept.length !== raw.length) {
+    await redis.del(key);
+    if (kept.length > 0) {
+      await redis.rpush(key, ...kept.map((p) => JSON.stringify(p)));
+    }
+  }
+  await redis.expire(key, LIVE_TRACK_TTL_SECONDS);
 }
 
 /** Sorted list of YYYYMMDD dates that have tracks for this tail (newest first). */
@@ -155,6 +218,110 @@ export async function getTracksForDay(
   return raw
     .map((s) => safeParse(s))
     .filter((p): p is TrackPoint => p !== null);
+}
+
+export function getCurrentFlightDurationFromPoints(
+  points: TrackPoint[],
+  nowMs = Date.now(),
+  gapSeconds = CURRENT_FLIGHT_GAP_SECONDS,
+): CurrentFlightDuration | null {
+  const track = getCurrentFlightTrackFromPoints(points, nowMs, gapSeconds);
+  if (!track) return null;
+  return {
+    elapsedMinutes: Math.max(0, Math.floor((nowMs - track.startedAtMs) / 60_000)),
+    startedAtMs: track.startedAtMs,
+    lastSampleMs: track.lastSampleMs,
+    sampleCount: track.points.length,
+  };
+}
+
+export function getCurrentFlightTrackFromPoints(
+  points: TrackPoint[],
+  nowMs = Date.now(),
+  gapSeconds = CURRENT_FLIGHT_GAP_SECONDS,
+): CurrentFlightTrack | null {
+  const sorted = points
+    .filter((p) => Number.isFinite(p.ts))
+    .sort((a, b) => a.ts - b.ts);
+  const latest = sorted[sorted.length - 1];
+  if (!latest) return null;
+
+  const gapMs = gapSeconds * 1000;
+  const latestMs = latest.ts * 1000;
+  if (Math.abs(nowMs - latestMs) > gapMs) return null;
+
+  const session: TrackPoint[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const point = sorted[i]!;
+    session.unshift(point);
+    const prev = sorted[i - 1];
+    if (!prev) break;
+    if (point.ts - prev.ts > gapSeconds) break;
+  }
+
+  const first = session[0];
+  if (!first) return null;
+  return {
+    points: session,
+    startedAtMs: first.ts * 1000,
+    lastSampleMs: latestMs,
+  };
+}
+
+export async function getCurrentFlightDuration(
+  tail: string,
+  nowMs = Date.now(),
+): Promise<CurrentFlightDuration | null> {
+  const track = await getCurrentFlightTrack(tail, nowMs);
+  if (!track) return null;
+  return {
+    elapsedMinutes: Math.max(0, Math.floor((nowMs - track.startedAtMs) / 60_000)),
+    startedAtMs: track.startedAtMs,
+    lastSampleMs: track.lastSampleMs,
+    sampleCount: track.points.length,
+  };
+}
+
+export async function getCurrentFlightTrack(
+  tail: string,
+  nowMs = Date.now(),
+): Promise<CurrentFlightTrack | null> {
+  const dates = (await listTrackKeys(tail)).slice(0, CURRENT_FLIGHT_LOOKBACK_DAYS);
+  if (dates.length === 0) return null;
+
+  const points: TrackPoint[] = [];
+  for (const date of dates) {
+    points.push(...(await getTracksForDay(tail, date)));
+  }
+  return getCurrentFlightTrackFromPoints(points, nowMs);
+}
+
+export async function getLiveTrackWindow(
+  tail: string,
+  nowMs = Date.now(),
+  windowSeconds = LIVE_TRACK_WINDOW_SECONDS,
+): Promise<TrackPoint[]> {
+  const cutoffSec = Math.floor(nowMs / 1000) - windowSeconds;
+  const key = liveTrackKey(tail);
+  const redis = await getRedis();
+  if (!redis) {
+    pruneMemoryLiveTracks();
+    return (memoryLiveTracks.get(key)?.points ?? [])
+      .filter((p) => p.ts >= cutoffSec)
+      .sort((a, b) => a.ts - b.ts);
+  }
+
+  let raw: unknown[] = [];
+  try {
+    raw = (await redis.lrange(key, 0, -1)) as unknown[];
+  } catch {
+    return [];
+  }
+
+  return raw
+    .map((s) => safeParse(s))
+    .filter((p): p is TrackPoint => p !== null && p.ts >= cutoffSec)
+    .sort((a, b) => a.ts - b.ts);
 }
 
 export type TrackSummary = {
@@ -229,5 +396,12 @@ function pruneMemoryTracks(): void {
   const now = Date.now();
   for (const [key, entry] of memoryTracks) {
     if (entry.expiresAt < now) memoryTracks.delete(key);
+  }
+}
+
+function pruneMemoryLiveTracks(): void {
+  const now = Date.now();
+  for (const [key, entry] of memoryLiveTracks) {
+    if (entry.expiresAt < now) memoryLiveTracks.delete(key);
   }
 }

@@ -10,6 +10,8 @@
 "use client";
 
 import { haversineNm } from "./geo";
+import { aircraftVehicleType } from "./aircraft-type";
+import { clampRegionProximityNm } from "./proximity-limits";
 import { SS_TOKENS } from "./tokens";
 import type { Aircraft, FleetRole } from "./types";
 import { speakAlert } from "./voice-mode";
@@ -53,13 +55,13 @@ export function getProximityThresholdNm(): number {
   if (typeof window === "undefined") return DEFAULT_PROXIMITY_NM;
   const raw = window.localStorage.getItem(PROXIMITY_THRESHOLD_KEY);
   const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0 || n > 50) return DEFAULT_PROXIMITY_NM;
-  return n;
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_PROXIMITY_NM;
+  return clampRegionProximityNm(n);
 }
 
 export function setProximityThresholdNm(nm: number): void {
   if (typeof window === "undefined") return;
-  const clamped = Math.max(1, Math.min(50, Math.round(nm)));
+  const clamped = clampRegionProximityNm(nm);
   window.localStorage.setItem(PROXIMITY_THRESHOLD_KEY, String(clamped));
 }
 
@@ -101,6 +103,7 @@ function markSeen(tail: string, band: ProximityBandInfo): void {
 export type ProximityHit = {
   tail: string;
   nickname: string | null;
+  model: string;
   role: FleetRole;
   distanceNm: number;
 };
@@ -127,6 +130,7 @@ export function detectProximityHits(
       hits.push({
         tail: a.tail,
         nickname: a.nickname,
+        model: a.model,
         role: a.role,
         distanceNm: d,
       });
@@ -153,13 +157,13 @@ export async function fireProximityNotifications(
   if (!reg) return 0;
   let posted = 0;
   for (const h of hits) {
-    const name = h.nickname ?? h.tail;
+    const vehicleType = aircraftVehicleType(h.model);
     const dist = h.distanceNm.toFixed(1);
     const band = proximityBandForDistance(h.distanceNm);
     try {
-      const title = `${band.label} - ${dist} nm - ${name} nearby`;
-      // Smokey umbrella: every alert-class proximity hit reads as
-      // Smokey. The smokey-class FLIR detail (Watching.) is preserved
+      const title = `${band.label} - ${dist} nm - ${vehicleType} nearby`;
+      // Bird umbrella: every alert-class proximity hit reads as
+      // Bird. The smokey-class FLIR detail (Watching.) is preserved
       // for fixed-wing speed enforcement; the rest collapse to a plain
       // distance-only body since the title already names the plane.
       const body =
@@ -168,8 +172,8 @@ export async function fireProximityNotifications(
           : `${dist} nm out.`;
       const options: ServiceWorkerNotificationOptions = {
         body,
-        icon: "/icons/washington-eye-logo.svg",
-        badge: "/icons/favicon.svg",
+        icon: "/icons/out-of-sight-icon-192.png",
+        badge: "/icons/out-of-sight-favicon-96.png",
         tag: `proximity-${h.tail}`,
         renotify: true,
         data: {

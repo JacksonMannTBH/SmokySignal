@@ -20,7 +20,7 @@ const BANNED_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /[\p{Extended_Pictographic}]/u, reason: "emoji forbidden in rider-facing copy" },
   { pattern: /!/, reason: "exclamation mark forbidden" },
   { pattern: /\bpolice\b/i, reason: 'use "WSP" or "agency", never "police"' },
-  { pattern: /\bcop\b/i, reason: 'use "Smokey", never "cop"' },
+  { pattern: /\bcop\b/i, reason: 'use "Bird", never "cop"' },
   { pattern: /\blaw enforcement\b/i, reason: 'use "WSP" or "agency"' },
   { pattern: /\bdrone\b/i, reason: "we track manned aircraft, not drones" },
   { pattern: /\bsurveilling\b/i, reason: 'use "watching"' },

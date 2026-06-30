@@ -9,6 +9,7 @@ type Props = {
   sub?: string;
   big?: boolean;
   tooltip?: React.ReactNode;
+  style?: React.CSSProperties;
 };
 
 export function StatusPill({
@@ -17,6 +18,7 @@ export function StatusPill({
   sub,
   big,
   tooltip,
+  style,
 }: Props) {
   const isAlert = kind === "alert";
   const c = isAlert ? SS_TOKENS.alert : SS_TOKENS.clear;
@@ -44,6 +46,7 @@ export function StatusPill({
         letterSpacing: 0,
         backdropFilter: "blur(18px)",
         WebkitBackdropFilter: "blur(18px)",
+        ...style,
       }}
     >
       <span

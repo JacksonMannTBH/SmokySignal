@@ -77,7 +77,7 @@ The production map uses MapLibre GL JS with the OpenFreeMap dark vector basemap.
 
 ## The product in one paragraph
 
-WSP runs a small fleet of traffic-enforcement Cessnas. The most famous is **Smoky** (N907SP), which orbits I-5 and SR-167 corridors clocking riders from above. The fleet's tail numbers are public and trackable on ADS-B Exchange / adsb.fi / OpenSky. SmokySignal polls those feeds every 10–15s, filters to the registered tails, and surfaces three things to riders: **(1)** is any patrol plane airborne right now, **(2)** where exactly is it orbiting, and **(3)** am I currently speeding inside its likely zone. It also learns hot zones from 30 days of rolling history so it can predict *where* Smoky will probably be tomorrow at 4pm.
+WSP runs a small fleet of traffic-enforcement Cessnas. The most famous is **Smoky** (N907SP), which orbits I-5 and SR-167 corridors clocking riders from above. The fleet's tail numbers are public and trackable on ADS-B Exchange / adsb.fi / OpenSky. SmokySignal polls those feeds every 10–15s, filters to the registered tails, and surfaces whether a patrol plane is airborne, where it is working, and whether one is near the rider's selected region.
 
 ---
 
@@ -87,7 +87,7 @@ WSP runs a small fleet of traffic-enforcement Cessnas. The most famous is **Smok
 |---|---|---|
 | Framework | **Next.js 14 App Router** | Vercel-native, RSC for the fleet status, edge for `/api/aircraft` |
 | Hosting | **Vercel** | User explicitly wants this |
-| Storage | **Vercel KV** (Upstash Redis) | 30-day rolling track history, hot-zone heatmap cache |
+| Storage | **Vercel KV** (Upstash Redis) | Rolling aircraft track history, flights, push subscriptions |
 | Map | **MapLibre GL JS** + OpenFreeMap dark | Free, no Mapbox or tile-key gates |
 | Realtime | **Server-Sent Events** from `/api/aircraft/stream` | Simpler than WebSocket, perfect for one-way push |
 | Push | **Web Push API** + service worker | "Smoky just went up" alerts; PWA, no app store |
@@ -151,7 +151,7 @@ All screens are designed in `design/screens.jsx`. Names match the artboard label
 
 ### 2. Home — Radar (variant B)
 **Purpose:** map-forward; rider sees their position and the plane's orbit at a glance.
-**Layout:** full-screen MapLibre canvas, rider as sky-blue dot in the center, plane(s) as orange chevrons rotated by `track`, hot zones as warm radial halos at 30% opacity.
+**Layout:** full-screen MapLibre canvas, rider as sky-blue dot in the center, plane(s) as orange chevrons rotated by `track`, distance rings, and recent flight paths.
 **Behavior:** auto-recenters on rider every 5s unless user has panned; chevrons animate position with 1s linear interp between samples; tap a chevron → plane detail.
 
 ### 3. Home — Dashboard (variant C)
@@ -160,16 +160,16 @@ All screens are designed in `design/screens.jsx`. Names match the artboard label
 **Speedometer:** SVG arc, 240° sweep, see `Speedometer` in `ui.jsx`.
 
 ### 4. Plane detail
-Header: tail + nickname + status pill. Live data block (alt, speed, heading, last update). **Orbit glyph** (small SVG showing recent track loop). "Typical haunts" — top 3 hot zones this tail visits, ranked by frequency. Sourced from KV history.
+Header: tail + nickname + status pill. Live data block (alt, speed, heading, last update). Recent track map, session metadata, and fleet metadata sourced from KV history.
 
-### 5. Hot zones
-Map view of all learned zones with intensity. List below: zone name (auto-generated from nearest highway exit), confidence %, typical time windows (e.g. "Tue–Thu, 3–6 PM, 78%"). Confidence requires ≥30 days of history; show "Learning…" state until then.
+### 5. Forecast
+Hour-of-week takeoff probability drawn from accumulated fleet activity. Confidence requires enough takeoff history; show a learning state until then.
 
 ### 6. Admin — tail editor
 Table of registered tails. Add row, delete row, edit nickname. Validates N-number format (`^N\d{1,5}[A-Z]{0,2}$`). On save → POST `/api/tails` → KV write → broadcast SSE invalidation.
 
-### 7. Speed warning (fullscreen)
-Triggered when rider speed > limit AND inside an active hot zone AND a tracked plane is airborne within 5nm. Full-screen red, current speed huge, limit below it, "SLOW DOWN" hed. Auto-dismisses 3s after speed drops back under limit.
+### 7. Proximity warning
+Triggered when an alert-tier aircraft enters the rider's selected region radius. Web Push can deliver this when the app is closed.
 
 ---
 
@@ -178,7 +178,6 @@ Triggered when rider speed > limit AND inside an active hot zone AND a tracked p
 ```
 GET  /api/aircraft           → current snapshot of all tracked tails (cached 10s)
 GET  /api/aircraft/stream    → SSE; emits {tail, lat, lon, alt, speed, track, ts} on each poll
-GET  /api/zones              → learned hot zones with confidence
 GET  /api/tails              → registry
 POST /api/tails              → admin: replace registry (passcode-gated)
 POST /api/push/subscribe     → store push subscription in KV
@@ -254,7 +253,7 @@ Pulled from the prototype's inline styles. Promote these to CSS variables / Tail
 3. Ship the **Glanceable** home as the MVP. Subscribe to SSE. Done = it works.
 4. Add MapLibre + the **Radar** home.
 5. Add geolocation + the **Dashboard** home + speed warning.
-6. Add KV-backed track history; cron job to roll it up nightly into hot zones.
+6. Add KV-backed track history for recent trails, flight detail pages, and forecasts.
 7. Add Web Push + service worker.
 8. Add the admin tail editor behind a passcode.
 9. PWA manifest + icons; ship to TestFlight-equivalent (just have rider add to home screen).

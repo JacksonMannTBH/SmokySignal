@@ -1,6 +1,5 @@
 import { SS_TOKENS } from "@/lib/tokens";
-
-const LOGO_SRC = "/icons/washington-eye-logo.svg";
+import type { CSSProperties } from "react";
 
 type LogoProps = {
   /** Pixel height of the rendered mark. Wordmark scales accordingly. */
@@ -20,6 +19,41 @@ type LogoProps = {
   textColor?: string;
 };
 
+type LogoMarkProps = {
+  height: number | string;
+  width?: number | string;
+  className?: string;
+  style?: CSSProperties;
+};
+
+export function LogoMark({ height, width, className, style }: LogoMarkProps) {
+  const renderedWidth =
+    width ?? (typeof height === "number" ? Math.round(height * 1.5) : undefined);
+
+  return (
+    <svg
+      className={className}
+      viewBox="8 16 48 32"
+      aria-hidden="true"
+      focusable="false"
+      style={{
+        display: "block",
+        width: renderedWidth,
+        height,
+        flexShrink: 0,
+        ...style,
+      }}
+    >
+      <path
+        d="M 8 32 C 14 21 23 16 32 16 C 41 16 50 21 56 32 C 50 43 41 48 32 48 C 23 48 14 43 8 32 Z"
+        fill="#ffffff"
+      />
+      <circle cx="32" cy="32" r="9.5" fill="#f6c431" />
+      <circle cx="32" cy="32" r="4.1" fill="#000000" />
+    </svg>
+  );
+}
+
 export function Logo({
   size = 24,
   markSize,
@@ -29,20 +63,7 @@ export function Logo({
 }: LogoProps) {
   const renderedMarkSize = markSize ?? size;
   const mark = (
-    <img
-      src={LOGO_SRC}
-      width={renderedMarkSize}
-      height={renderedMarkSize}
-      alt=""
-      aria-hidden="true"
-      style={{
-        display: "block",
-        width: renderedMarkSize,
-        height: renderedMarkSize,
-        objectFit: "contain",
-        flexShrink: 0,
-      }}
-    />
+    <LogoMark height={renderedMarkSize} />
   );
 
   if (!wordmark) {

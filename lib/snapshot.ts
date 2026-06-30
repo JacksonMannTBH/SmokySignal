@@ -1,7 +1,9 @@
 import { buildSnapshot } from "./adsb";
 import { cacheGet, cacheSet, getRedis } from "./cache";
-import { logTracks } from "./tracks";
+import { getCurrentFlightDuration, logTracks } from "./tracks";
 import { recordActivity } from "./activity";
+import { dispatchProximitySnapshot } from "./push/dispatcher";
+import { DEFAULT_REGION, type RegionId } from "./regions";
 import type { Snapshot, SnapshotSource } from "./types";
 
 const KEY = "ss:snapshot:v1";
@@ -23,11 +25,11 @@ const LAST_AIRBORNE_TTL_SECONDS = 30 * 24 * 60 * 60;
  * — used after registry edits so changes are visible immediately rather
  * than after the 10s KV TTL.
  */
-export async function invalidateSnapshot(): Promise<void> {
+export async function invalidateSnapshot(regionId: RegionId = DEFAULT_REGION): Promise<void> {
   const redis = await getRedis();
   if (redis) {
     try {
-      await redis.del(KEY);
+      await redis.del(snapshotKey(regionId));
     } catch (e) {
       console.warn("[snapshot] invalidate failed:", e);
     }
@@ -47,7 +49,7 @@ export async function getLastAirborneTs(): Promise<number | null> {
 
 /** Read-only access to the cached snapshot (no fresh fetch). */
 export async function peekSnapshot(): Promise<Snapshot | null> {
-  return await cacheGet<Snapshot>(KEY);
+  return await cacheGet<Snapshot>(snapshotKey(DEFAULT_REGION));
 }
 
 /**
@@ -62,50 +64,86 @@ export async function peekHealthSnapshot(): Promise<Snapshot | null> {
 // Single-flight: collapse concurrent calls within the cache window into one
 // upstream fetch so 100 riders = 1 adsb.fi call.
 let inflight: Promise<Snapshot> | null = null;
+const inflightByRegion = new Map<RegionId, Promise<Snapshot>>();
 
-export async function getSnapshot(): Promise<Snapshot> {
-  const cached = await cacheGet<Snapshot>(KEY);
+export async function getSnapshot(regionId: RegionId = DEFAULT_REGION): Promise<Snapshot> {
+  const key = snapshotKey(regionId);
+  const cached = await cacheGet<Snapshot>(key);
   if (cached) {
     lastSource = cached.source;
     return cached;
   }
-  if (inflight) return inflight;
+  const existing = inflightByRegion.get(regionId);
+  if (existing) return existing;
 
-  inflight = (async () => {
+  const next = (async () => {
     try {
-      const snap = await buildSnapshot();
+      const snap = await buildSnapshot(regionId);
+      let enrichedSnap = snap;
       // Append airborne positions + record state-change activity events.
       // Both are best-effort: never fail /api/aircraft on a side-channel error.
       try {
-        await Promise.all([logTracks(snap), recordActivity(snap)]);
+        await logTracks(snap);
       } catch (e) {
-        console.warn("[snapshot] side-channel write failed:", e);
+        console.warn("[snapshot] track write failed:", e);
+      }
+      try {
+        enrichedSnap = await hydrateCurrentFlightDurations(snap);
+      } catch (e) {
+        console.warn("[snapshot] current-flight duration failed:", e);
+      }
+      try {
+        await recordActivity(enrichedSnap, regionId);
+      } catch (e) {
+        console.warn("[snapshot] activity write failed:", e);
+      }
+      try {
+        await dispatchProximitySnapshot(enrichedSnap);
+      } catch (e) {
+        console.warn("[snapshot] proximity dispatch failed:", e);
       }
       // Stamp the canary if any tail is airborne.
-      if (snap.aircraft.some((a) => a.airborne)) {
+      if (enrichedSnap.aircraft.some((a) => a.airborne)) {
         try {
           await cacheSet(
             LAST_AIRBORNE_KEY,
-            snap.fetched_at,
+            enrichedSnap.fetched_at,
             LAST_AIRBORNE_TTL_SECONDS,
           );
         } catch (e) {
           console.warn("[snapshot] last-airborne stamp failed:", e);
         }
       }
-      await cacheSet(KEY, snap, TTL_SECONDS);
+      await cacheSet(key, enrichedSnap, TTL_SECONDS);
       // Health mirror gets a much longer TTL so the cron pipeline is
       // observable between hot-path cache expirations.
       try {
-        await cacheSet(HEALTH_KEY, snap, HEALTH_TTL_SECONDS);
+        await cacheSet(HEALTH_KEY, enrichedSnap, HEALTH_TTL_SECONDS);
       } catch (e) {
         console.warn("[snapshot] health-mirror write failed:", e);
       }
-      lastSource = snap.source;
-      return snap;
+      lastSource = enrichedSnap.source;
+      return enrichedSnap;
     } finally {
-      inflight = null;
+      inflightByRegion.delete(regionId);
     }
   })();
-  return inflight;
+  inflightByRegion.set(regionId, next);
+  inflight = regionId === DEFAULT_REGION ? next : inflight;
+  return next;
+}
+
+function snapshotKey(regionId: RegionId): string {
+  return regionId === DEFAULT_REGION ? KEY : `${KEY}:${regionId}`;
+}
+
+async function hydrateCurrentFlightDurations(snap: Snapshot): Promise<Snapshot> {
+  const aircraft = await Promise.all(
+    snap.aircraft.map(async (a) => {
+      if (!a.airborne) return { ...a, time_aloft_min: undefined };
+      const duration = await getCurrentFlightDuration(a.tail, snap.fetched_at);
+      return { ...a, time_aloft_min: duration?.elapsedMinutes };
+    }),
+  );
+  return { ...snap, aircraft };
 }

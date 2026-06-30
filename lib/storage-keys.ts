@@ -1,6 +1,6 @@
 // Centralized KV key formatter. NX7 federation foundation.
 //
-// Today every region-scoped namespace (tracks / spots / hotzones / flights)
+// Today every region-scoped namespace (tracks / spots / flights)
 // uses an unprefixed key: e.g. tracks:N305DK:20260502. The default region
 // stays unprefixed to preserve byte-for-byte back-compat with all existing
 // data — no migration needed for Puget Sound. Non-default regions get a
@@ -38,6 +38,10 @@ export function trackScanAllPattern(region?: Region): string {
   return `${regionPrefix(region)}tracks:*`;
 }
 
+export function liveTrackKey(tail: string, region?: Region): string {
+  return `${regionPrefix(region)}tracks:live:${tail}`;
+}
+
 // ─── spots:{YYYYMMDD}:{uuid} ─────────────────────────────────────────
 export const SPOTS_PREFIX = "spots:";
 export function spotKey(date: string, id: string, region?: Region): string {
@@ -50,18 +54,17 @@ export function spotsRecentCacheKey(region?: Region): string {
   return `${regionPrefix(region)}spots:recent_cache_v1`;
 }
 
-// ─── hotzones:* ──────────────────────────────────────────────────────
+// ─── flights:* ───────────────────────────────────────────────────────
+export function flightsRecentCacheKey(region?: Region): string {
+  return `${regionPrefix(region)}flights:recent_cache_v1`;
+}
+
 export function hotzonesCurrentKey(region?: Region): string {
   return `${regionPrefix(region)}hotzones:current`;
 }
 export function hotzonesLastRefreshKey(region?: Region): string {
-  return `${regionPrefix(region)}hotzones:last_refresh_ts`;
+  return `${regionPrefix(region)}hotzones:last_refresh`;
 }
 export function hotzonesPlaneKey(tail: string, region?: Region): string {
   return `${regionPrefix(region)}hotzones:plane:${tail.toUpperCase()}`;
-}
-
-// ─── flights:* ───────────────────────────────────────────────────────
-export function flightsRecentCacheKey(region?: Region): string {
-  return `${regionPrefix(region)}flights:recent_cache_v1`;
 }

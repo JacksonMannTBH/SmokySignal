@@ -1,10 +1,15 @@
 #!/usr/bin/env node
-// Generate browser and PWA icon PNGs from the source logo SVG.
-// Requires a local Chromium/Chrome/Edge executable.
+// Generate browser, PWA, and social icons from the current logo source.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -12,18 +17,28 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 const iconsDir = join(root, "public", "icons");
-const logoSvg = join(iconsDir, "washington-eye-logo.svg");
+const logoImage = join(iconsDir, "out-of-sight-logo.jpg");
 
 const outputs = [
-  { file: "favicon-16.png", size: 16, background: "transparent" },
-  { file: "favicon-32.png", size: 32, background: "transparent" },
-  { file: "favicon-96.png", size: 96, background: "transparent" },
-  { file: "apple-touch-icon.png", size: 180, background: "white" },
-  { file: "icon-192.png", size: 192, background: "white" },
-  { file: "icon-512.png", size: 512, background: "white" },
-  { file: "icon-maskable-192.png", size: 192, background: "white" },
-  { file: "icon-maskable-512.png", size: 512, background: "white" },
+  { file: "out-of-sight-favicon-16.png", size: 16 },
+  { file: "out-of-sight-favicon-32.png", size: 32 },
+  { file: "out-of-sight-favicon-96.png", size: 96 },
+  { file: "out-of-sight-apple-touch-icon.png", size: 180 },
+  { file: "out-of-sight-icon-192.png", size: 192 },
+  { file: "out-of-sight-icon-512.png", size: 512 },
+  { file: "out-of-sight-maskable-192.png", size: 192 },
+  { file: "out-of-sight-maskable-512.png", size: 512 },
+  { file: "favicon-16.png", size: 16 },
+  { file: "favicon-32.png", size: 32 },
+  { file: "favicon-96.png", size: 96 },
+  { file: "apple-touch-icon.png", size: 180 },
+  { file: "icon-192.png", size: 192 },
+  { file: "icon-512.png", size: 512 },
+  { file: "icon-maskable-192.png", size: 192 },
+  { file: "icon-maskable-512.png", size: 512 },
 ];
+
+const ogOutputs = ["out-of-sight-og-image.png", "og-image.png"];
 
 function findChrome() {
   const candidates = [
@@ -51,9 +66,8 @@ function findChrome() {
   return chrome;
 }
 
-function renderHtml({ size, background }) {
-  const bg = background === "transparent" ? "transparent" : "#ffffff";
-  const svgUrl = pathToFileURL(logoSvg).href;
+function renderIconHtml({ size }) {
+  const logoUrl = pathToFileURL(logoImage).href;
   return `<!doctype html>
 <html>
   <head>
@@ -66,61 +80,301 @@ function renderHtml({ size, background }) {
         height: ${size}px;
         margin: 0;
         overflow: hidden;
-        background: ${bg};
+        background: #000000;
       }
 
       img {
         display: block;
         width: ${size}px;
         height: ${size}px;
-        object-fit: contain;
+        object-fit: cover;
       }
     </style>
   </head>
   <body>
-    <img src="${svgUrl}" alt="">
+    <img src="${logoUrl}" alt="">
   </body>
 </html>`;
 }
 
+function renderOgHtml() {
+  const logoUrl = pathToFileURL(logoImage).href;
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=1200, initial-scale=1">
+    <style>
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        margin: 0;
+        overflow: hidden;
+        background: #000000;
+        color: #ffffff;
+        font-family: Inter, Arial, sans-serif;
+      }
+
+      body {
+        display: grid;
+        grid-template-columns: 520px 1fr;
+        align-items: center;
+        gap: 56px;
+        box-sizing: border-box;
+        padding: 72px 82px;
+      }
+
+      img {
+        display: block;
+        width: 470px;
+        height: 470px;
+        object-fit: cover;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 74px;
+        line-height: .94;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 32px 0 0;
+        max-width: 500px;
+        color: #f6c431;
+        font-size: 34px;
+        line-height: 1.18;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <img src="${logoUrl}" alt="">
+    <main>
+      <h1>Out Of Sight</h1>
+      <p>Live aircraft tracker for Washington state riders.</p>
+    </main>
+  </body>
+</html>`;
+}
+
+function embeddedLogoSvg() {
+  const encoded = readFileSync(logoImage).toString("base64");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Out Of Sight logo">
+  <image href="data:image/jpeg;base64,${encoded}" width="1024" height="1024" preserveAspectRatio="xMidYMid slice"/>
+</svg>
+`;
+}
+
+function pinnedTabSvg() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Out Of Sight logo">
+  <path fill="#000000" d="M512 326c-176 0-300 82-384 186 84 104 208 186 384 186s300-82 384-186c-84-104-208-186-384-186Zm0 312c-116 0-215-43-295-126 80-83 179-126 295-126s215 43 295 126c-80 83-179 126-295 126Z"/>
+  <circle cx="512" cy="512" r="118" fill="#000000"/>
+</svg>
+`;
+}
+
+function powershellGenerator() {
+  const psOutputs = outputs
+    .map(({ file, size }) => `  @{ File = '${file}'; Size = ${size} }`)
+    .join("\n");
+
+  return `
+param([string]$Root)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+
+$iconsDir = Join-Path $Root 'public\\icons'
+$logoPath = Join-Path $iconsDir 'out-of-sight-logo.jpg'
+$outputs = @(
+${psOutputs}
+)
+$ogOutputs = @(
+${ogOutputs.map((file) => `  '${file}'`).join("\n")}
+)
+
+function Set-Quality($Graphics) {
+  $Graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+  $Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+  $Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+}
+
+function Save-Png([System.Drawing.Bitmap]$Bitmap, [string]$Path) {
+  $tmpPath = "$Path.tmp"
+  if (Test-Path -LiteralPath $tmpPath) {
+    Remove-Item -LiteralPath $tmpPath -Force
+  }
+  $stream = [System.IO.File]::Open(
+    $tmpPath,
+    [System.IO.FileMode]::Create,
+    [System.IO.FileAccess]::Write
+  )
+  try {
+    $Bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+  } finally {
+    $stream.Dispose()
+  }
+  Move-Item -LiteralPath $tmpPath -Destination $Path -Force
+}
+
+function New-Icon([System.Drawing.Image]$Source, [string]$File, [int]$Size) {
+  $bitmap = New-Object System.Drawing.Bitmap $Size, $Size
+  try {
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+      Set-Quality $graphics
+      $graphics.Clear([System.Drawing.Color]::Black)
+      $graphics.DrawImage($Source, 0, 0, $Size, $Size)
+    } finally {
+      $graphics.Dispose()
+    }
+
+    Save-Png $bitmap (Join-Path $iconsDir $File)
+    Write-Host "wrote public/icons/$File"
+  } finally {
+    $bitmap.Dispose()
+  }
+}
+
+function New-OgImage([System.Drawing.Image]$Source) {
+  $bitmap = New-Object System.Drawing.Bitmap 1200, 630
+  try {
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
+    $gold = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(246, 196, 49))
+    $titleFont = New-Object System.Drawing.Font 'Arial', 74, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+    $bodyFont = New-Object System.Drawing.Font 'Arial', 34, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+    try {
+      Set-Quality $graphics
+      $graphics.Clear([System.Drawing.Color]::Black)
+      $random = New-Object System.Random 42
+      for ($i = 0; $i -lt 45000; $i++) {
+        $gray = $random.Next(0, 12)
+        $bitmap.SetPixel(
+          $random.Next(0, 1200),
+          $random.Next(0, 630),
+          [System.Drawing.Color]::FromArgb($gray, $gray, $gray)
+        )
+      }
+      $gridPen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(13, 13, 13)), 1
+      try {
+        for ($x = 0; $x -le 1200; $x += 60) {
+          $graphics.DrawLine($gridPen, $x, 0, $x, 630)
+        }
+        for ($y = 0; $y -le 630; $y += 60) {
+          $graphics.DrawLine($gridPen, 0, $y, 1200, $y)
+        }
+      } finally {
+        $gridPen.Dispose()
+      }
+      $graphics.DrawImage($Source, 82, 80, 470, 470)
+      $graphics.DrawString('Out Of Sight', $titleFont, $white, 620, 188)
+      $graphics.DrawString('Live aircraft tracker', $bodyFont, $gold, 620, 306)
+      $graphics.DrawString('for Washington state riders.', $bodyFont, $gold, 620, 348)
+    } finally {
+      $bodyFont.Dispose()
+      $titleFont.Dispose()
+      $gold.Dispose()
+      $white.Dispose()
+      $graphics.Dispose()
+    }
+
+    foreach ($file in $ogOutputs) {
+      Save-Png $bitmap (Join-Path $iconsDir $file)
+      Write-Host "wrote public/icons/$file"
+    }
+  } finally {
+    $bitmap.Dispose()
+  }
+}
+
+$source = [System.Drawing.Image]::FromFile($logoPath)
+try {
+  foreach ($output in $outputs) {
+    New-Icon $source $output.File $output.Size
+  }
+  New-OgImage $source
+} finally {
+  $source.Dispose()
+}
+`;
+}
+
+function generateWithPowerShell(tempDir) {
+  const scriptPath = join(tempDir, "gen-icons.ps1");
+  writeFileSync(scriptPath, powershellGenerator(), "utf8");
+  execFileSync(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath, "-Root", root],
+    { stdio: "inherit" },
+  );
+}
+
+function screenshot(chrome, htmlPath, outputPath, width, height) {
+  execFileSync(
+    chrome,
+    [
+      "--headless=new",
+      "--disable-gpu",
+      "--no-first-run",
+      "--hide-scrollbars",
+      "--allow-file-access-from-files",
+      "--force-device-scale-factor=1",
+      `--window-size=${width},${height}`,
+      `--screenshot=${outputPath}`,
+      pathToFileURL(htmlPath).href,
+    ],
+    { stdio: "ignore" },
+  );
+}
+
+function generateWithChrome(tempDir) {
+  const chrome = findChrome();
+
+  for (const output of outputs) {
+    const htmlPath = join(tempDir, `${output.file}.html`);
+    const pngPath = join(iconsDir, output.file);
+    writeFileSync(htmlPath, renderIconHtml(output), "utf8");
+    screenshot(chrome, htmlPath, pngPath, output.size, output.size);
+    console.log(`wrote public/icons/${output.file}`);
+  }
+
+  const ogHtmlPath = join(tempDir, "og-image.html");
+  writeFileSync(ogHtmlPath, renderOgHtml(), "utf8");
+  for (const file of ogOutputs) {
+    screenshot(chrome, ogHtmlPath, join(iconsDir, file), 1200, 630);
+    console.log(`wrote public/icons/${file}`);
+  }
+}
+
+function syncSvgShims() {
+  const logoSvg = embeddedLogoSvg();
+  writeFileSync(join(iconsDir, "out-of-sight-favicon.svg"), logoSvg, "utf8");
+  writeFileSync(join(iconsDir, "favicon.svg"), logoSvg, "utf8");
+  writeFileSync(join(iconsDir, "washington-eye-logo.svg"), logoSvg, "utf8");
+  writeFileSync(join(iconsDir, "safari-pinned-tab.svg"), pinnedTabSvg(), "utf8");
+  console.log("synced SVG logo shims");
+}
+
 async function main() {
-  if (!existsSync(logoSvg)) {
-    throw new Error(`Missing source logo: ${logoSvg}`);
+  if (!existsSync(logoImage)) {
+    throw new Error(`Missing source logo: ${logoImage}`);
   }
 
   await mkdir(iconsDir, { recursive: true });
-  const chrome = findChrome();
   const tempDir = mkdtempSync(join(tmpdir(), "out-of-sight-icons-"));
 
   try {
-    for (const output of outputs) {
-      const htmlPath = join(tempDir, `${output.file}.html`);
-      const pngPath = join(iconsDir, output.file);
-      writeFileSync(htmlPath, renderHtml(output), "utf8");
-
-      const args = [
-        "--headless=new",
-        "--disable-gpu",
-        "--no-first-run",
-        "--hide-scrollbars",
-        "--allow-file-access-from-files",
-        "--force-device-scale-factor=1",
-        `--window-size=${output.size},${output.size}`,
-        `--screenshot=${pngPath}`,
-      ];
-
-      if (output.background === "transparent") {
-        args.push("--default-background-color=00000000");
-      }
-
-      args.push(pathToFileURL(htmlPath).href);
-      execFileSync(chrome, args, { stdio: "ignore" });
-      console.log(`wrote public/icons/${output.file}`);
+    if (process.platform === "win32") {
+      generateWithPowerShell(tempDir);
+    } else {
+      generateWithChrome(tempDir);
     }
-
-    await copyFile(logoSvg, join(iconsDir, "favicon.svg"));
-    await copyFile(logoSvg, join(iconsDir, "safari-pinned-tab.svg"));
-    console.log("synced favicon.svg and safari-pinned-tab.svg");
+    syncSvgShims();
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

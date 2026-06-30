@@ -1,3 +1,5 @@
+import { ADDITIONAL_TRACKED_TAILS } from "./aircraft-directory";
+
 export const TRACKED_TAILS = [
   "N102LP",
   "N207HB",
@@ -14,6 +16,7 @@ export const TRACKED_TAILS = [
   "N815SC",
   "N9446P",
   "N422CT",
+  ...ADDITIONAL_TRACKED_TAILS,
 ] as const;
 
 const TRACKED_ORDER = new Map<string, number>(

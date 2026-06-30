@@ -83,7 +83,7 @@ The bird is not the threat. The app is. Until it isn't.
 **Ignores:**
 - The lore about Smokey Bear. Cute, irrelevant.
 - The activity feed. (They wonder briefly if it is logging which entries each user reads. It is not. They are reassured by the localStorage-only state.)
-- Hot zone learning. (They wonder if the heatmap is per-user. It is not. Aggregate.)
+- Forecast learning. (They wonder whether it uses user location. It does not.)
 - The high-contrast mode. (They use it.)
 - Notifications. They will not turn them on.
 
@@ -125,7 +125,7 @@ In a PR review they would push back hard on:
 - **Adding a referer header to map tile fetches.** "Strip it."
 - **Adding a "rate this app" prompt.** "Not because of UX — because the prompt SDK probably ships analytics."
 - **Adding any third-party SDK without a public review of its data flow.** "I will write a Reddit post about this within 24 hours of detecting it."
-- **Persisting any geolocation server-side, even for legitimate reasons** like "we want to improve hot zone learning by aggregating where users tend to be." "Use only the bird's positions for the heatmap. The user's positions are not your data."
+- **Persisting any geolocation server-side, even for legitimate reasons.** "Use only aircraft positions and selected regions for alerts. The user's position is not your data."
 - **Storing the push subscription endpoint with anything other than the bird-region pairing.** "No install IDs. No timestamps beyond rotation. The endpoint is PII; treat it as such."
 - **Quiet defaults that lean toward more permissions.** "Default deny. Always."
 

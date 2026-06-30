@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const TEST_PAYLOAD = {
   title: "Out Of Sight · test",
-  body: "Channel 19. Test ping. 10-4.",
+  body: "",
   tag: "smokey-test",
   data: { url: "/settings/alerts" },
 };

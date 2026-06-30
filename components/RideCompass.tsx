@@ -5,7 +5,7 @@ import type { RideContact, RideStatus } from "@/lib/ride-mode";
 const STATUS_COLORS: Record<RideStatus, string> = {
   clear: "#39d98a",
   watch: "#60a5fa",
-  warning: "#f4c430",
+  warning: "#f6c431",
   danger: "#ff4d4f",
 };
 
@@ -13,29 +13,36 @@ type Props = {
   status: RideStatus;
   contact: RideContact | null;
   displayBearingDeg: number | null;
-  modeLabel: "Relative" | "North-up";
+  clearDistanceNm: number;
+  highlightTrackingArrow?: boolean;
 };
 
 export function RideCompass({
   status,
   contact,
   displayBearingDeg,
-  modeLabel,
+  clearDistanceNm,
+  highlightTrackingArrow = false,
 }: Props) {
   const color = STATUS_COLORS[status];
+  const arrowColor = highlightTrackingArrow ? "#ff1f2d" : "#050505";
   const hasMarker = contact != null && displayBearingDeg != null;
   const marker = hasMarker ? markerPosition(displayBearingDeg) : null;
-  const name = contact ? contact.plane.nickname ?? contact.plane.tail : null;
+  const name = contact
+    ? contact.plane.nickname
+      ? `${contact.plane.tail} - ${contact.plane.nickname}`
+      : contact.plane.tail
+    : null;
   const ariaLabel = contact
-    ? `${modeLabel} compass. ${name} is ${contact.cardinal}, ${contact.distanceNm.toFixed(1)} nautical miles away.`
-    : `${modeLabel} compass. No watched aircraft within five nautical miles.`;
+    ? `Compass. ${name} is ${contact.cardinal}, ${contact.distanceNm.toFixed(1)} nautical miles away.`
+    : `Compass. No tracked aircraft within ${formatNm(clearDistanceNm)} nautical miles.`;
 
   return (
     <section
       role="img"
       aria-label={ariaLabel}
       style={{
-        width: "min(72vw, 340px, 48dvh)",
+        width: "min(70vw, 320px, 42dvh)",
         aspectRatio: "1",
         position: "relative",
         borderRadius: "50%",
@@ -49,12 +56,6 @@ export function RideCompass({
         overflow: "hidden",
       }}
     >
-      <style>
-        {`@keyframes ss-ride-danger-pulse {
-          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .82; }
-          50% { transform: translate(-50%, -50%) scale(1.22); opacity: .36; }
-        }`}
-      </style>
       <CompassRing color={color} />
 
       {hasMarker && marker && (
@@ -83,36 +84,38 @@ export function RideCompass({
               width: status === "danger" ? 70 : 60,
               height: status === "danger" ? 70 : 60,
               borderRadius: "50%",
-              background: color,
+              background: highlightTrackingArrow ? "#050505" : color,
               transform: "translate(-50%, -50%)",
-              boxShadow: `0 0 0 8px color-mix(in srgb, ${color} 18%, transparent), 0 0 28px color-mix(in srgb, ${color} 56%, transparent)`,
+              boxShadow: highlightTrackingArrow
+                ? "0 0 0 8px rgba(255,31,45,0.22), 0 0 34px rgba(255,31,45,0.82), 0 0 72px rgba(255,31,45,0.42)"
+                : `0 0 0 8px color-mix(in srgb, ${color} 18%, transparent), 0 0 28px color-mix(in srgb, ${color} 56%, transparent)`,
+              border: highlightTrackingArrow
+                ? "2px solid rgba(255,31,45,0.92)"
+                : undefined,
               display: "grid",
               placeItems: "center",
             }}
           >
-            {status === "danger" && (
-              <span
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  inset: -18,
-                  borderRadius: "50%",
-                  border: `3px solid ${color}`,
-                  animation: "ss-ride-danger-pulse 1.2s ease-in-out infinite",
-                }}
-              />
-            )}
             <span
               aria-hidden
               style={{
-                width: 0,
-                height: 0,
-                borderLeft: "11px solid transparent",
-                borderRight: "11px solid transparent",
-                borderBottom: "25px solid #050505",
                 transform: `rotate(${displayBearingDeg}deg)`,
+                display: "grid",
+                placeItems: "center",
               }}
-            />
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeft: "11px solid transparent",
+                  borderRight: "11px solid transparent",
+                  borderBottom: `25px solid ${arrowColor}`,
+                  transformOrigin: "50% 62%",
+                }}
+              />
+            </span>
           </div>
         </>
       )}
@@ -139,26 +142,12 @@ export function RideCompass({
       >
         YOU
       </div>
-
-      <div
-        style={{
-          position: "absolute",
-          left: "50%",
-          bottom: "12%",
-          transform: "translateX(-50%)",
-          padding: "5px 10px",
-          borderRadius: 999,
-          background: "rgba(0,0,0,0.62)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          color: "#f5f2e8",
-          fontSize: 12,
-          fontWeight: 800,
-        }}
-      >
-        {modeLabel}
-      </div>
     </section>
   );
+}
+
+function formatNm(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function markerPosition(degrees: number): { x: number; y: number } {

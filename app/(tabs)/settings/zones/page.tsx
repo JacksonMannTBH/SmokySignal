@@ -1,12 +1,12 @@
-import { UserZonesManager } from "@/components/UserZonesManager";
+import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "Your zones",
-  description: "Manage rider-defined geofences. Push alerts route through these.",
+  title: "Settings",
+  description: "Tune Out Of Sight alerts and region preferences.",
 };
 
 export const dynamic = "force-static";
 
 export default function ZonesPage() {
-  return <UserZonesManager />;
+  redirect("/settings/alerts");
 }

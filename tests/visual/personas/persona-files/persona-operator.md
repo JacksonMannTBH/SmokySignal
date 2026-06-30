@@ -106,7 +106,7 @@ Most days the operator does not touch the product. The app runs. The cron runs. 
 - **`/legal` and `/about`** to verify the live copy matches the source.
 - **`/radar` and `/`** to dogfood.
 
-In code: they touch `lib/snapshot.ts`, `lib/tracks.ts`, `lib/hotzones.ts`, `lib/push/*`, `lib/storage-keys.ts` more than any other files. They know `app/(tabs)/*` route layout by feel.
+In code: they touch `lib/snapshot.ts`, `lib/tracks.ts`, `lib/push/*`, `lib/storage-keys.ts` more than any other files. They know `app/(tabs)/*` route layout by feel.
 
 ## Voice when reviewing
 

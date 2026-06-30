@@ -8,17 +8,13 @@
 //   - Sorted ascending by ts so a polyline reads from oldest → newest.
 
 import { NextResponse } from "next/server";
-import { getTracksForDay, listTrackKeys, type TrackPoint } from "@/lib/tracks";
+import { getSnapshot } from "@/lib/snapshot";
+import { getCurrentFlightTrack, getLiveTrackWindow } from "@/lib/tracks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_TAILS = 32;
-const MAX_LOOKBACK_DAYS = 3;
-// Treat ordinary feed/cache dropouts as one current flight. A 5-minute gap
-// split trails whenever sampling was sparse, making the path look like it
-// began when the web page opened.
-const CURRENT_FLIGHT_GAP_SECONDS = 60 * 60;
 
 function parseTails(raw: string | null): string[] {
   if (!raw) return [];
@@ -33,29 +29,15 @@ type TrailPoint = { lat: number; lon: number; ts: number };
 
 async function trailFor(
   tail: string,
+  nowMs: number,
 ): Promise<TrailPoint[]> {
-  const interestingDates = (await listTrackKeys(tail)).slice(
-    0,
-    MAX_LOOKBACK_DAYS,
-  );
-  const allPoints: TrackPoint[] = [];
-  for (const date of interestingDates) {
-    const points = await getTracksForDay(tail, date);
-    allPoints.push(...points);
-  }
-  allPoints.sort((a, b) => a.ts - b.ts);
-  if (allPoints.length === 0) return [];
-
-  const session: TrackPoint[] = [];
-  for (let i = allPoints.length - 1; i >= 0; i--) {
-    const point = allPoints[i]!;
-    session.unshift(point);
-    const prev = allPoints[i - 1];
-    if (!prev) break;
-    if (point.ts - prev.ts > CURRENT_FLIGHT_GAP_SECONDS) break;
+  const live = await getLiveTrackWindow(tail, nowMs);
+  if (live.length > 0) {
+    return live.map((p) => ({ lat: p.lat, lon: p.lon, ts: p.ts }));
   }
 
-  return session.map((p) => ({ lat: p.lat, lon: p.lon, ts: p.ts }));
+  const track = await getCurrentFlightTrack(tail, nowMs);
+  return (track?.points ?? []).map((p) => ({ lat: p.lat, lon: p.lon, ts: p.ts }));
 }
 
 export async function GET(req: Request) {
@@ -64,8 +46,22 @@ export async function GET(req: Request) {
   if (tails.length === 0) {
     return NextResponse.json({ trails: {} });
   }
+
+  const snap = await getSnapshot();
+  const activeTails = new Set(
+    snap.aircraft
+      .filter((a) => a.airborne)
+      .map((a) => a.tail.trim().toUpperCase()),
+  );
+  const activeRequestedTails = tails.filter((tail) => activeTails.has(tail));
+  if (activeRequestedTails.length === 0) {
+    return NextResponse.json({ trails: {} });
+  }
+
   const entries = await Promise.all(
-    tails.map(async (t) => [t, await trailFor(t)] as const),
+    activeRequestedTails.map(
+      async (t) => [t, await trailFor(t, snap.fetched_at)] as const,
+    ),
   );
   const trails: Record<string, TrailPoint[]> = {};
   for (const [tail, points] of entries) {

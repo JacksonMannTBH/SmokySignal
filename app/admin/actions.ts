@@ -16,6 +16,7 @@ import {
 } from "@/lib/registry";
 import { invalidateSnapshot } from "@/lib/snapshot";
 import { setSpeedWarningEnabled } from "@/lib/flags";
+import { FLEET } from "@/lib/seed";
 import type { FleetEntry, FleetRole, RoleConfidence } from "@/lib/types";
 
 const TAIL_RE = /^N\d{1,5}[A-Z]{0,2}$/;
@@ -225,6 +226,30 @@ export async function setSpeedWarningFlagAction(formData: FormData) {
   // No path revalidation needed for the flag itself — it's read live in
   // the (tabs) layout server fetch on each request.
   redirect(bouncePath(undefined, enabled ? "warn_on" : "warn_off"));
+}
+
+export async function syncSeedRegistryAction() {
+  requireAdmin();
+  const current = await getRegistry();
+  const existing = new Set(current.map((entry) => entry.tail));
+  const missing = FLEET.filter((entry) => !existing.has(entry.tail));
+
+  if (missing.length === 0) {
+    redirect(bouncePath(undefined, "seed_sync_0"));
+  }
+
+  await saveRegistry([...current, ...missing]);
+  await appendAudit({
+    ts: new Date().toISOString(),
+    op: "update",
+    tail: `(seed sync +${missing.length})`,
+    prev: null,
+    next: null,
+  });
+  await invalidateSnapshot();
+  revalidatePath("/admin");
+  revalidatePath("/about");
+  redirect(bouncePath(undefined, `seed_sync_${missing.length}`));
 }
 
 export async function restoreBackupAction(formData: FormData) {

@@ -1,73 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SS_TOKENS } from "@/lib/tokens";
 import type { ActivityEntry, ActivityKind } from "@/lib/activity";
 import { fmtAgoTs, formatTsBare } from "@/lib/time";
 
-const TABBAR_HEIGHT = 66;
-
-export function ActivityFeed({ initial }: { initial: ActivityEntry[] }) {
-  const [entries, setEntries] = useState<ActivityEntry[]>(initial);
-
-  useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      if (document.visibilityState === "hidden") return;
-      try {
-        const r = await fetch("/api/activity?limit=50", { cache: "no-store" });
-        if (!r.ok) return;
-        const d = (await r.json()) as { entries: ActivityEntry[] };
-        if (!cancelled) setEntries(d.entries);
-      } catch {
-        /* transient */
-      }
-    };
-    const id = setInterval(tick, 30_000);
-    const onVis = () => {
-      if (document.visibilityState === "visible") void tick();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, []);
-
+export function ActivityEventsSection({
+  entries,
+  id,
+}: {
+  entries: ActivityEntry[];
+  id?: string;
+}) {
+  const headingId = id ? `${id}-heading` : undefined;
   return (
-    <main
-      className="ss-page-narrow"
+    <section
+      id={id}
+      aria-labelledby={headingId}
       style={{
-        minHeight: "100dvh",
-        // Bottom padding = tab bar (66) + iOS install prompt overlay
-        // (~80) + breathing room. Without this the last activity row
-        // hides behind the fixed-position prompt on iOS Safari.
-        padding: `12px 18px ${TABBAR_HEIGHT + 110}px`,
         display: "flex",
         flexDirection: "column",
-        gap: 14,
+        gap: 10,
+        scrollMarginTop: "calc(env(safe-area-inset-top, 0px) + 24px)",
       }}
     >
-      <header style={{ marginTop: 4 }}>
-        <span className="ss-eyebrow">Activity</span>
-        <h1
-          style={{
-            fontSize: 28,
-            fontWeight: 700,
-            letterSpacing: "-.02em",
-            color: SS_TOKENS.fg0,
-            margin: "4px 0 0",
-          }}
-        >
-          Recent events
-        </h1>
-      </header>
-
-      {entries.length === 0 ? <Empty /> : <List entries={entries} />}
-    </main>
+      <h2
+        id={headingId}
+        style={{
+          margin: "6px 4px 0",
+          fontSize: 20,
+          lineHeight: 1.15,
+          fontWeight: 750,
+          letterSpacing: 0,
+          color: SS_TOKENS.fg0,
+        }}
+      >
+        Recent events
+      </h2>
+      <ActivityEventsList entries={entries} />
+    </section>
   );
+}
+
+export function ActivityEventsList({ entries }: { entries: ActivityEntry[] }) {
+  return entries.length === 0 ? <Empty /> : <List entries={entries} />;
 }
 
 function Empty() {

@@ -8,7 +8,11 @@ import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { getRegistry } from "@/lib/registry";
 import { fleetHex } from "@/lib/seed";
-import { getFlightById, parseFlightId } from "@/lib/flights";
+import {
+  averageGroundSpeedKt,
+  getFlightById,
+  parseFlightId,
+} from "@/lib/flights";
 import { SS_TOKENS } from "@/lib/tokens";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { fmtDurationHuman, formatTs } from "@/lib/time";
@@ -66,6 +70,7 @@ export default async function FlightSharePage({ params }: Props) {
 
   const { session, points } = flight;
   const hour12 = isHour12(getTimeFormatPref());
+  const avgGroundSpeed = averageGroundSpeedKt(points);
 
   return (
     <main
@@ -180,6 +185,10 @@ export default async function FlightSharePage({ params }: Props) {
           <KV label="LAST SEEN" value={formatTs(session.end_ts, "datetime", { hour12 })} />
           <KV label="DURATION" value={fmtDurationHuman(session.duration_s)} />
           <KV label="SAMPLES" value={String(session.sample_count)} />
+          <KV
+            label="AVG GS"
+            value={avgGroundSpeed != null ? `${Math.round(avgGroundSpeed)} kt` : "—"}
+          />
           <KV
             label="MAX ALT"
             value={

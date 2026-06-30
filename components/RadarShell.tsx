@@ -14,10 +14,10 @@ import {
 import { computeStatus } from "@/lib/status";
 import { StatusPill } from "./StatusPill";
 import { RadarLayerControls } from "./RadarLayerControls";
-import { FlightPathLayer } from "./FlightPathLayer";
 import { UserZoneLayer } from "./UserZoneLayer";
 import { AircraftTrailLayer } from "./AircraftTrailLayer";
 import { aircraftColorForTail } from "@/lib/aircraft-colors";
+import { haversineNm } from "@/lib/geo";
 import {
   detectProximityHits,
   fireProximityNotifications,
@@ -31,7 +31,12 @@ import {
   hasExplicitRegion,
   setRegion,
 } from "@/lib/region-pref";
-import { DEFAULT_REGION, regionForPoint, type RegionId } from "@/lib/regions";
+import {
+  DEFAULT_REGION,
+  REGIONS,
+  regionForPoint,
+  type RegionId,
+} from "@/lib/regions";
 import type { Aircraft, FleetEntry, Snapshot } from "@/lib/types";
 
 export type RiderPos = { lat: number; lon: number };
@@ -51,6 +56,7 @@ const RadarMap = nextDynamic(() => import("./RadarMap"), {
 
 const TABBAR_HEIGHT = 66;
 const GLASS_BG_STRONG = SS_TOKENS.surface;
+const AIRBORNE_BUBBLE_LIMIT = 3;
 
 type Props = {
   initial: Snapshot;
@@ -83,13 +89,27 @@ export function RadarShell({
   const [toast, setToast] = useState<string | null>(null);
   const [map, setMap] = useState<MaplibreMap | null>(null);
   const [showRings, setShowRings] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   const [regionId, setRegionId] = useState<RegionId>(DEFAULT_REGION);
   const [focusRequest, setFocusRequest] = useState<{
     tail: string;
     seq: number;
   } | null>(null);
   const focusSeqRef = useRef(0);
+  const bubbleAircraft = useMemo(() => {
+    const region = REGIONS[regionId] ?? REGIONS[DEFAULT_REGION];
+    const origin = rider ?? { lat: region.centerLat, lon: region.centerLon };
+    return [...airborne]
+      .sort((a, b) => distanceFrom(origin, a) - distanceFrom(origin, b))
+      .slice(0, AIRBORNE_BUBBLE_LIMIT);
+  }, [airborne, rider, regionId]);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.dataset.radarMode = "true";
+    return () => {
+      delete document.body.dataset.radarMode;
+    };
+  }, []);
   // Hydrate the rings pref + region from localStorage on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -134,15 +154,16 @@ export function RadarShell({
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (document.visibilityState !== "visible") return;
-    if (!rider) return;
     if (!isProximityEnabled()) return;
+    const region = REGIONS[regionId];
+    if (!region) return;
     const hits = detectProximityHits(
       snap.aircraft,
-      rider,
+      { lat: region.centerLat, lon: region.centerLon },
       getProximityThresholdNm(),
     );
     if (hits.length > 0) void fireProximityNotifications(hits);
-  }, [snap.aircraft, rider]);
+  }, [snap.aircraft, regionId]);
 
   // Geolocation only kicks in when this component mounts — i.e. when the user
   // actually visits /radar. The home page never asks.
@@ -203,16 +224,13 @@ export function RadarShell({
         focusRequest={focusRequest}
         onMapReady={setMap}
       />
-      <RadarLayerControls />
-      <FlightPathLayer map={map} />
+      <RadarLayerControls
+        ringsActive={showRings}
+        onToggleRings={() => setShowRings((v) => !v)}
+        ringsDisabled={!rider}
+      />
       <UserZoneLayer map={map} />
       <AircraftTrailLayer map={map} airborne={airborne} />
-      <DistanceRingsToggle
-        active={showRings}
-        onToggle={() => setShowRings((v) => !v)}
-        bottom={`calc(${TABBAR_HEIGHT + 16}px + var(--ss-install-prompt-h, 0px))`}
-        disabled={!rider}
-      />
 
       <header
         style={{
@@ -233,12 +251,13 @@ export function RadarShell({
           sub={status.pillSub}
           big
           tooltip={pillTooltip}
+          style={{ marginLeft: 26 }}
         />
       </header>
 
-      {airborne.length > 0 && (
+      {bubbleAircraft.length > 0 && (
         <AirborneBubbles
-          airborne={airborne}
+          airborne={bubbleAircraft}
           onSelect={(tail) => {
             focusSeqRef.current += 1;
             setFocusRequest({ tail, seq: focusSeqRef.current });
@@ -249,6 +268,11 @@ export function RadarShell({
       {toast && <Toast message={toast} bottomBoost={0} />}
     </main>
   );
+}
+
+function distanceFrom(origin: RiderPos, aircraft: Aircraft): number {
+  if (aircraft.lat == null || aircraft.lon == null) return Number.POSITIVE_INFINITY;
+  return haversineNm(origin.lat, origin.lon, aircraft.lat, aircraft.lon);
 }
 
 function flashToast(
@@ -613,74 +637,6 @@ function Stat({ label, value }: { label: string; value: string }) {
         {value}
       </div>
     </div>
-  );
-}
-
-function DistanceRingsToggle({
-  active,
-  onToggle,
-  bottom,
-  disabled,
-}: {
-  active: boolean;
-  onToggle: () => void;
-  bottom: number | string;
-  disabled?: boolean;
-}) {
-  // Disabled when there's no rider position to pin the rings to. The toggle
-  // stays visible so the rider knows the feature exists.
-  return (
-    <Tooltip
-      side="top"
-      align="start"
-      content={
-        disabled
-          ? "Distance rings need your location. Allow location access on /radar."
-          : "1 / 3 / 5 nm rings around your position. Tap to toggle."
-      }
-    >
-      <button
-        type="button"
-        onClick={() => {
-          if (!disabled) onToggle();
-        }}
-        aria-pressed={active}
-        aria-disabled={disabled}
-        className="ss-mono"
-        style={{
-          position: "absolute",
-          left: 12,
-          bottom,
-          zIndex: 12,
-          width: 116,
-          height: 46,
-          padding: "0 12px",
-          borderRadius: 999,
-          background: GLASS_BG_STRONG,
-          border: `.5px solid ${SS_TOKENS.hairline2}`,
-          color: disabled
-            ? SS_TOKENS.fg3
-            : active
-              ? SS_TOKENS.alert
-              : SS_TOKENS.fg1,
-          fontSize: 11,
-          letterSpacing: 0,
-          boxShadow: SS_TOKENS.shadowMd,
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          cursor: disabled ? "not-allowed" : "pointer",
-          whiteSpace: "nowrap",
-          touchAction: "manipulation",
-          WebkitTapHighlightColor: "transparent",
-          opacity: disabled ? 0.6 : 1,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {active ? "Rings on" : "Rings"}
-      </button>
-    </Tooltip>
   );
 }
 

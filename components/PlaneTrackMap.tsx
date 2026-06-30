@@ -137,7 +137,7 @@ export default function PlaneTrackMap({
         source: "track",
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#f4c430",
+          "line-color": "#f6c431",
           "line-width": 3,
         },
       });

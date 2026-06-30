@@ -1,7 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { SS_TOKENS } from "@/lib/tokens";
 import {
   getCurrentSubscriptionId,
@@ -13,7 +18,7 @@ import {
   unsubscribePush,
   updatePushPrefs,
 } from "@/lib/push/client";
-import { DEFAULT_PREFS, type AlertPrefs } from "@/lib/push/types";
+import { DEFAULT_PREFS, type AlertPrefs, type UserZoneSpec } from "@/lib/push/types";
 import {
   DEFAULT_PROXIMITY_NM,
   getProximityThresholdNm,
@@ -21,7 +26,47 @@ import {
   setProximityEnabled,
   setProximityThresholdNm,
 } from "@/lib/proximity-alert";
-import { TRACKED_TAILS } from "@/lib/tracked-tails";
+import {
+  REGION_PROXIMITY_MAX_MI,
+  REGION_PROXIMITY_MIN_MI,
+  clampRegionProximityMiles,
+  clampRegionProximityNm,
+  nmToStatuteMiles,
+  statuteMilesToNm,
+} from "@/lib/proximity-limits";
+import {
+  DEFAULT_RIDE_STATUS_THRESHOLDS,
+  normalizeRideStatusThresholds,
+  rideStatusLabel,
+  type RideStatus,
+  type RideStatusThresholds,
+} from "@/lib/ride-mode";
+import {
+  DEFAULT_RIDE_STATUS_NOTIFICATIONS,
+  getRideStatusNotificationPrefs,
+  getRideStatusThresholds,
+  setRideStatusNotificationPrefs,
+  setRideStatusThresholds,
+  type RideStatusNotificationPrefs,
+} from "@/lib/ride-settings";
+import {
+  APP_REGIONS_BY_ID,
+  APP_STATES,
+  firstRegionForState,
+  stateForRegion,
+  type AppRegionId,
+  type AppStateId,
+} from "@/lib/app-regions";
+import {
+  REGION_CHANGE_EVENT,
+  getRegion,
+  setRegion,
+} from "@/lib/region-pref";
+import {
+  readStoredWakeLockEnabled,
+  WAKE_LOCK_CHANGE_EVENT,
+  writeStoredWakeLockEnabled,
+} from "@/lib/wake-lock";
 
 type LoadState = "loading" | "ready";
 
@@ -38,26 +83,76 @@ export function AlertsSettings() {
   const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULT_PREFS);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [wakeMode, setWakeMode] = useState(true);
+  const [wakeSupported, setWakeSupported] = useState(true);
   const [proximityOn, setProximityOn] = useState<boolean>(false);
   const [proximityNm, setProximityNm] = useState<number>(DEFAULT_PROXIMITY_NM);
+  const [proximityInput, setProximityInput] = useState<string>(
+    formatProximityMiles(DEFAULT_PROXIMITY_NM),
+  );
+  const [selectedRegionId, setSelectedRegionId] = useState<AppRegionId>(
+    () => getRegion(),
+  );
+  const [rideThresholds, setRideThresholds] =
+    useState<RideStatusThresholds>(DEFAULT_RIDE_STATUS_THRESHOLDS);
+  const [rideInputs, setRideInputs] = useState<Record<keyof RideStatusThresholds, string>>({
+    watchNm: String(DEFAULT_RIDE_STATUS_THRESHOLDS.watchNm),
+    warningNm: String(DEFAULT_RIDE_STATUS_THRESHOLDS.warningNm),
+    stopNm: String(DEFAULT_RIDE_STATUS_THRESHOLDS.stopNm),
+  });
+  const [rideNotifications, setRideNotifications] =
+    useState<RideStatusNotificationPrefs>(DEFAULT_RIDE_STATUS_NOTIFICATIONS);
 
   useEffect(() => {
+    const storedProximityNm = getProximityThresholdNm();
+    const storedRideThresholds = getRideStatusThresholds();
+    setWakeMode(readStoredWakeLockEnabled());
+    setWakeSupported("wakeLock" in navigator);
     setProximityOn(isProximityEnabled());
-    setProximityNm(getProximityThresholdNm());
+    setProximityNm(storedProximityNm);
+    setProximityInput(formatProximityMiles(storedProximityNm));
+    setSelectedRegionId(getRegion());
+    setRideThresholds(storedRideThresholds);
+    setRideInputs({
+      watchNm: String(storedRideThresholds.watchNm),
+      warningNm: String(storedRideThresholds.warningNm),
+      stopNm: String(storedRideThresholds.stopNm),
+    });
+    setRideNotifications(getRideStatusNotificationPrefs());
+  }, []);
+
+  useEffect(() => {
+    const onWakeChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ enabled?: boolean }>).detail;
+      setWakeMode(detail?.enabled ?? readStoredWakeLockEnabled());
+    };
+    window.addEventListener(WAKE_LOCK_CHANGE_EVENT, onWakeChange);
+    const onRegionChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: AppRegionId }>).detail;
+      setSelectedRegionId(detail?.id ?? getRegion());
+    };
+    window.addEventListener(REGION_CHANGE_EVENT, onRegionChange);
+    return () => {
+      window.removeEventListener(WAKE_LOCK_CHANGE_EVENT, onWakeChange);
+      window.removeEventListener(REGION_CHANGE_EVENT, onRegionChange);
+    };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const sup = isPushSupported();
-      setSupported(sup);
-      setContextOk(pushAvailableInThisContext());
-      setPermission(getPushPermission());
-      if (sup) {
-        const id = await getCurrentSubscriptionId();
-        if (!cancelled && id) setSubId(id);
+      try {
+        const sup = isPushSupported();
+        setSupported(sup);
+        setContextOk(pushAvailableInThisContext());
+        setPermission(getPushPermission());
+        if (sup) {
+          const id = await withTimeout(getCurrentSubscriptionId(), 1500, null);
+          if (!cancelled && id) setSubId(id);
+        }
+      } finally {
+        if (!cancelled) setLoadState("ready");
       }
-      if (!cancelled) setLoadState("ready");
     })();
     return () => {
       cancelled = true;
@@ -75,10 +170,28 @@ export function AlertsSettings() {
       tier: "all",
       zones: "any",
       tails: undefined,
-      userZones: undefined,
+      userZones: buildRegionZones(selectedRegionId, proximityOn, proximityNm),
+      region_id: selectedRegionId,
+      proximity_enabled: proximityOn,
+      proximity_nm: proximityNm,
     }),
-    [prefs],
+    [prefs, proximityNm, proximityOn, selectedRegionId],
   );
+
+  const proximityMi = useMemo(
+    () => clampRegionProximityMiles(nmToStatuteMiles(proximityNm)),
+    [proximityNm],
+  );
+
+  useEffect(() => {
+    if (!subId) return;
+    void updatePushPrefs(subId, {
+      userZones: buildRegionZones(selectedRegionId, proximityOn, proximityNm),
+      region_id: selectedRegionId,
+      proximity_enabled: proximityOn,
+      proximity_nm: proximityNm,
+    });
+  }, [proximityNm, proximityOn, selectedRegionId, subId]);
 
   const onArm = useCallback(async () => {
     setBusy(true);
@@ -127,6 +240,82 @@ export function AlertsSettings() {
     if (!ok) flash("Couldn't send the test ping.");
   }, [permission, flash]);
 
+  const onWakeToggle = useCallback((checked: boolean) => {
+    setWakeMode(checked);
+    writeStoredWakeLockEnabled(checked);
+  }, []);
+
+  const commitProximityMiles = useCallback((miles: number) => {
+    if (!Number.isFinite(miles)) return;
+    const clampedMiles = clampRegionProximityMiles(miles);
+    const clampedNm = clampRegionProximityNm(statuteMilesToNm(clampedMiles));
+    setProximityNm(clampedNm);
+    setProximityInput(formatMiles(clampedMiles));
+    setProximityThresholdNm(clampedNm);
+  }, []);
+
+  const onProximityInputBlur = useCallback(() => {
+    const n = Number(proximityInput);
+    if (Number.isFinite(n) && n > 0) {
+      commitProximityMiles(n);
+      return;
+    }
+    setProximityInput(formatProximityMiles(proximityNm));
+  }, [commitProximityMiles, proximityInput, proximityNm]);
+
+  const nudgeProximityMiles = useCallback(
+    (delta: number) => {
+      commitProximityMiles(proximityMi + delta);
+    },
+    [commitProximityMiles, proximityMi],
+  );
+
+  const commitRideThreshold = useCallback(
+    (key: keyof RideStatusThresholds, value: number) => {
+      if (!Number.isFinite(value)) return;
+      const next = setRideStatusThresholds({ ...rideThresholds, [key]: value });
+      setRideThresholds(next);
+      setRideInputs({
+        watchNm: String(next.watchNm),
+        warningNm: String(next.warningNm),
+        stopNm: String(next.stopNm),
+      });
+    },
+    [rideThresholds],
+  );
+
+  const onRideInputBlur = useCallback(
+    (key: keyof RideStatusThresholds) => {
+      const n = Number(rideInputs[key]);
+      if (Number.isFinite(n) && n > 0) {
+        commitRideThreshold(key, n);
+        return;
+      }
+      setRideInputs({
+        watchNm: String(rideThresholds.watchNm),
+        warningNm: String(rideThresholds.warningNm),
+        stopNm: String(rideThresholds.stopNm),
+      });
+    },
+    [commitRideThreshold, rideInputs, rideThresholds],
+  );
+
+  const onRideNotifyChange = useCallback(
+    (status: RideStatus, checked: boolean) => {
+      const next = setRideStatusNotificationPrefs({
+        ...rideNotifications,
+        [status]: checked,
+      });
+      setRideNotifications(next);
+    },
+    [rideNotifications],
+  );
+
+  const rideBands = useMemo(
+    () => buildRideBands(rideThresholds, rideNotifications),
+    [rideNotifications, rideThresholds],
+  );
+
   const statusBadge = useMemo<{ label: string; color: string; bg: string }>(
     () =>
       subId
@@ -139,41 +328,14 @@ export function AlertsSettings() {
     <main
       style={{
         minHeight: "100dvh",
-        padding: "12px 18px 180px",
-        maxWidth: 460,
+        padding: "22px 20px 170px",
+        maxWidth: 430,
         margin: "0 auto",
         display: "flex",
         flexDirection: "column",
         gap: 18,
       }}
     >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginTop: 4,
-        }}
-      >
-        <span className="ss-eyebrow">Alerts - Channel 19</span>
-        <Link
-          href="/"
-          className="ss-mono"
-          style={{
-            fontSize: 11,
-            color: SS_TOKENS.fg1,
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 44,
-            padding: "0 8px",
-            margin: "-12px -8px",
-          }}
-        >
-          Back
-        </Link>
-      </header>
-
       <h1
         style={{
           fontSize: 28,
@@ -184,8 +346,18 @@ export function AlertsSettings() {
           margin: 0,
         }}
       >
-        Get a ping when the bird's up.
+        Settings
       </h1>
+
+      <Section eyebrow="Device">
+        <PreferenceToggleRow
+          label="Wake mode"
+          checked={wakeMode}
+          onChange={onWakeToggle}
+          disabled={!wakeSupported}
+          stateText={wakeSupported ? undefined : "Unavailable"}
+        />
+      </Section>
 
       {loadState === "loading" ? (
         <Card>
@@ -243,7 +415,8 @@ export function AlertsSettings() {
                       lineHeight: 1.45,
                     }}
                   >
-                    Alerts are off. Arm once to follow the fixed aircraft list.
+                    Alerts are off. Arm once to allow proximity and ride-mode
+                    notifications.
                   </p>
                 )}
               </div>
@@ -287,7 +460,7 @@ export function AlertsSettings() {
             )}
           </Card>
 
-          <Section eyebrow="Tracked aircraft">
+          <Section eyebrow="Region">
             <p
               style={{
                 fontSize: 13,
@@ -296,54 +469,28 @@ export function AlertsSettings() {
                 lineHeight: 1.45,
               }}
             >
-              Alerts use this fixed list for everyone.
+              Background proximity alerts use the selected region center ZIP,
+              not your active location.
             </p>
-            <div
-              className="ss-mono"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))",
-                gap: 6,
+            <RegionChoice
+              regionId={selectedRegionId}
+              onStateChange={(stateId) => {
+                const next = firstRegionForState(stateId).id;
+                setSelectedRegionId(next);
+                setRegion(next);
               }}
-            >
-              {TRACKED_TAILS.map((tail) => (
-                <span
-                  key={tail}
-                  style={{
-                    padding: "7px 8px",
-                    borderRadius: 8,
-                    background: SS_TOKENS.bg2,
-                    border: `.5px solid ${SS_TOKENS.hairline2}`,
-                    color: SS_TOKENS.fg0,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textAlign: "center",
-                  }}
-                >
-                  {tail}
-                </span>
-              ))}
-            </div>
-          </Section>
-
-          <Section eyebrow="Proximity">
-            <p
-              style={{
-                fontSize: 13,
-                color: SS_TOKENS.fg1,
-                margin: 0,
-                lineHeight: 1.45,
+              onRegionChange={(regionId) => {
+                setSelectedRegionId(regionId);
+                setRegion(regionId);
               }}
-            >
-              While the app is open and GPS is granted, ping me when a tracked
-              bird gets within range.
-            </p>
+            />
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
                 marginTop: 10,
+                flexWrap: "wrap",
               }}
             >
               <label
@@ -371,39 +518,117 @@ export function AlertsSettings() {
                 </span>
               </label>
               <span style={{ flex: 1 }} />
+              <button
+                type="button"
+                onClick={() => nudgeProximityMiles(-1)}
+                disabled={!proximityOn || proximityMi <= REGION_PROXIMITY_MIN_MI}
+                aria-label="Decrease proximity range"
+                style={stepButtonStyle(
+                  !proximityOn || proximityMi <= REGION_PROXIMITY_MIN_MI,
+                )}
+              >
+                -
+              </button>
               <input
-                type="number"
-                min={1}
-                max={50}
-                value={proximityNm}
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.]?[0-9]*"
+                min={REGION_PROXIMITY_MIN_MI}
+                max={REGION_PROXIMITY_MAX_MI}
+                value={proximityInput}
                 onChange={(e) => {
-                  const n = Number(e.target.value);
-                  if (Number.isFinite(n) && n > 0) {
-                    setProximityNm(n);
-                    setProximityThresholdNm(n);
-                  }
+                  setProximityInput(e.target.value);
+                }}
+                onBlur={onProximityInputBlur}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
                 }}
                 disabled={!proximityOn}
-                aria-label="Proximity threshold in nautical miles"
+                aria-label="Proximity threshold in miles"
                 style={{
-                  width: 56,
-                  padding: "6px 8px",
+                  width: 72,
+                  minHeight: 40,
+                  padding: "6px 10px",
                   background: SS_TOKENS.bg2,
                   border: `.5px solid ${SS_TOKENS.hairline2}`,
-                  borderRadius: 6,
+                  borderRadius: 8,
                   color: SS_TOKENS.fg0,
                   fontFamily: "var(--font-mono)",
-                  fontSize: 13,
-                  textAlign: "right",
+                  fontSize: 16,
+                  textAlign: "center",
                   opacity: proximityOn ? 1 : 0.5,
                 }}
               />
+              <button
+                type="button"
+                onClick={() => nudgeProximityMiles(1)}
+                disabled={!proximityOn || proximityMi >= REGION_PROXIMITY_MAX_MI}
+                aria-label="Increase proximity range"
+                style={stepButtonStyle(
+                  !proximityOn || proximityMi >= REGION_PROXIMITY_MAX_MI,
+                )}
+              >
+                +
+              </button>
               <span
                 className="ss-mono"
                 style={{ fontSize: 11, color: SS_TOKENS.fg2 }}
               >
-                NM
+                MI
               </span>
+            </div>
+          </Section>
+
+          <Section eyebrow="Ride mode">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: 8,
+              }}
+            >
+              <RideThresholdInput
+                label="Clear above"
+                value={rideInputs.watchNm}
+                onChange={(value) =>
+                  setRideInputs((current) => ({ ...current, watchNm: value }))
+                }
+                onCommit={() => onRideInputBlur("watchNm")}
+              />
+              <RideThresholdInput
+                label="Warning within"
+                value={rideInputs.warningNm}
+                onChange={(value) =>
+                  setRideInputs((current) => ({
+                    ...current,
+                    warningNm: value,
+                  }))
+                }
+                onCommit={() => onRideInputBlur("warningNm")}
+              />
+              <RideThresholdInput
+                label="Stop within"
+                value={rideInputs.stopNm}
+                onChange={(value) =>
+                  setRideInputs((current) => ({ ...current, stopNm: value }))
+                }
+                onCommit={() => onRideInputBlur("stopNm")}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {rideBands.map((band) => (
+                <RideBandRow
+                  key={band.status}
+                  label={band.label}
+                  range={band.range}
+                  color={band.color}
+                  checked={band.notify}
+                  onChange={(checked) =>
+                    onRideNotifyChange(band.status, checked)
+                  }
+                />
+              ))}
             </div>
           </Section>
 
@@ -497,6 +722,414 @@ export function AlertsSettings() {
         </div>
       )}
     </main>
+  );
+}
+
+const RIDE_STATUS_COLORS: Record<RideStatus, string> = {
+  clear: SS_TOKENS.clear,
+  watch: SS_TOKENS.sky,
+  warning: SS_TOKENS.warn,
+  danger: SS_TOKENS.danger,
+};
+
+type RideBand = {
+  status: RideStatus;
+  label: string;
+  range: string;
+  color: string;
+  notify: boolean;
+};
+
+function normalizeProximityNm(nm: number): number {
+  return clampRegionProximityNm(nm);
+}
+
+function formatMiles(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatProximityMiles(nm: number): string {
+  return formatMiles(clampRegionProximityMiles(nmToStatuteMiles(nm)));
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(fallback), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        window.clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
+function buildRideBands(
+  thresholds: RideStatusThresholds,
+  notifications: RideStatusNotificationPrefs,
+): RideBand[] {
+  const t = normalizeRideStatusThresholds(thresholds);
+  return [
+    {
+      status: "clear",
+      label: rideStatusLabel("clear"),
+      range: `>${formatNm(t.watchNm)} nm`,
+      color: RIDE_STATUS_COLORS.clear,
+      notify: notifications.clear,
+    },
+    {
+      status: "watch",
+      label: rideStatusLabel("watch"),
+      range: `${formatNm(t.warningNm)}-${formatNm(t.watchNm)} nm`,
+      color: RIDE_STATUS_COLORS.watch,
+      notify: notifications.watch,
+    },
+    {
+      status: "warning",
+      label: rideStatusLabel("warning"),
+      range: `${formatNm(t.stopNm)}-${formatNm(t.warningNm)} nm`,
+      color: RIDE_STATUS_COLORS.warning,
+      notify: notifications.warning,
+    },
+    {
+      status: "danger",
+      label: rideStatusLabel("danger"),
+      range: `<=${formatNm(t.stopNm)} nm`,
+      color: RIDE_STATUS_COLORS.danger,
+      notify: notifications.danger,
+    },
+  ];
+}
+
+function formatNm(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function buildRegionZones(
+  regionId: AppRegionId,
+  enabled: boolean,
+  radiusNm: number,
+): UserZoneSpec[] {
+  if (!enabled) return [];
+  const region = APP_REGIONS_BY_ID[regionId];
+  return [
+    {
+      lat: region.centerLat,
+      lon: region.centerLon,
+      radiusNm: normalizeProximityNm(radiusNm),
+      label: `${region.label} ${region.zip}`,
+    },
+  ];
+}
+
+function RegionChoice({
+  regionId,
+  onStateChange,
+  onRegionChange,
+}: {
+  regionId: AppRegionId;
+  onStateChange: (stateId: AppStateId) => void;
+  onRegionChange: (regionId: AppRegionId) => void;
+}) {
+  const state = stateForRegion(regionId);
+  const region = APP_REGIONS_BY_ID[regionId];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <label style={selectLabelStyle}>
+        <span className="ss-mono" style={selectCaptionStyle}>
+          State
+        </span>
+        <select
+          value={state.id}
+          onChange={(event) => onStateChange(event.target.value as AppStateId)}
+          style={selectStyle}
+          aria-label="State"
+        >
+          {APP_STATES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label style={selectLabelStyle}>
+        <span className="ss-mono" style={selectCaptionStyle}>
+          Region
+        </span>
+        <select
+          value={region.id}
+          onChange={(event) => onRegionChange(event.target.value as AppRegionId)}
+          style={selectStyle}
+          aria-label="Region"
+        >
+          {state.regions.map((r) => (
+            <option key={r[0]} value={r[0]}>
+              {r[1]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div
+        className="ss-mono"
+        style={{
+          gridColumn: "1 / -1",
+          color: SS_TOKENS.fg2,
+          fontSize: 11,
+          lineHeight: 1.45,
+        }}
+      >
+        ZIP {region.zip} - {region.city}
+      </div>
+    </div>
+  );
+}
+
+function stepButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    border: `.5px solid ${SS_TOKENS.hairline2}`,
+    background: SS_TOKENS.bg2,
+    color: SS_TOKENS.fg0,
+    fontFamily: "var(--font-mono)",
+    fontSize: 22,
+    lineHeight: 1,
+    fontWeight: 700,
+    cursor: disabled ? "default" : "pointer",
+    opacity: disabled ? 0.45 : 1,
+    touchAction: "manipulation",
+    WebkitTapHighlightColor: "transparent",
+  };
+}
+
+const selectLabelStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 5,
+  minWidth: 0,
+};
+
+const selectCaptionStyle: CSSProperties = {
+  color: SS_TOKENS.fg2,
+  fontSize: 10,
+};
+
+const selectStyle: CSSProperties = {
+  minHeight: 42,
+  width: "100%",
+  borderRadius: 10,
+  border: `.5px solid ${SS_TOKENS.hairline2}`,
+  background: SS_TOKENS.bg2,
+  color: SS_TOKENS.fg0,
+  fontFamily: "inherit",
+  fontSize: 13,
+  fontWeight: 700,
+  padding: "8px 10px",
+};
+
+function PreferenceToggleRow({
+  label,
+  checked,
+  disabled = false,
+  stateText,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  stateText?: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        alignItems: "center",
+        gap: 12,
+        minHeight: 46,
+        padding: "8px 10px",
+        borderRadius: 10,
+        background: SS_TOKENS.bg2,
+        border: `.5px solid ${SS_TOKENS.hairline2}`,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      <span style={{ minWidth: 0 }}>
+        <span
+          style={{
+            display: "block",
+            color: SS_TOKENS.fg0,
+            fontSize: 14,
+            fontWeight: 750,
+            lineHeight: 1.2,
+          }}
+        >
+          {label}
+        </span>
+        <span
+          className="ss-mono"
+          style={{ color: SS_TOKENS.fg2, fontSize: 10, marginTop: 3 }}
+        >
+          {stateText ?? (checked ? "ON" : "OFF")}
+        </span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={label}
+      />
+    </label>
+  );
+}
+
+function RideThresholdInput({
+  label,
+  value,
+  onChange,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        minWidth: 0,
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <span
+        className="ss-mono"
+        style={{ color: SS_TOKENS.fg2, fontSize: 9.5, letterSpacing: 0 }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          alignItems: "center",
+          gap: 6,
+          minHeight: 40,
+          padding: "0 8px",
+          borderRadius: 8,
+          background: SS_TOKENS.bg2,
+          border: `.5px solid ${SS_TOKENS.hairline2}`,
+        }}
+      >
+        <input
+          type="text"
+          inputMode="decimal"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onCommit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+          aria-label={`${label} nautical miles`}
+          style={{
+            width: "100%",
+            minWidth: 0,
+            border: 0,
+            outline: "none",
+            background: "transparent",
+            color: SS_TOKENS.fg0,
+            fontFamily: "var(--font-mono)",
+            fontSize: 16,
+            textAlign: "center",
+          }}
+        />
+        <span className="ss-mono" style={{ color: SS_TOKENS.fg2, fontSize: 10 }}>
+          NM
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function RideBandRow({
+  label,
+  range,
+  color,
+  checked,
+  onChange,
+}: {
+  label: string;
+  range: string;
+  color: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        alignItems: "center",
+        gap: 12,
+        padding: "8px 10px",
+        borderRadius: 10,
+        background: SS_TOKENS.bg2,
+        border: `.5px solid ${SS_TOKENS.hairline2}`,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div
+          className="ss-mono"
+          style={{
+            color,
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: 0,
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </div>
+        <div
+          className="ss-mono"
+          style={{ color: SS_TOKENS.fg2, fontSize: 11, marginTop: 3 }}
+        >
+          {range}
+        </div>
+      </div>
+      <label
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          minHeight: 40,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+          aria-label={`${label} ride notification`}
+        />
+        <span className="ss-mono" style={{ color: SS_TOKENS.fg1, fontSize: 11 }}>
+          Notify
+        </span>
+      </label>
+    </div>
   );
 }
 

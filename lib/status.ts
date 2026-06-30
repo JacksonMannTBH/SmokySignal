@@ -3,10 +3,10 @@
 // (Glanceable), the radar status pill, the PWA app-icon badge, and the
 // embeddable /api/badge.svg all derive their copy from computeStatus().
 //
-// Alert classes (amber pill, all read SMOKEY UP): smokey, patrol, unknown
+// Alert classes (amber pill, all read BIRD UP): smokey, patrol, unknown
 // Clear classes (green pill, ALL CLEAR): sar, transport, nothing
 //
-// Smokey-as-umbrella: every law-enforcement aircraft surfaces as SMOKEY UP
+// Bird-as-umbrella: every law-enforcement aircraft surfaces as BIRD UP
 // on the rider-facing pill. The granular role taxonomy still drives body
 // copy (a fixed-wing smokey vs a patrol helicopter read differently
 // underneath the pill), but the headline is uniform.
@@ -21,7 +21,7 @@ export type StatusKind = "alert" | "clear";
 
 export type StatusState = {
   kind: StatusKind;
-  /** Top-line label inside the pill: SMOKEY UP / ALL CLEAR. */
+  /** Top-line label inside the pill: BIRD UP / ALL CLEAR. */
   pill: string;
   /** Optional sub-label inside the pill (e.g. "2 watching"). */
   pillSub?: string;
@@ -75,20 +75,20 @@ export function computeStatus(
   const alertCount =
     upByRole.smokey.length + upByRole.patrol.length + upByRole.unknown.length;
 
-  // Alert tier 1 — any smokey-class up. SMOKEY UP, amber.
+  // Alert tier 1 — any smokey-class up. BIRD UP, amber.
   if (upByRole.smokey.length > 0) {
     const lead = upByRole.smokey[0]!;
-    const otherSmokey = upByRole.smokey.length - 1;
+    const otherBirds = upByRole.smokey.length - 1;
     return {
       kind: "alert",
-      pill: "SMOKEY UP",
+      pill: "BIRD UP",
       pillSub: alertCount > 1 ? `${alertCount} up` : undefined,
-      headline: "Smokey's up.",
+      headline: "Eye In The Sky",
       body: lead.entry.nickname
         ? `${lead.entry.nickname} watching. Mind the throttle.`
         : "Speed enforcement plane in the air. Mind the throttle.",
       footnote:
-        otherSmokey > 0 || upByRole.patrol.length > 0
+        otherBirds > 0 || upByRole.patrol.length > 0
           ? buildAlertFootnote(upByRole, lead)
           : undefined,
       lead,
@@ -97,17 +97,17 @@ export function computeStatus(
     };
   }
 
-  // Alert tier 2 — patrol or unknown up (no smokey). Per the Smokey
-  // umbrella, the pill reads SMOKEY UP just like tier 1 — body copy
+  // Alert tier 2 — patrol or unknown up (no smokey). Per the Bird
+  // umbrella, the pill reads BIRD UP just like tier 1 — body copy
   // still distinguishes a patrol helicopter from a fixed-wing smokey
   // for context, but the headline is uniform.
   if (upByRole.patrol.length > 0 || upByRole.unknown.length > 0) {
     const lead = upByRole.patrol[0] ?? upByRole.unknown[0]!;
     return {
       kind: "alert",
-      pill: "SMOKEY UP",
+      pill: "BIRD UP",
       pillSub: alertCount > 1 ? `${alertCount} up` : undefined,
-      headline: "Smokey's up.",
+      headline: "Eye In The Sky",
       body: lead.entry.nickname
         ? `${lead.entry.nickname} in the air. Could be patrol.`
         : "Patrol helicopter in the air. Mind the throttle.",
@@ -125,8 +125,8 @@ export function computeStatus(
     return {
       kind: "clear",
       pill: "ALL CLEAR",
-      headline: "Smokey's down.",
-      body: "No bird up over Washington. Send it.",
+      headline: "No Eyes",
+      body: "No bird up in your selected state. Send it.",
       footnote: `${name} on a ${mission}.`,
       lead,
       alertCount: 0,
@@ -138,8 +138,8 @@ export function computeStatus(
   return {
     kind: "clear",
     pill: "ALL CLEAR",
-    headline: "Smokey's down.",
-    body: "No bird up over Washington. Send it.",
+    headline: "No Eyes",
+    body: "No bird up in your selected state. Send it.",
     lead: null,
     alertCount: 0,
     totalAirborne: 0,

@@ -76,7 +76,7 @@ export default function NotFound() {
       >
         <NavBtn href="/">Home</NavBtn>
         <NavBtn href="/radar">Radar</NavBtn>
-        <NavBtn href="/activity">Activity</NavBtn>
+        <NavBtn href="/dash#recent-events">Recent events</NavBtn>
       </nav>
     </main>
   );

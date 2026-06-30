@@ -36,14 +36,7 @@ export default async function HelpPage() {
     >
       <header
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          background: "rgba(255,255,255,0.86)",
           borderBottom: `.5px solid ${SS_TOKENS.hairline}`,
-          boxShadow: SS_TOKENS.shadowSm,
-          backdropFilter: "blur(22px) saturate(1.08)",
-          WebkitBackdropFilter: "blur(22px) saturate(1.08)",
         }}
       >
         <div

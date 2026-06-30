@@ -9,14 +9,24 @@ import {
 import { Tooltip } from "./Tooltip";
 
 const TABBAR_HEIGHT = 66;
+const PATH_ICON = "/icons/radar-path.svg";
+const RINGS_ICON = "/icons/radar-rings.svg";
 
 type Props = {
   /** Extra px above the tab bar; pass when the airborne carousel is on. */
   bottomBoost?: number;
+  ringsActive: boolean;
+  onToggleRings: () => void;
+  ringsDisabled?: boolean;
 };
 
-export function RadarLayerControls({ bottomBoost = 0 }: Props) {
-  const [flightPathsEnabled, setFlightPathsEnabled] = useState<boolean>(true);
+export function RadarLayerControls({
+  bottomBoost = 0,
+  ringsActive,
+  onToggleRings,
+  ringsDisabled = false,
+}: Props) {
+  const [flightPathsEnabled, setFlightPathsEnabled] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -61,7 +71,7 @@ export function RadarLayerControls({ bottomBoost = 0 }: Props) {
     }
   };
 
-  const bottom = TABBAR_HEIGHT + 16 + bottomBoost;
+  const bottom = TABBAR_HEIGHT + 80 + bottomBoost;
   const offsetCss = (extra: number) =>
     `calc(${bottom + extra}px + var(--ss-install-prompt-h, 0px))`;
 
@@ -69,57 +79,118 @@ export function RadarLayerControls({ bottomBoost = 0 }: Props) {
     <div
       style={{
         position: "absolute",
-        left: 136,
+        left: 12,
         bottom: offsetCss(0),
         zIndex: 12,
         display: "flex",
-        gap: 6,
-        flexWrap: "wrap",
-        maxWidth: "calc(100vw - 148px)",
+        flexDirection: "column",
+        gap: 8,
       }}
     >
       <Tooltip
-        side="top"
+        side="right"
         align="start"
-        content="30-day flight-path threads. Each line is one tail-day."
+        content={
+          ringsDisabled
+            ? "Distance rings need your location. Allow location access on /radar."
+            : "1 / 3 / 5 nm rings around your position. Tap to toggle."
+        }
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (!ringsDisabled) onToggleRings();
+          }}
+          aria-label="Toggle distance rings"
+          aria-pressed={ringsActive}
+          aria-disabled={ringsDisabled}
+          style={iconButtonStyle(ringsActive, ringsDisabled)}
+        >
+          <IconGlyph
+            src={RINGS_ICON}
+            active={ringsActive}
+            disabled={ringsDisabled}
+          />
+        </button>
+      </Tooltip>
+      <Tooltip
+        side="right"
+        align="start"
+        content="Current flight paths for aircraft actively in the air."
       >
         <button
           type="button"
           onClick={toggleFlightPaths}
+          aria-label="Toggle flight paths"
           aria-pressed={flightPathsEnabled}
-          className="ss-mono"
-          style={pillStyle(
-            flightPathsEnabled ? SS_TOKENS.alert : SS_TOKENS.fg1,
-          )}
+          style={iconButtonStyle(flightPathsEnabled)}
         >
-          {flightPathsEnabled ? "Flight paths on" : "Flight paths"}
+          <IconGlyph src={PATH_ICON} active={flightPathsEnabled} />
         </button>
       </Tooltip>
     </div>
   );
 }
 
-function pillStyle(color: string): React.CSSProperties {
+function iconButtonStyle(
+  active: boolean,
+  disabled = false,
+): React.CSSProperties {
   return {
-    width: 116,
-    height: 46,
-    padding: "0 12px",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.9)",
-    border: `.5px solid ${SS_TOKENS.hairline2}`,
-    color,
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: 0,
-    boxShadow: SS_TOKENS.shadowMd,
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
+    width: 44,
+    height: 44,
+    padding: 0,
+    borderRadius: 14,
+    background: active
+      ? "rgba(246, 196, 49, 0.18)"
+      : "rgba(15, 15, 15, 0.72)",
+    border: active
+      ? "1px solid rgba(246, 196, 49, 0.70)"
+      : `1px solid ${SS_TOKENS.hairline}`,
+    color: disabled
+      ? SS_TOKENS.fg3
+      : active
+        ? SS_TOKENS.alert
+        : SS_TOKENS.fg1,
+    boxShadow: active
+      ? "0 0 22px rgba(246, 196, 49, 0.24), 0 14px 34px rgba(0, 0, 0, 0.34)"
+      : "0 14px 34px rgba(0, 0, 0, 0.34)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+    cursor: disabled ? "not-allowed" : "pointer",
     touchAction: "manipulation",
     WebkitTapHighlightColor: "transparent",
+    opacity: disabled ? 0.58 : 1,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
   };
+}
+
+function IconGlyph({
+  src,
+  active,
+  disabled = false,
+}: {
+  src: string;
+  active: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 23,
+        height: 23,
+        display: "block",
+        background: disabled
+          ? SS_TOKENS.fg3
+          : active
+            ? SS_TOKENS.alert
+            : SS_TOKENS.fg1,
+        WebkitMask: `url(${src}) center / contain no-repeat`,
+        mask: `url(${src}) center / contain no-repeat`,
+      }}
+    />
+  );
 }

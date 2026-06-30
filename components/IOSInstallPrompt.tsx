@@ -118,8 +118,8 @@ export function IOSInstallPrompt() {
   }, [pulse]);
 
   // Publish prompt height as a CSS variable on <html> so other fixed-
-  // position components on /radar (HotZoneLayer's HOT ZONES / FLIGHT
-  // PATHS pills, the trail status badge) can offset above the prompt
+  // position components on /radar (layer controls, the trail status
+  // badge) can offset above the prompt
   // and not be hidden by it. Empty / 0 when the prompt isn't rendering.
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -162,7 +162,7 @@ export function IOSInstallPrompt() {
       // visible (the wrapper is still painted) but isn't tappable — taps on
       // text fall through to the radar layer underneath. The X button + the
       // post-install "Arm alerts" link are the only tap targets inside the
-      // prompt. Fixes verify-prod #10 (hot-zones filter click intercept).
+      // prompt.
       style={{
         position: "fixed",
         left: 0,

@@ -4,9 +4,8 @@
 
 export type AlertTier = "all" | "alert_only";
 
-/** Server-side mirror of a UserZone — coordinates + radius + label only,
- *  no IDs, no timestamps. The dispatcher matches takeoff coords against
- *  these on the server so a rider's zone list drives push routing. */
+/** Legacy server-side mirror of a UserZone. Proximity alerts now resolve
+ *  from region_id + proximity_nm instead of these coordinates. */
 export type UserZoneSpec = {
   lat: number;
   lon: number;
@@ -23,21 +22,23 @@ export type AlertPrefs = {
   tier: AlertTier;
   /**
    * 'any' → push for any qualifying takeoff regardless of where it happens.
-   * Otherwise an array of hot-zone cell IDs the rider has opted into.
+   * Other values are legacy zone IDs kept only so old subscriptions parse.
    */
   zones: string[] | "any";
-  /**
-   * Rider-defined geofences (synced from lib/user-zones.ts). When present
-   * + non-empty, the dispatcher matches takeoff coords against these in
-   * addition to the predefined `zones` list — predefined OR user match
-   * makes the takeoff eligible for that subscriber.
-   */
+  /** Legacy rider-defined geofences. Kept for compatibility with existing
+   * subscriptions; region proximity does not read these coordinates. */
   userZones?: UserZoneSpec[];
+  /** Selected app region id. Used by cron to know which regions to refresh. */
+  region_id?: string;
+  /** Whether background proximity notifications are armed for this sub. */
+  proximity_enabled?: boolean;
+  /** Radius used by the region-center geofence, stored internally in nautical miles. */
+  proximity_nm?: number;
   /**
    * Optional per-tail allow-list. When present + non-empty, the dispatcher
    * only fires for takeoffs of these specific tails (after tier filter).
    * Empty / undefined = no tail restriction. Useful for riders who only
-   * care about a specific Smokey.
+   * care about a specific Bird.
    */
   tails?: string[];
   /** Rider-local hour at which quiet hours START (24-hour, 0-23). */

@@ -5,8 +5,12 @@ import assert from "node:assert";
 import {
   bearingDeg,
   cardinalFromDeg,
+  cardinalTrackFromDeg,
   classifyRideStatus,
+  isSameCardinalTrack,
+  normalizeRideStatusThresholds,
   relativeBearingDeg,
+  rideStatusLabel,
 } from "./ride-mode";
 
 function assertAbout(actual: number, expected: number, tolerance = 0.5) {
@@ -41,6 +45,29 @@ test("cardinalFromDeg returns eight-way direction labels", () => {
   assert.equal(cardinalFromDeg(315), "NW");
 });
 
+test("cardinalTrackFromDeg reduces headings to N/E/S/W travel tracks", () => {
+  assert.equal(cardinalTrackFromDeg(0), "N");
+  assert.equal(cardinalTrackFromDeg(44), "N");
+  assert.equal(cardinalTrackFromDeg(46), "E");
+  assert.equal(cardinalTrackFromDeg(134), "E");
+  assert.equal(cardinalTrackFromDeg(136), "S");
+  assert.equal(cardinalTrackFromDeg(224), "S");
+  assert.equal(cardinalTrackFromDeg(226), "W");
+  assert.equal(cardinalTrackFromDeg(314), "W");
+  assert.equal(cardinalTrackFromDeg(316), "N");
+  assert.equal(cardinalTrackFromDeg(null), null);
+});
+
+test("isSameCardinalTrack matches aircraft movement with rider direction", () => {
+  assert.equal(isSameCardinalTrack(3, 358), true);
+  assert.equal(isSameCardinalTrack(87, 112), true);
+  assert.equal(isSameCardinalTrack(182, 201), true);
+  assert.equal(isSameCardinalTrack(271, 290), true);
+  assert.equal(isSameCardinalTrack(30, 95), false);
+  assert.equal(isSameCardinalTrack(undefined, 95), false);
+  assert.equal(isSameCardinalTrack(95, null), false);
+});
+
 test("classifyRideStatus follows ride-mode distance thresholds", () => {
   assert.equal(classifyRideStatus(null), "clear");
   assert.equal(classifyRideStatus(5.1), "clear");
@@ -50,4 +77,23 @@ test("classifyRideStatus follows ride-mode distance thresholds", () => {
   assert.equal(classifyRideStatus(1.1), "warning");
   assert.equal(classifyRideStatus(1), "danger");
   assert.equal(classifyRideStatus(0.5), "danger");
+});
+
+test("classifyRideStatus accepts custom ride-mode thresholds", () => {
+  const thresholds = { watchNm: 8, warningNm: 4, stopNm: 2 };
+  assert.equal(classifyRideStatus(8.1, thresholds), "clear");
+  assert.equal(classifyRideStatus(8, thresholds), "watch");
+  assert.equal(classifyRideStatus(4, thresholds), "warning");
+  assert.equal(classifyRideStatus(2, thresholds), "danger");
+});
+
+test("normalizeRideStatusThresholds keeps cutoffs ordered", () => {
+  assert.deepEqual(
+    normalizeRideStatusThresholds({ watchNm: 1, warningNm: 1, stopNm: 3 }),
+    { watchNm: 3.2, warningNm: 3.1, stopNm: 3 },
+  );
+});
+
+test("rideStatusLabel presents danger as Stop", () => {
+  assert.equal(rideStatusLabel("danger"), "Stop");
 });

@@ -1,10 +1,10 @@
 // Shared role-badge display helpers. Used by /about and /plane/[tail]
 // so the role taxonomy reads consistently across the app.
 //
-// Rider mental model: any law-enforcement aircraft is "Smokey". The
+// Rider mental model: any law-enforcement aircraft is "Bird". The
 // backend role taxonomy stays granular (smokey vs patrol vs unknown)
 // for plane-detail accuracy, but every rider-visible badge collapses
-// LE-tier roles to the single "SMOKEY" label. Tooltip body preserves
+// LE-tier roles to the single "BIRD" label. Tooltip body preserves
 // the airframe-specific detail for curious riders who hover.
 
 import type { FleetRole } from "./types";
@@ -15,7 +15,7 @@ export function roleBadgeText(role: FleetRole): string {
     case "smokey":
     case "patrol":
     case "unknown":
-      return "SMOKEY";
+      return "BIRD";
     case "sar":
       return "SEARCH & RESCUE";
     case "transport":
@@ -26,20 +26,20 @@ export function roleBadgeText(role: FleetRole): string {
 export function roleTooltip(role: FleetRole): string {
   switch (role) {
     case "smokey":
-      return "Smokey. Fixed-wing speed enforcement plane. Up = ease off.";
+      return "Bird. Fixed-wing speed enforcement plane. Up = ease off.";
     case "patrol":
-      return "Smokey. Multi-role helicopter — traffic enforcement, pursuit, or SAR. We err on alert.";
+      return "Bird. Multi-role helicopter — traffic enforcement, pursuit, or SAR. We err on alert.";
     case "sar":
       return "Search and rescue helicopter. Almost always responding to a rescue, not enforcement.";
     case "transport":
       return "State transport or photography aircraft. Not enforcement-related.";
     case "unknown":
-      return "Smokey. Role not yet confirmed. Treated as alert until classified.";
+      return "Bird. Role not yet confirmed. Treated as alert until classified.";
   }
 }
 
 /**
- * Inline style for the role badge pill. Smokey + patrol get the alert
+ * Inline style for the role badge pill. Bird + patrol get the alert
  * amber tint; sar / transport / unknown get a neutral fg2 tint.
  */
 export function roleBadgeStyle(role: FleetRole): React.CSSProperties {
