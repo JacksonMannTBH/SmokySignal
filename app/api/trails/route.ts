@@ -8,7 +8,7 @@
 //   - Sorted ascending by ts so a polyline reads from oldest → newest.
 
 import { NextResponse } from "next/server";
-import { getSnapshot } from "@/lib/snapshot";
+import { getSnapshotForRender } from "@/lib/snapshot";
 import { getCurrentFlightTrack, getLiveTrackWindow } from "@/lib/tracks";
 
 export const runtime = "nodejs";
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ trails: {} });
   }
 
-  const snap = await getSnapshot();
+  const snap = await getSnapshotForRender();
   const activeTails = new Set(
     snap.aircraft
       .filter((a) => a.airborne)

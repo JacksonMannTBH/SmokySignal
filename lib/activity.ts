@@ -274,8 +274,6 @@ export async function recordActivity(
         FEED_TTL_SECONDS,
       );
     }
-    // Takeoff events remain feed-only. Browser notifications are reserved for
-    // explicit local experiences such as proximity and ride-mode alerts.
   }
 
   try {

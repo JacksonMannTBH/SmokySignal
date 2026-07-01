@@ -5,7 +5,7 @@ import { ForecastGridView } from "@/components/ForecastGridView";
 import { LearningPanel } from "@/components/LearningPanel";
 import { getLearningState } from "@/lib/learning";
 import { getTimeFormatPref, isHour12 } from "@/lib/user-prefs";
-import { getSnapshot } from "@/lib/snapshot";
+import { getSnapshotForRender } from "@/lib/snapshot";
 import { getRegistry } from "@/lib/registry";
 import { computeStatus } from "@/lib/status";
 import {
@@ -34,7 +34,7 @@ export default async function ForecastPage({
   const [realGrid, realLearning, realSnap, fleet] = await Promise.all([
     getForecastGrid(),
     getLearningState(),
-    getSnapshot(),
+    getSnapshotForRender(),
     getRegistry(),
   ]);
   const grid = applyMockForecastGrid(realGrid, mockState);

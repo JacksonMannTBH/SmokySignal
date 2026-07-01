@@ -6,26 +6,10 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { SS_TOKENS } from "@/lib/tokens";
-import {
-  getCurrentSubscriptionId,
-  getPushPermission,
-  isPushSupported,
-  pushAvailableInThisContext,
-  showLocalTestNotification,
-  subscribePush,
-  unsubscribePush,
-  updatePushPrefs,
-} from "@/lib/push/client";
-import { DEFAULT_PREFS, type AlertPrefs, type UserZoneSpec } from "@/lib/push/types";
-import {
-  DEFAULT_PROXIMITY_NM,
-  getProximityThresholdNm,
-  isProximityEnabled,
-  setProximityEnabled,
-  setProximityThresholdNm,
-} from "@/lib/proximity-alert";
+import { DEFAULT_PROXIMITY_NM } from "@/lib/proximity-display";
 import {
   REGION_PROXIMITY_MAX_MI,
   REGION_PROXIMITY_MIN_MI,
@@ -42,12 +26,8 @@ import {
   type RideStatusThresholds,
 } from "@/lib/ride-mode";
 import {
-  DEFAULT_RIDE_STATUS_NOTIFICATIONS,
-  getRideStatusNotificationPrefs,
   getRideStatusThresholds,
-  setRideStatusNotificationPrefs,
   setRideStatusThresholds,
-  type RideStatusNotificationPrefs,
 } from "@/lib/ride-settings";
 import {
   APP_REGIONS_BY_ID,
@@ -63,26 +43,49 @@ import {
   setRegion,
 } from "@/lib/region-pref";
 import {
+  disableAircraftProximityAlerts,
+  enableAircraftProximityAlerts,
+  getStoredAircraftAlertRangeNm,
+  readAircraftAlertStatus,
+  sendAircraftAlertTest,
+  syncAircraftAlertPreferences,
+} from "@/lib/aircraft-alerts/client";
+import type { AircraftAlertStatus } from "@/lib/aircraft-alerts/types";
+import {
   readStoredWakeLockEnabled,
   WAKE_LOCK_CHANGE_EVENT,
   writeStoredWakeLockEnabled,
 } from "@/lib/wake-lock";
 
-type LoadState = "loading" | "ready";
+const SOON_MESSAGE = "Ride-mode notifications are not part of this rebuild yet.";
+
+type DeliveryState = "checking" | "off" | "on" | "unsupported" | "not_configured" | "denied";
+
+type QuietHours = {
+  quietStartH: number;
+  quietEndH: number;
+  tz: string;
+};
+
+type RideStatusNotificationPrefs = Record<RideStatus, boolean>;
+
+const DEFAULT_QUIET_HOURS: QuietHours = {
+  quietStartH: 23,
+  quietEndH: 6,
+  tz: "America/Los_Angeles",
+};
+
+const DEFAULT_RIDE_STATUS_NOTIFICATIONS: RideStatusNotificationPrefs = {
+  clear: true,
+  watch: true,
+  warning: true,
+  danger: true,
+};
 
 export function AlertsSettings() {
-  const [loadState, setLoadState] = useState<LoadState>("loading");
-  const [supported, setSupported] = useState(true);
-  const [contextOk, setContextOk] = useState<{
-    available: boolean;
-    reason?: "ios-not-pwa" | "ios-too-old";
-  }>({ available: true });
-  const [permission, setPermission] =
-    useState<NotificationPermission>("default");
-  const [subId, setSubId] = useState<string | null>(null);
-  const [prefs, setPrefs] = useState<AlertPrefs>(DEFAULT_PREFS);
   const [toast, setToast] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [deliveryState, setDeliveryState] = useState<DeliveryState>("checking");
+  const [deliveryBusy, setDeliveryBusy] = useState(false);
   const [wakeMode, setWakeMode] = useState(true);
   const [wakeSupported, setWakeSupported] = useState(true);
   const [proximityOn, setProximityOn] = useState<boolean>(false);
@@ -93,6 +96,7 @@ export function AlertsSettings() {
   const [selectedRegionId, setSelectedRegionId] = useState<AppRegionId>(
     () => getRegion(),
   );
+  const [quietHours, setQuietHours] = useState<QuietHours>(DEFAULT_QUIET_HOURS);
   const [rideThresholds, setRideThresholds] =
     useState<RideStatusThresholds>(DEFAULT_RIDE_STATUS_THRESHOLDS);
   const [rideInputs, setRideInputs] = useState<Record<keyof RideStatusThresholds, string>>({
@@ -104,21 +108,37 @@ export function AlertsSettings() {
     useState<RideStatusNotificationPrefs>(DEFAULT_RIDE_STATUS_NOTIFICATIONS);
 
   useEffect(() => {
-    const storedProximityNm = getProximityThresholdNm();
+    let cancelled = false;
     const storedRideThresholds = getRideStatusThresholds();
+    const storedRange = getStoredAircraftAlertRangeNm();
     setWakeMode(readStoredWakeLockEnabled());
     setWakeSupported("wakeLock" in navigator);
-    setProximityOn(isProximityEnabled());
-    setProximityNm(storedProximityNm);
-    setProximityInput(formatProximityMiles(storedProximityNm));
     setSelectedRegionId(getRegion());
+    setProximityNm(storedRange);
+    setProximityInput(formatProximityMiles(storedRange));
     setRideThresholds(storedRideThresholds);
     setRideInputs({
       watchNm: String(storedRideThresholds.watchNm),
       warningNm: String(storedRideThresholds.warningNm),
       stopNm: String(storedRideThresholds.stopNm),
     });
-    setRideNotifications(getRideStatusNotificationPrefs());
+    readAircraftAlertStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setProximityOn(status.enabled);
+        if (status.regionId) setSelectedRegionId(status.regionId);
+        if (status.proximityRangeNm) {
+          setProximityNm(status.proximityRangeNm);
+          setProximityInput(formatProximityMiles(status.proximityRangeNm));
+        }
+        setDeliveryState(deliveryStateFromStatus(status));
+      })
+      .catch(() => {
+        if (!cancelled) setDeliveryState("off");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -126,36 +146,15 @@ export function AlertsSettings() {
       const detail = (event as CustomEvent<{ enabled?: boolean }>).detail;
       setWakeMode(detail?.enabled ?? readStoredWakeLockEnabled());
     };
-    window.addEventListener(WAKE_LOCK_CHANGE_EVENT, onWakeChange);
     const onRegionChange = (event: Event) => {
       const detail = (event as CustomEvent<{ id?: AppRegionId }>).detail;
       setSelectedRegionId(detail?.id ?? getRegion());
     };
+    window.addEventListener(WAKE_LOCK_CHANGE_EVENT, onWakeChange);
     window.addEventListener(REGION_CHANGE_EVENT, onRegionChange);
     return () => {
       window.removeEventListener(WAKE_LOCK_CHANGE_EVENT, onWakeChange);
       window.removeEventListener(REGION_CHANGE_EVENT, onRegionChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const sup = isPushSupported();
-        setSupported(sup);
-        setContextOk(pushAvailableInThisContext());
-        setPermission(getPushPermission());
-        if (sup) {
-          const id = await withTimeout(getCurrentSubscriptionId(), 1500, null);
-          if (!cancelled && id) setSubId(id);
-        }
-      } finally {
-        if (!cancelled) setLoadState("ready");
-      }
-    })();
-    return () => {
-      cancelled = true;
     };
   }, []);
 
@@ -164,81 +163,63 @@ export function AlertsSettings() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  const fixedPrefs = useMemo<AlertPrefs>(
-    () => ({
-      ...prefs,
-      tier: "all",
-      zones: "any",
-      tails: undefined,
-      userZones: buildRegionZones(selectedRegionId, proximityOn, proximityNm),
-      region_id: selectedRegionId,
-      proximity_enabled: proximityOn,
-      proximity_nm: proximityNm,
-    }),
-    [prefs, proximityNm, proximityOn, selectedRegionId],
-  );
-
   const proximityMi = useMemo(
     () => clampRegionProximityMiles(nmToStatuteMiles(proximityNm)),
     [proximityNm],
   );
 
-  useEffect(() => {
-    if (!subId) return;
-    void updatePushPrefs(subId, {
-      userZones: buildRegionZones(selectedRegionId, proximityOn, proximityNm),
-      region_id: selectedRegionId,
-      proximity_enabled: proximityOn,
-      proximity_nm: proximityNm,
-    });
-  }, [proximityNm, proximityOn, selectedRegionId, subId]);
-
   const onArm = useCallback(async () => {
-    setBusy(true);
-    const r = await subscribePush(fixedPrefs);
-    setBusy(false);
-    setPermission(getPushPermission());
-    if (r.ok) {
-      setSubId(r.id);
-      flash("10-4. We'll keep you posted.");
-    } else if (r.reason === "denied") {
-      flash("Browser blocked alerts. Update permission in your settings.");
-    } else if (r.reason === "vapid_missing") {
-      flash("Push isn't configured on this build. Try the live site.");
-    } else if (r.reason === "unsupported") {
-      flash("This browser doesn't support push.");
-    } else {
-      flash("Couldn't subscribe. Try again in a moment.");
+    setDeliveryBusy(true);
+    try {
+      const status = await enableAircraftProximityAlerts({
+        regionId: selectedRegionId,
+        stateId: stateForRegion(selectedRegionId).id,
+        proximityRangeNm: proximityNm,
+      });
+      setProximityOn(true);
+      setDeliveryState(deliveryStateFromStatus(status));
+      flash("Aircraft proximity alerts armed.");
+    } catch (error) {
+      const next = deliveryStateFromError(error);
+      setDeliveryState(next);
+      flash(messageForDeliveryState(next));
+    } finally {
+      setDeliveryBusy(false);
     }
-  }, [fixedPrefs, flash]);
+  }, [flash, proximityNm, selectedRegionId]);
 
   const onDisarm = useCallback(async () => {
-    setBusy(true);
-    await unsubscribePush();
-    setBusy(false);
-    setSubId(null);
-    flash("Off the air. Channel 19 still open if you change your mind.");
+    setDeliveryBusy(true);
+    try {
+      await disableAircraftProximityAlerts();
+      setProximityOn(false);
+      setDeliveryState("off");
+      flash("Aircraft proximity alerts disarmed.");
+    } catch {
+      flash("Could not disarm alerts. Try again.");
+    } finally {
+      setDeliveryBusy(false);
+    }
   }, [flash]);
 
-  const persistPrefs = useCallback(
-    async (next: Partial<AlertPrefs>) => {
-      const merged: AlertPrefs = { ...prefs, ...next };
-      setPrefs(merged);
-      if (!subId) return;
-      const ok = await updatePushPrefs(subId, next);
-      if (!ok) flash("Couldn't save preference. Try again.");
+  const syncDeliveryPrefs = useCallback(
+    async (regionId: AppRegionId, rangeNm: number) => {
+      try {
+        const status = await syncAircraftAlertPreferences({
+          regionId,
+          stateId: stateForRegion(regionId).id,
+          proximityRangeNm: rangeNm,
+        });
+        if (status) {
+          setProximityOn(status.enabled);
+          setDeliveryState(deliveryStateFromStatus(status));
+        }
+      } catch {
+        flash("Could not sync alert settings.");
+      }
     },
-    [prefs, subId, flash],
+    [flash],
   );
-
-  const onTest = useCallback(async () => {
-    if (permission !== "granted") {
-      flash("Arm alerts first to receive the test ping.");
-      return;
-    }
-    const ok = await showLocalTestNotification();
-    if (!ok) flash("Couldn't send the test ping.");
-  }, [permission, flash]);
 
   const onWakeToggle = useCallback((checked: boolean) => {
     setWakeMode(checked);
@@ -251,8 +232,8 @@ export function AlertsSettings() {
     const clampedNm = clampRegionProximityNm(statuteMilesToNm(clampedMiles));
     setProximityNm(clampedNm);
     setProximityInput(formatMiles(clampedMiles));
-    setProximityThresholdNm(clampedNm);
-  }, []);
+    void syncDeliveryPrefs(selectedRegionId, clampedNm);
+  }, [selectedRegionId, syncDeliveryPrefs]);
 
   const onProximityInputBlur = useCallback(() => {
     const n = Number(proximityInput);
@@ -302,26 +283,15 @@ export function AlertsSettings() {
 
   const onRideNotifyChange = useCallback(
     (status: RideStatus, checked: boolean) => {
-      const next = setRideStatusNotificationPrefs({
-        ...rideNotifications,
-        [status]: checked,
-      });
-      setRideNotifications(next);
+      setRideNotifications((current) => ({ ...current, [status]: checked }));
+      flash(SOON_MESSAGE);
     },
-    [rideNotifications],
+    [flash],
   );
 
   const rideBands = useMemo(
     () => buildRideBands(rideThresholds, rideNotifications),
     [rideNotifications, rideThresholds],
-  );
-
-  const statusBadge = useMemo<{ label: string; color: string; bg: string }>(
-    () =>
-      subId
-        ? { label: "ARMED", color: SS_TOKENS.alert, bg: SS_TOKENS.alertDim }
-        : { label: "OFF", color: SS_TOKENS.fg2, bg: SS_TOKENS.bg2 },
-    [subId],
   );
 
   return (
@@ -359,339 +329,333 @@ export function AlertsSettings() {
         />
       </Section>
 
-      {loadState === "loading" ? (
-        <Card>
-          <p style={{ color: SS_TOKENS.fg2, fontSize: 13 }}>Checking...</p>
-        </Card>
-      ) : !supported ? (
-        <UnsupportedCard />
-      ) : !contextOk.available ? (
-        <IosNotPwaCard reason={contextOk.reason} />
-      ) : (
-        <>
-          <Card>
+      <Card>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div>
             <div
+              className="ss-mono"
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
+                fontSize: 9.5,
+                letterSpacing: 0,
+                color: SS_TOKENS.fg2,
               }}
             >
-              <div>
-                <div
-                  className="ss-mono"
-                  style={{
-                    fontSize: 9.5,
-                    letterSpacing: 0,
-                    color: SS_TOKENS.fg2,
-                  }}
-                >
-                  STATUS
-                </div>
-                <div
-                  className="ss-mono"
-                  style={{
-                    display: "inline-block",
-                    marginTop: 6,
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: 0,
-                    color: statusBadge.color,
-                    background: statusBadge.bg,
-                    border: `.5px solid ${statusBadge.color}55`,
-                  }}
-                >
-                  {statusBadge.label}
-                </div>
-                {!subId && (
-                  <p
-                    style={{
-                      marginTop: 10,
-                      fontSize: 13,
-                      color: SS_TOKENS.fg2,
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    Alerts are off. Arm once to allow proximity and ride-mode
-                    notifications.
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={subId ? onDisarm : onArm}
-                disabled={busy || permission === "denied"}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 999,
-                  border: 0,
-                  background: subId ? SS_TOKENS.bg2 : SS_TOKENS.alert,
-                  color: subId ? SS_TOKENS.fg1 : SS_TOKENS.bg0,
-                  fontFamily: "var(--font-brand)",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  letterSpacing: 0,
-                  cursor:
-                    busy || permission === "denied" ? "default" : "pointer",
-                  opacity: busy || permission === "denied" ? 0.6 : 1,
-                  touchAction: "manipulation",
-                  WebkitTapHighlightColor: "transparent",
-                }}
-              >
-                {subId ? "Disarm" : "Arm alerts"}
-              </button>
+              STATUS
             </div>
-
-            {permission === "denied" && (
-              <p
-                style={{
-                  marginTop: 12,
-                  fontSize: 12.5,
-                  color: SS_TOKENS.danger,
-                  lineHeight: 1.45,
-                }}
-              >
-                Your browser blocked alerts. Open Safari settings for Out Of
-                Sight to fix.
-              </p>
-            )}
-          </Card>
-
-          <Section eyebrow="Region">
+            <div
+              className="ss-mono"
+              style={{
+                display: "inline-block",
+                marginTop: 6,
+                padding: "3px 10px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0,
+                color: deliveryState === "on" ? SS_TOKENS.alert : SS_TOKENS.fg2,
+                background: SS_TOKENS.bg2,
+                border: `.5px solid ${deliveryState === "on" ? SS_TOKENS.alert : `${SS_TOKENS.fg2}55`}`,
+              }}
+            >
+              {deliveryStatusLabel(deliveryState)}
+            </div>
             <p
               style={{
+                marginTop: 10,
                 fontSize: 13,
-                color: SS_TOKENS.fg1,
-                margin: 0,
-                lineHeight: 1.45,
-              }}
-            >
-              Background proximity alerts use the selected region center ZIP,
-              not your active location.
-            </p>
-            <RegionChoice
-              regionId={selectedRegionId}
-              onStateChange={(stateId) => {
-                const next = firstRegionForState(stateId).id;
-                setSelectedRegionId(next);
-                setRegion(next);
-              }}
-              onRegionChange={(regionId) => {
-                setSelectedRegionId(regionId);
-                setRegion(regionId);
-              }}
-            />
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginTop: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={proximityOn}
-                  onChange={(e) => {
-                    const next = e.target.checked;
-                    setProximityOn(next);
-                    setProximityEnabled(next);
-                  }}
-                />
-                <span
-                  className="ss-mono"
-                  style={{ fontSize: 12, letterSpacing: 0 }}
-                >
-                  ENABLED
-                </span>
-              </label>
-              <span style={{ flex: 1 }} />
-              <button
-                type="button"
-                onClick={() => nudgeProximityMiles(-1)}
-                disabled={!proximityOn || proximityMi <= REGION_PROXIMITY_MIN_MI}
-                aria-label="Decrease proximity range"
-                style={stepButtonStyle(
-                  !proximityOn || proximityMi <= REGION_PROXIMITY_MIN_MI,
-                )}
-              >
-                -
-              </button>
-              <input
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]*[.]?[0-9]*"
-                min={REGION_PROXIMITY_MIN_MI}
-                max={REGION_PROXIMITY_MAX_MI}
-                value={proximityInput}
-                onChange={(e) => {
-                  setProximityInput(e.target.value);
-                }}
-                onBlur={onProximityInputBlur}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                disabled={!proximityOn}
-                aria-label="Proximity threshold in miles"
-                style={{
-                  width: 72,
-                  minHeight: 40,
-                  padding: "6px 10px",
-                  background: SS_TOKENS.bg2,
-                  border: `.5px solid ${SS_TOKENS.hairline2}`,
-                  borderRadius: 8,
-                  color: SS_TOKENS.fg0,
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 16,
-                  textAlign: "center",
-                  opacity: proximityOn ? 1 : 0.5,
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => nudgeProximityMiles(1)}
-                disabled={!proximityOn || proximityMi >= REGION_PROXIMITY_MAX_MI}
-                aria-label="Increase proximity range"
-                style={stepButtonStyle(
-                  !proximityOn || proximityMi >= REGION_PROXIMITY_MAX_MI,
-                )}
-              >
-                +
-              </button>
-              <span
-                className="ss-mono"
-                style={{ fontSize: 11, color: SS_TOKENS.fg2 }}
-              >
-                MI
-              </span>
-            </div>
-          </Section>
-
-          <Section eyebrow="Ride mode">
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: 8,
-              }}
-            >
-              <RideThresholdInput
-                label="Clear above"
-                value={rideInputs.watchNm}
-                onChange={(value) =>
-                  setRideInputs((current) => ({ ...current, watchNm: value }))
-                }
-                onCommit={() => onRideInputBlur("watchNm")}
-              />
-              <RideThresholdInput
-                label="Warning within"
-                value={rideInputs.warningNm}
-                onChange={(value) =>
-                  setRideInputs((current) => ({
-                    ...current,
-                    warningNm: value,
-                  }))
-                }
-                onCommit={() => onRideInputBlur("warningNm")}
-              />
-              <RideThresholdInput
-                label="Stop within"
-                value={rideInputs.stopNm}
-                onChange={(value) =>
-                  setRideInputs((current) => ({ ...current, stopNm: value }))
-                }
-                onCommit={() => onRideInputBlur("stopNm")}
-              />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {rideBands.map((band) => (
-                <RideBandRow
-                  key={band.status}
-                  label={band.label}
-                  range={band.range}
-                  color={band.color}
-                  checked={band.notify}
-                  onChange={(checked) =>
-                    onRideNotifyChange(band.status, checked)
-                  }
-                />
-              ))}
-            </div>
-          </Section>
-
-          <Section eyebrow="Quiet hours">
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <HourInput
-                value={prefs.quiet_start_h}
-                onChange={(h) => persistPrefs({ quiet_start_h: h })}
-              />
-              <span
-                className="ss-mono"
-                style={{ color: SS_TOKENS.fg2, fontSize: 12 }}
-              >
-                to
-              </span>
-              <HourInput
-                value={prefs.quiet_end_h}
-                onChange={(h) => persistPrefs({ quiet_end_h: h })}
-              />
-              <span
-                className="ss-mono"
-                style={{ color: SS_TOKENS.fg2, fontSize: 11 }}
-              >
-                {prefs.tz}
-              </span>
-            </div>
-            <p
-              style={{
-                marginTop: 10,
-                fontSize: 12,
                 color: SS_TOKENS.fg2,
                 lineHeight: 1.45,
               }}
             >
-              Channel 19 stays quiet between these hours.
+              {deliveryStatusCopy(deliveryState)}
             </p>
-          </Section>
+          </div>
+          <button
+            type="button"
+            onClick={deliveryState === "on" ? onDisarm : onArm}
+            disabled={deliveryBusy || deliveryState === "unsupported" || deliveryState === "not_configured"}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 999,
+              border: 0,
+              background: deliveryState === "on" ? SS_TOKENS.bg2 : SS_TOKENS.alert,
+              color: deliveryState === "on" ? SS_TOKENS.fg0 : SS_TOKENS.bg0,
+              fontFamily: "var(--font-brand)",
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: 0,
+              cursor:
+                deliveryBusy ||
+                deliveryState === "unsupported" ||
+                deliveryState === "not_configured"
+                  ? "default"
+                  : "pointer",
+              opacity:
+                deliveryBusy ||
+                deliveryState === "unsupported" ||
+                deliveryState === "not_configured"
+                  ? 0.62
+                  : 1,
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            {deliveryBusy
+              ? "Working"
+              : deliveryState === "on"
+                ? "Disarm"
+                : "Arm alerts"}
+          </button>
+        </div>
+      </Card>
 
-          <Section eyebrow="Test">
-            <button
-              type="button"
-              onClick={onTest}
-              disabled={permission !== "granted"}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 999,
-                border: `.5px solid ${SS_TOKENS.hairline2}`,
-                background: SS_TOKENS.bg2,
-                color: SS_TOKENS.fg0,
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-                letterSpacing: 0,
-                cursor: permission === "granted" ? "pointer" : "default",
-                opacity: permission === "granted" ? 1 : 0.5,
-                touchAction: "manipulation",
-                WebkitTapHighlightColor: "transparent",
+      <Section eyebrow="Region">
+        <p
+          style={{
+            fontSize: 13,
+            color: SS_TOKENS.fg1,
+            margin: 0,
+            lineHeight: 1.45,
+          }}
+        >
+          Aircraft proximity alerts use this region center and your selected
+          range when checking live aircraft server-side.
+        </p>
+        <RegionChoice
+          regionId={selectedRegionId}
+          onStateChange={(stateId) => {
+            const next = firstRegionForState(stateId).id;
+            setSelectedRegionId(next);
+            setRegion(next);
+            void syncDeliveryPrefs(next, proximityNm);
+          }}
+          onRegionChange={(regionId) => {
+            setSelectedRegionId(regionId);
+            setRegion(regionId);
+            void syncDeliveryPrefs(regionId, proximityNm);
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={proximityOn}
+              onChange={(e) => {
+                if (e.target.checked) void onArm();
+                else void onDisarm();
               }}
+            />
+            <span
+              className="ss-mono"
+              style={{ fontSize: 12, letterSpacing: 0 }}
             >
-              Send me a test ping
-            </button>
-          </Section>
-        </>
-      )}
+              ENABLED
+            </span>
+          </label>
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            onClick={() => nudgeProximityMiles(-1)}
+            disabled={!proximityOn || proximityMi <= REGION_PROXIMITY_MIN_MI}
+            aria-label="Decrease proximity range"
+            style={stepButtonStyle(
+              !proximityOn || proximityMi <= REGION_PROXIMITY_MIN_MI,
+            )}
+          >
+            -
+          </button>
+          <input
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]*[.]?[0-9]*"
+            min={REGION_PROXIMITY_MIN_MI}
+            max={REGION_PROXIMITY_MAX_MI}
+            value={proximityInput}
+            onChange={(e) => {
+              setProximityInput(e.target.value);
+            }}
+            onBlur={onProximityInputBlur}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            disabled={!proximityOn}
+            aria-label="Proximity threshold in miles"
+            style={{
+              width: 72,
+              minHeight: 40,
+              padding: "6px 10px",
+              background: SS_TOKENS.bg2,
+              border: `.5px solid ${SS_TOKENS.hairline2}`,
+              borderRadius: 8,
+              color: SS_TOKENS.fg0,
+              fontFamily: "var(--font-mono)",
+              fontSize: 16,
+              textAlign: "center",
+              opacity: proximityOn ? 1 : 0.5,
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => nudgeProximityMiles(1)}
+            disabled={!proximityOn || proximityMi >= REGION_PROXIMITY_MAX_MI}
+            aria-label="Increase proximity range"
+            style={stepButtonStyle(
+              !proximityOn || proximityMi >= REGION_PROXIMITY_MAX_MI,
+            )}
+          >
+            +
+          </button>
+          <span
+            className="ss-mono"
+            style={{ fontSize: 11, color: SS_TOKENS.fg2 }}
+          >
+            MI
+          </span>
+        </div>
+      </Section>
+
+      <Section eyebrow="Ride mode">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 8,
+          }}
+        >
+          <RideThresholdInput
+            label="Clear above"
+            value={rideInputs.watchNm}
+            onChange={(value) =>
+              setRideInputs((current) => ({ ...current, watchNm: value }))
+            }
+            onCommit={() => onRideInputBlur("watchNm")}
+          />
+          <RideThresholdInput
+            label="Warning within"
+            value={rideInputs.warningNm}
+            onChange={(value) =>
+              setRideInputs((current) => ({ ...current, warningNm: value }))
+            }
+            onCommit={() => onRideInputBlur("warningNm")}
+          />
+          <RideThresholdInput
+            label="Stop within"
+            value={rideInputs.stopNm}
+            onChange={(value) =>
+              setRideInputs((current) => ({ ...current, stopNm: value }))
+            }
+            onCommit={() => onRideInputBlur("stopNm")}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rideBands.map((band) => (
+            <RideBandRow
+              key={band.status}
+              label={band.label}
+              range={band.range}
+              color={band.color}
+              checked={band.notify}
+              onChange={(checked) => onRideNotifyChange(band.status, checked)}
+            />
+          ))}
+        </div>
+      </Section>
+
+      <Section eyebrow="Quiet hours">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <HourInput
+            value={quietHours.quietStartH}
+            onChange={(h) =>
+              setQuietHours((current) => ({ ...current, quietStartH: h }))
+            }
+          />
+          <span
+            className="ss-mono"
+            style={{ color: SS_TOKENS.fg2, fontSize: 12 }}
+          >
+            to
+          </span>
+          <HourInput
+            value={quietHours.quietEndH}
+            onChange={(h) =>
+              setQuietHours((current) => ({ ...current, quietEndH: h }))
+            }
+          />
+          <span
+            className="ss-mono"
+            style={{ color: SS_TOKENS.fg2, fontSize: 11 }}
+          >
+            {quietHours.tz}
+          </span>
+        </div>
+        <p
+          style={{
+            marginTop: 10,
+            fontSize: 12,
+            color: SS_TOKENS.fg2,
+            lineHeight: 1.45,
+          }}
+        >
+          Quiet-hour controls remain visible for the UI. The new proximity
+          delivery path does not apply quiet-hour filtering yet.
+        </p>
+      </Section>
+
+      <Section eyebrow="Test">
+        <button
+          type="button"
+          onClick={async () => {
+            if (!proximityOn) {
+              flash("Arm alerts first.");
+              return;
+            }
+            try {
+              await sendAircraftAlertTest();
+              flash("Test ping sent.");
+            } catch {
+              flash("Could not send test ping.");
+            }
+          }}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 999,
+            border: `.5px solid ${SS_TOKENS.hairline2}`,
+            background: SS_TOKENS.bg2,
+            color: SS_TOKENS.fg0,
+            fontFamily: "var(--font-mono)",
+            fontSize: 12,
+            letterSpacing: 0,
+            cursor: "pointer",
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          Send me a test ping
+        </button>
+      </Section>
 
       {toast && (
         <div
@@ -725,6 +689,68 @@ export function AlertsSettings() {
   );
 }
 
+function deliveryStateFromStatus(status: AircraftAlertStatus): DeliveryState {
+  if (!status.supported) return "unsupported";
+  if (!status.configured) return "not_configured";
+  if (status.permission === "denied") return "denied";
+  return status.enabled ? "on" : "off";
+}
+
+function deliveryStateFromError(error: unknown): DeliveryState {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "unsupported") return "unsupported";
+  if (message === "not_configured") return "not_configured";
+  if (message === "permission_denied") return "denied";
+  return "off";
+}
+
+function deliveryStatusLabel(state: DeliveryState): string {
+  switch (state) {
+    case "checking":
+      return "CHECKING";
+    case "on":
+      return "ON";
+    case "unsupported":
+      return "UNSUPPORTED";
+    case "not_configured":
+      return "NEEDS KEYS";
+    case "denied":
+      return "BLOCKED";
+    default:
+      return "OFF";
+  }
+}
+
+function deliveryStatusCopy(state: DeliveryState): string {
+  switch (state) {
+    case "checking":
+      return "Checking this browser and saved alert subscription.";
+    case "on":
+      return "Aircraft proximity alerts are armed for your selected region and range.";
+    case "unsupported":
+      return "This browser cannot receive web notifications.";
+    case "not_configured":
+      return "Web Push keys are not configured for this deployment.";
+    case "denied":
+      return "Notifications are blocked in this browser. Update browser settings to arm alerts.";
+    default:
+      return "Alerts are off. Arm once to save this browser for server-side proximity checks.";
+  }
+}
+
+function messageForDeliveryState(state: DeliveryState): string {
+  switch (state) {
+    case "unsupported":
+      return "This browser cannot receive web notifications.";
+    case "not_configured":
+      return "Notification keys are not configured yet.";
+    case "denied":
+      return "Notification permission was not granted.";
+    default:
+      return "Could not arm alerts. Try again.";
+  }
+}
+
 const RIDE_STATUS_COLORS: Record<RideStatus, string> = {
   clear: SS_TOKENS.clear,
   watch: SS_TOKENS.sky,
@@ -740,36 +766,12 @@ type RideBand = {
   notify: boolean;
 };
 
-function normalizeProximityNm(nm: number): number {
-  return clampRegionProximityNm(nm);
-}
-
 function formatMiles(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatProximityMiles(nm: number): string {
   return formatMiles(clampRegionProximityMiles(nmToStatuteMiles(nm)));
-}
-
-function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  fallback: T,
-): Promise<T> {
-  return new Promise((resolve) => {
-    const timer = window.setTimeout(() => resolve(fallback), timeoutMs);
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      () => {
-        window.clearTimeout(timer);
-        resolve(fallback);
-      },
-    );
-  });
 }
 
 function buildRideBands(
@@ -811,23 +813,6 @@ function buildRideBands(
 
 function formatNm(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-function buildRegionZones(
-  regionId: AppRegionId,
-  enabled: boolean,
-  radiusNm: number,
-): UserZoneSpec[] {
-  if (!enabled) return [];
-  const region = APP_REGIONS_BY_ID[regionId];
-  return [
-    {
-      lat: region.centerLat,
-      lon: region.centerLon,
-      radiusNm: normalizeProximityNm(radiusNm),
-      label: `${region.label} ${region.zip}`,
-    },
-  ];
 }
 
 function RegionChoice({
@@ -1138,7 +1123,7 @@ function Section({
   children,
 }: {
   eyebrow: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <Card>
@@ -1161,7 +1146,7 @@ function Section({
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children }: { children: ReactNode }) {
   return (
     <section
       style={{
@@ -1209,57 +1194,5 @@ function HourInput({
         textAlign: "center",
       }}
     />
-  );
-}
-
-function UnsupportedCard() {
-  return (
-    <Card>
-      <p
-        style={{
-          fontSize: 13.5,
-          color: SS_TOKENS.fg1,
-          margin: 0,
-          lineHeight: 1.5,
-        }}
-      >
-        This browser doesn't support push notifications. Try Chrome, Firefox,
-        or Safari on iOS 16.4+ after Add to Home Screen.
-      </p>
-    </Card>
-  );
-}
-
-function IosNotPwaCard({
-  reason,
-}: {
-  reason?: "ios-not-pwa" | "ios-too-old";
-}) {
-  return (
-    <Card>
-      <div
-        className="ss-mono"
-        style={{
-          fontSize: 9.5,
-          color: SS_TOKENS.fg2,
-          letterSpacing: 0,
-          marginBottom: 8,
-        }}
-      >
-        ON IPHONE
-      </div>
-      <p
-        style={{
-          fontSize: 14,
-          color: SS_TOKENS.fg0,
-          margin: 0,
-          lineHeight: 1.5,
-        }}
-      >
-        {reason === "ios-too-old"
-          ? "iOS 16.4 or later is required for browser-based push. Update iOS to enable alerts."
-          : "Alerts only work after you Add to Home Screen. Tap Share, then Add to Home Screen, then open the app icon."}
-      </p>
-    </Card>
   );
 }

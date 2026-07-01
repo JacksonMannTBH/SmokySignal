@@ -1,7 +1,7 @@
-// Vercel cron — invalidates the snapshot cache and re-fetches so adsb.fi
-// is queried even when no human traffic is hitting /api/aircraft. This
-// keeps the activity feed firing continuously (recordActivity runs as a
-// side-channel inside getSnapshot's regen path).
+// Scheduled refresh — invalidates the snapshot cache and re-fetches so adsb.fi
+// is queried even when no human traffic is hitting /api/aircraft. This keeps
+// the activity feed and proximity notification checks running independently
+// of normal page loads.
 //
 // Schedule: vercel.json. Vercel Hobby plan limits crons to once per day,
 // so the default is "0 14 * * *" (daily, 2 PM UTC = 7 AM Pacific). On
@@ -13,9 +13,9 @@
 
 import { NextResponse } from "next/server";
 import { getSnapshot, invalidateSnapshot } from "@/lib/snapshot";
-import { listSubscriptions } from "@/lib/push/store";
-import { DEFAULT_REGION, isRegionId, type RegionId } from "@/lib/regions";
+import { DEFAULT_REGION, type RegionId } from "@/lib/regions";
 import { purgeRetiredHotZoneData } from "@/lib/retired-data";
+import { listAircraftAlertRegions } from "@/lib/aircraft-alerts/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   const snaps = [];
   for (const regionId of regionIds) {
     await invalidateSnapshot(regionId);
-    snaps.push(await getSnapshot(regionId));
+    snaps.push(await getSnapshot(regionId, { dispatchAlerts: true }));
   }
   const airborne = snaps.reduce(
     (sum, snap) => sum + snap.aircraft.filter((a) => a.airborne).length,
@@ -54,11 +54,6 @@ export async function GET(req: Request) {
 }
 
 async function activeRegionIds(): Promise<RegionId[]> {
-  const out = new Set<RegionId>([DEFAULT_REGION]);
-  const subs = await listSubscriptions();
-  for (const sub of subs) {
-    const id = sub.prefs.region_id;
-    if (isRegionId(id)) out.add(id);
-  }
-  return [...out];
+  const regions = await listAircraftAlertRegions();
+  return [...new Set([DEFAULT_REGION, ...regions])];
 }

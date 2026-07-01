@@ -1,98 +1,51 @@
 "use client";
 
-// Visible "Arm alerts" call-to-action for the home page. Self-hides when
-// it isn't relevant: armed already, browser blocked, push unsupported,
-// or the rider dismissed it within the last 14 days. The settings page
-// is one tap away — the CTA exists purely to point riders at it.
-
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useState } from "react";
 import { SS_TOKENS } from "@/lib/tokens";
-import { isPushSupported, getPushPermission } from "@/lib/push/client";
+import {
+  enableAircraftProximityAlerts,
+  getStoredAircraftAlertRangeNm,
+} from "@/lib/aircraft-alerts/client";
+import { getRegion } from "@/lib/region-pref";
 
 const DISMISS_KEY = "ss_arm_alerts_dismissed_at";
 const DISMISS_DAYS = 14;
 const DISMISS_MS = DISMISS_DAYS * 24 * 60 * 60 * 1000;
 
-type State =
-  | { kind: "loading" }
-  | { kind: "unsupported" }
-  | { kind: "denied" }
-  | { kind: "armed" }
-  | { kind: "available"; recentlyDismissed: boolean };
-
 export function ArmAlertsCallout() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const dismissedAt = Number(window.localStorage.getItem(DISMISS_KEY) ?? "0");
+    return Number.isFinite(dismissedAt) && Date.now() - dismissedAt < DISMISS_MS;
+  });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("Range alerts can work while the app is closed.");
 
-  useEffect(() => {
-    if (!isPushSupported()) {
-      setState({ kind: "unsupported" });
-      return;
-    }
-    if (getPushPermission() === "denied") {
-      setState({ kind: "denied" });
-      return;
-    }
-    let cancelled = false;
-
-    // Compute the dismiss-aware "available" state up front and render
-    // it IMMEDIATELY. Previously we waited on navigator.serviceWorker
-    // .ready before showing anything, which left first-visit riders
-    // staring at a missing CTA — verify-prod's 2000ms read-back
-    // window beat the 2500ms SW timeout, and even within Playwright
-    // the SW often takes 3–5s to register on a cold visit. The CTA
-    // is purely a pointer at /settings/alerts; rendering it before
-    // we know the rider's subscription state is harmless because the
-    // settings page is the source of truth either way.
-    //
-    // If the SW reveals the rider is actually armed, we hide the CTA
-    // afterward (one-tick flicker is acceptable; missing the CTA is
-    // not).
-    const dismissedAt = Number(
-      window.localStorage.getItem(DISMISS_KEY) ?? "0",
-    );
-    const recentlyDismissed = Date.now() - dismissedAt < DISMISS_MS;
-    const availableState: State = { kind: "available", recentlyDismissed };
-    setState(availableState);
-
-    navigator.serviceWorker.ready
-      .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => {
-        if (cancelled) return;
-        if (sub) setState({ kind: "armed" });
-        // else leave availableState in place
-      })
-      .catch(() => {
-        // already showing availableState — nothing to do
+  const onArm = useCallback(async () => {
+    setBusy(true);
+    try {
+      await enableAircraftProximityAlerts({
+        regionId: getRegion(),
+        proximityRangeNm: getStoredAircraftAlertRangeNm(),
       });
-    return () => {
-      cancelled = true;
-    };
+      setMessage("Alerts armed.");
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "";
+      setMessage(
+        text === "permission_denied"
+          ? "Notification permission was not granted."
+          : text === "unsupported"
+            ? "This browser cannot receive web notifications."
+            : text === "not_configured"
+              ? "Notification keys are not configured yet."
+              : "Could not arm alerts. Try Settings.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }, []);
 
-  if (state.kind === "loading" || state.kind === "unsupported") return null;
-  // Armed state has its own indicator (AlertsStateChip); don't double up.
-  if (state.kind === "armed") return null;
-
-  if (state.kind === "denied") {
-    return (
-      <div
-        className="ss-mono"
-        style={{
-          fontSize: 11,
-          color: SS_TOKENS.fg2,
-          padding: "8px 12px",
-          border: `.5px solid ${SS_TOKENS.hairline}`,
-          borderRadius: 8,
-          letterSpacing: ".04em",
-        }}
-      >
-        Browser blocked alerts. Open Safari → Settings → Out Of Sight to unblock.
-      </div>
-    );
-  }
-
-  if (state.recentlyDismissed) return null;
+  if (dismissed) return null;
 
   return (
     <div
@@ -122,28 +75,35 @@ export function ArmAlertsCallout() {
         >
           Get a ping when Bird&rsquo;s up.
         </div>
+        <div style={{ marginTop: 4, fontSize: 12, color: SS_TOKENS.fg2 }}>
+          {message}
+        </div>
       </div>
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-        <Link
-          href="/settings/alerts"
+        <button
+          type="button"
+          onClick={onArm}
+          disabled={busy}
           style={{
             background: SS_TOKENS.alert,
             color: "#fffdf8",
             padding: "8px 14px",
             borderRadius: 999,
+            border: 0,
             fontSize: 13,
             fontWeight: 600,
-            textDecoration: "none",
             whiteSpace: "nowrap",
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.72 : 1,
           }}
         >
-          Arm alerts
-        </Link>
+          {busy ? "Arming" : "Arm alerts"}
+        </button>
         <button
           type="button"
           onClick={() => {
             window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
-            setState({ kind: "available", recentlyDismissed: true });
+            setDismissed(true);
           }}
           aria-label="Dismiss for 14 days"
           style={{

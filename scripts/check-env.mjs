@@ -17,6 +17,12 @@ const WARN = [
   ],
   ["KV_REST_API_TOKEN", "Without it: in-memory cache fallback."],
   [
+    "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
+    "Without it: browser push subscriptions cannot be created.",
+  ],
+  ["VAPID_PRIVATE_KEY", "Without it: server push sends are disabled."],
+  ["VAPID_SUBJECT", "Without it: push sender identity falls back to feedback email."],
+  [
     "OPENSKY_CLIENT_ID",
     "Without it: anonymous OpenSky fallback (heavily rate-limited).",
   ],

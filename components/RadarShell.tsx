@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import nextDynamic from "next/dynamic";
@@ -18,12 +18,6 @@ import { UserZoneLayer } from "./UserZoneLayer";
 import { AircraftTrailLayer } from "./AircraftTrailLayer";
 import { aircraftColorForTail } from "@/lib/aircraft-colors";
 import { haversineNm } from "@/lib/geo";
-import {
-  detectProximityHits,
-  fireProximityNotifications,
-  getProximityThresholdNm,
-  isProximityEnabled,
-} from "@/lib/proximity-alert";
 import { Tooltip } from "./Tooltip";
 import {
   REGION_CHANGE_EVENT,
@@ -145,31 +139,11 @@ export function RadarShell({
       showRings ? "1" : "0",
     );
   }, [showRings]);
-  // Foreground proximity alerts. Runs whenever snap.aircraft changes
-  // (every poll cycle from useAircraft) — when a tracked alert-tier
-  // tail enters the rider's threshold, fire a local notification via
-  // the SW. No server-side rider position storage; pure client logic.
-  // Per-tail cooldown lives in localStorage to prevent re-firing
-  // every 10s while a plane orbits within range.
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (document.visibilityState !== "visible") return;
-    if (!isProximityEnabled()) return;
-    const region = REGIONS[regionId];
-    if (!region) return;
-    const hits = detectProximityHits(
-      snap.aircraft,
-      { lat: region.centerLat, lon: region.centerLon },
-      getProximityThresholdNm(),
-    );
-    if (hits.length > 0) void fireProximityNotifications(hits);
-  }, [snap.aircraft, regionId]);
-
-  // Geolocation only kicks in when this component mounts — i.e. when the user
+  // Geolocation only kicks in when this component mounts â€” i.e. when the user
   // actually visits /radar. The home page never asks.
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      flashToast(setToast, "Location off · radar still works");
+      flashToast(setToast, "Location off Â· radar still works");
       return;
     }
     const watchId = navigator.geolocation.watchPosition(
@@ -177,7 +151,7 @@ export function RadarShell({
         setRider({ lat: pos.coords.latitude, lon: pos.coords.longitude });
       },
       () => {
-        flashToast(setToast, "Location off · radar still works");
+        flashToast(setToast, "Location off Â· radar still works");
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
     );
@@ -291,7 +265,7 @@ function Toast({
   message: string;
   bottomBoost: number;
 }) {
-  // Sit just above whatever's currently anchored to the bottom — carousel
+  // Sit just above whatever's currently anchored to the bottom â€” carousel
   // when present, tab bar otherwise.
   const bottomOffset = TABBAR_HEIGHT + 16 + bottomBoost;
   return (
@@ -524,7 +498,7 @@ function Carousel({
             }}
           >
             <span style={{ fontSize: 16 }}>v</span>
-            {collapsed ? "⌃" : "⌄"}
+            {collapsed ? "âŒƒ" : "âŒ„"}
           </button>
         </Tooltip>
       </div>
@@ -595,17 +569,17 @@ function PlaneCard({ p }: { p: Aircraft }) {
           label="ALT"
           value={
             p.altitude_ft != null
-              ? `${p.altitude_ft.toLocaleString()}′`
-              : "—"
+              ? `${p.altitude_ft.toLocaleString()}â€²`
+              : "â€”"
           }
         />
         <Stat
           label="GS"
-          value={p.ground_speed_kt != null ? `${p.ground_speed_kt}kt` : "—"}
+          value={p.ground_speed_kt != null ? `${p.ground_speed_kt}kt` : "â€”"}
         />
         <Stat
           label="TIME"
-          value={p.time_aloft_min != null ? `${p.time_aloft_min}m` : "—"}
+          value={p.time_aloft_min != null ? `${p.time_aloft_min}m` : "â€”"}
         />
       </div>
     </Link>

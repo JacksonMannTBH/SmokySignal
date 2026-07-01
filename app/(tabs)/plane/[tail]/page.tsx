@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import nextDynamic from "next/dynamic";
 import { fleetHex } from "@/lib/seed";
 import { getRegistry } from "@/lib/registry";
-import { getSnapshot } from "@/lib/snapshot";
+import { getSnapshotForRender } from "@/lib/snapshot";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
 import {
   averageGroundSpeedKt,
@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: Props) {
 export default async function PlanePage({ params, searchParams }: Props) {
   const tail = params.tail.toUpperCase();
 
-  const [fleet, real] = await Promise.all([getRegistry(), getSnapshot()]);
+  const [fleet, real] = await Promise.all([getRegistry(), getSnapshotForRender()]);
   const entry = fleet.find((f) => f.tail === tail);
   if (!entry) notFound();
   const recentFlight = await getMostRecentFlightForTail(tail, entry.nickname);

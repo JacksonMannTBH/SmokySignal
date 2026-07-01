@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSnapshot, invalidateSnapshot } from "@/lib/snapshot";
+import {
+  getSnapshot,
+  getSnapshotForRender,
+  invalidateSnapshot,
+} from "@/lib/snapshot";
 import { applyMockState, getMockStateFromRequest } from "@/lib/mock-state";
 import { DEFAULT_REGION, isRegionId } from "@/lib/regions";
 
@@ -14,7 +18,9 @@ export async function GET(req: Request) {
   if (fresh) {
     await invalidateSnapshot(regionId);
   }
-  const snap = await getSnapshot(regionId);
+  const snap = fresh
+    ? await getSnapshot(regionId)
+    : await getSnapshotForRender(regionId);
   const out = applyMockState(snap, getMockStateFromRequest(req));
   return NextResponse.json(out, {
     headers: {

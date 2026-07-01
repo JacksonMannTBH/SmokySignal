@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -137,13 +137,9 @@ export function Editor({
         <FlagsForm enabled={flags.speedWarningEnabled} />
       </Section>
 
-      <Section title="Push" subtitle="broadcast test ping">
-        <PushTestButton />
-      </Section>
-
       <Section title="Backups" subtitle={`${backups.length} most recent`}>
         {backups.length === 0 ? (
-          <Empty>No backups yet — they&rsquo;re created automatically on every save.</Empty>
+          <Empty>No backups yet â€” they&rsquo;re created automatically on every save.</Empty>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {backups.map((b) => (
@@ -219,7 +215,7 @@ export function Editor({
   );
 }
 
-// ─── shared admin nav ──────────────────────────────────────────────────────
+// â”€â”€â”€ shared admin nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AdminNav({ active }: { active: "registry" | "flights" | "spots" }) {
   return (
@@ -312,7 +308,7 @@ function NavLink({
   );
 }
 
-// ─── recent flights ────────────────────────────────────────────────────────
+// â”€â”€â”€ recent flights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function RecentFlights({ flights, hour12 }: { flights: FlightSession[]; hour12: boolean }) {
   return (
@@ -341,7 +337,7 @@ function RecentFlights({ flights, hour12 }: { flights: FlightSession[]; hour12: 
           className="ss-mono"
           style={{ fontSize: 10.5, color: SS_TOKENS.fg3 }}
         >
-          {flights.length} session{flights.length === 1 ? "" : "s"} · last 7 days
+          {flights.length} session{flights.length === 1 ? "" : "s"} Â· last 7 days
         </span>
       </div>
       {flights.length === 0 ? (
@@ -370,7 +366,7 @@ function FlightsEmpty() {
     >
       <RadarPulse />
       <div style={{ fontSize: 13 }}>
-        No flights logged yet — system is watching.
+        No flights logged yet â€” system is watching.
       </div>
     </div>
   );
@@ -481,8 +477,8 @@ function FlightRow({
         style={{ textDecoration: "none", color: "inherit" }}
       >
         <div style={{ fontSize: 12.5, color: SS_TOKENS.fg0 }}>
-          {formatTs(flight.start_ts, "date-short")} ·{" "}
-          {formatTsBare(flight.start_ts, "time", { hour12 })} –{" "}
+          {formatTs(flight.start_ts, "date-short")} Â·{" "}
+          {formatTsBare(flight.start_ts, "time", { hour12 })} â€“{" "}
           {formatTs(flight.end_ts, "time", { hour12 })}
         </div>
         <div
@@ -530,7 +526,7 @@ function fmtDuration(seconds: number): string {
   return `${h}h ${String(mm).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`;
 }
 
-// ─── pieces ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ pieces â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Section({
   title,
@@ -668,10 +664,10 @@ function ReadRow({
   return (
     <tr style={{ borderTop: `.5px solid ${SS_TOKENS.hairline}` }}>
       <Td mono>{entry.tail}</Td>
-      <Td mono dim>{(entry.hex ?? "—").toUpperCase()}</Td>
+      <Td mono dim>{(entry.hex ?? "â€”").toUpperCase()}</Td>
       <Td>{entry.operator}</Td>
       <Td>{entry.model}</Td>
-      <Td dim>{entry.nickname ?? "—"}</Td>
+      <Td dim>{entry.nickname ?? "â€”"}</Td>
       <Td>{entry.base}</Td>
       <Td dim>{entry.roleDescription}</Td>
       <Td dim>
@@ -756,7 +752,7 @@ function EditRow({
             required
           />
           <Field
-            label="Class note (≤120 chars, optional)"
+            label="Class note (â‰¤120 chars, optional)"
             name="roleNote"
             defaultValue={entry.roleNote ?? ""}
             maxLength={120}
@@ -798,7 +794,7 @@ function AddForm({ onCancel }: { onCancel: () => void }) {
       <Field label="Mission (free text, optional)" name="roleDescription" />
       <RoleSelect label="Class (drives status pill)" name="role" required />
       <RoleConfidenceSelect label="Confidence" name="roleConfidence" required />
-      <Field label="Class note (≤120 chars, optional)" name="roleNote" maxLength={120} />
+      <Field label="Class note (â‰¤120 chars, optional)" name="roleNote" maxLength={120} />
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
         <button type="submit" style={primaryButtonStyle}>
           Save tail
@@ -880,11 +876,11 @@ function Field({
 }
 
 const ROLE_OPTIONS: Array<{ value: import("@/lib/types").FleetRole; label: string }> = [
-  { value: "smokey", label: "bird — fixed-wing speed enforcement" },
-  { value: "patrol", label: "patrol — multi-role helicopter" },
-  { value: "sar", label: "sar — search & rescue" },
-  { value: "transport", label: "transport — exec / multi-mission" },
-  { value: "unknown", label: "unknown — default to alert" },
+  { value: "smokey", label: "bird â€” fixed-wing speed enforcement" },
+  { value: "patrol", label: "patrol â€” multi-role helicopter" },
+  { value: "sar", label: "sar â€” search & rescue" },
+  { value: "transport", label: "transport â€” exec / multi-mission" },
+  { value: "unknown", label: "unknown â€” default to alert" },
 ];
 
 const CONFIDENCE_OPTIONS: Array<{
@@ -956,42 +952,6 @@ function RoleConfidenceSelect({
   );
 }
 
-function PushTestButton() {
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  const click = async () => {
-    if (busy) return;
-    if (!confirm("Broadcast a test push to ALL opted-in subscriptions?")) return;
-    setBusy(true);
-    setResult(null);
-    try {
-      const r = await fetch("/api/push/test", { method: "POST" });
-      const data = (await r.json()) as { sent?: number; removed?: number; error?: string };
-      if (!r.ok) {
-        setResult(`Failed: ${data.error ?? r.status}`);
-      } else {
-        setResult(`Sent ${data.sent ?? 0} · pruned ${data.removed ?? 0}`);
-      }
-    } catch (e) {
-      setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <button type="button" onClick={click} style={smallButtonStyle} disabled={busy}>
-        {busy ? "Sending…" : "Broadcast test ping"}
-      </button>
-      {result && (
-        <span className="ss-mono" style={{ fontSize: 11, color: SS_TOKENS.fg2 }}>
-          {result}
-        </span>
-      )}
-    </div>
-  );
-}
-
 function FlashMsg({ kind, code }: { kind: "error" | "ok"; code: string }) {
   const color = kind === "error" ? SS_TOKENS.danger : SS_TOKENS.clear;
   const message =
@@ -1029,7 +989,7 @@ function savedMessage(code: string): string {
     case "restored":
       return "Backup restored. The pre-restore registry was backed up first.";
     default:
-      return `Saved · ${code}`;
+      return `Saved Â· ${code}`;
   }
 }
 
@@ -1038,7 +998,7 @@ function errorMessage(code: string): string {
     case "invalid":
       return "Invalid passcode.";
     case "bad_tail":
-      return "Tail must match N + 1–5 digits + 0–2 letters (e.g. N305DK).";
+      return "Tail must match N + 1â€“5 digits + 0â€“2 letters (e.g. N305DK).";
     case "bad_hex":
       return "Hex must be 6 hex characters (or blank to auto-compute).";
     case "bad_operator":
@@ -1071,7 +1031,7 @@ function opColor(op: string): string {
   }
 }
 
-// ─── styling primitives ────────────────────────────────────────────────────
+// â”€â”€â”€ styling primitives â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const tableStyle: React.CSSProperties = {
   width: "100%",

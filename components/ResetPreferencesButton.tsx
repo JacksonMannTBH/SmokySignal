@@ -1,26 +1,16 @@
-"use client";
+﻿"use client";
 
-// Wipes every rider-side preference back to defaults — both the
-// localStorage keys (region, voice, proximity, zones, install-prompt
-// dismiss flags, distance-rings visibility)
-// and the server-readable cookies (time format, contrast). Confirms
-// before firing because the wipe is irreversible.
-//
-// Server cookie clear runs via the imported server action; the
-// localStorage clear runs inline before that action fires so a
-// failure on the server side doesn't leave the rider half-reset.
+// Wipes rider-side display, region, zone, and install-prompt preferences.
+// Server cookie clear runs through the imported server action; localStorage
+// is cleared inline so a server failure does not leave the rider half-reset.
 
 import { useState } from "react";
 import { SS_TOKENS } from "@/lib/tokens";
 import { resetPreferenceCookiesAction } from "@/app/(tabs)/settings/alerts/actions";
 
 const LOCAL_STORAGE_KEYS = [
-  "ss_voice_mode_enabled",
   "ss_wake_lock",
-  "ss_proximity_enabled",
-  "ss_proximity_threshold_nm",
   "ss_ride_status_thresholds",
-  "ss_ride_status_notifications",
   "ss_user_zones",
   "ss_region_pref",
   "ss_flight_paths_visible",
@@ -38,19 +28,6 @@ function clearLocalStorage(): void {
     } catch {
       // best-effort
     }
-  }
-  // Drop any per-tail proximity cooldown stamps too — they share a
-  // common prefix and clearing them avoids stale "already pinged"
-  // suppression after a reset.
-  try {
-    const toRemove: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
-      if (k && k.startsWith("ss_proximity_lastfired_")) toRemove.push(k);
-    }
-    for (const k of toRemove) window.localStorage.removeItem(k);
-  } catch {
-    // best-effort
   }
 }
 
@@ -102,9 +79,8 @@ export function ResetPreferencesButton() {
             marginBottom: 0,
           }}
         >
-          Clears every preference on this device — display, audio,
-          alerts, zones, region. Push subscriptions stay armed until
-          you disarm them above.
+          Clears every preference on this device â€” display, alert UI,
+          zones, and region.
         </p>
       </div>
 
@@ -119,7 +95,7 @@ export function ResetPreferencesButton() {
           try {
             await resetPreferenceCookiesAction();
           } catch {
-            // server action failed — localStorage is already cleared, the
+            // server action failed â€” localStorage is already cleared, the
             // cookie clear can be retried on next page load
           }
           window.location.reload();
@@ -139,7 +115,7 @@ export function ResetPreferencesButton() {
           WebkitTapHighlightColor: "transparent",
         }}
       >
-        {busy ? "Resetting…" : "Reset preferences"}
+        {busy ? "Resettingâ€¦" : "Reset preferences"}
       </button>
     </section>
   );

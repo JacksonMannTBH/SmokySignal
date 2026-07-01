@@ -77,23 +77,22 @@ waiting for a live event.
 
 - `lib/snapshot.ts` — fleet snapshot from adsb.fi (primary) + OpenSky (fallback)
 - `lib/tracks.ts` — per-tail position history, KV-backed, 35-day TTL
-- `lib/push/*` — VAPID push pipeline (subscribe / dispatcher / dedupe / quiet hours)
+- `lib/aircraft-alerts/*` — Web Push proximity alerts (subscribe / dispatcher / dedupe)
 - `lib/user-zones.ts` — rider-defined geofences (localStorage); managed at `/settings/zones`
 - `lib/user-prefs.ts` — cookie-backed display prefs (12/24-hour, normal/high contrast)
 - `lib/voice-mode.ts` — speechSynthesis readback toggle (foreground only)
-- `lib/proximity-alert.ts` — foreground proximity ping when alert-tier tail nearby
 - `lib/storage-keys.ts` — canonical KV key formatter (NX7 foundation; route all `tracks:*`/`spots:*`/`flights:*` through this)
 - `app/(tabs)/` — main app routes (home, radar, dash, plane, settings, etc.)
 - `app/api/cron/` — scheduled refreshes (snapshot, predictor)
-- `public/sw.js` — service worker (push-only, no caching)
+- `public/sw.js` — service worker for PWA install/update + alert notification display/click handling
 
 ## Privacy posture
 
 - No accounts. Rider-side state lives in localStorage (zones, dismissals,
   region pref, proximity threshold, voice mode) or cookies (time-format
   pref, contrast pref).
-- The only server-side identifier is the push subscription endpoint —
-  required by Web Push, treated as PII-equivalent in the schema.
+- The only server-side rider identifier is the anonymous aircraft-alert
+  subscription record — required by Web Push, treated as PII-equivalent.
 - Geolocation is browser-only, never persisted server-side.
 - Speed data: device reports it, we do not display or store it.
 
@@ -104,19 +103,17 @@ waiting for a live event.
   and adsb.fi has no historical equivalent. The 30-day track tank fills
   forward via the live cron only. OpenSky is still used as a live
   states-snapshot fallback in `lib/snapshot.ts`.
-- Vercel preview-scope env vars for VAPID + ADMIN_PASSCODE are
-  intentionally empty — `vercel env pull` cannot decrypt sensitive
-  vars from production. Generate fresh values manually if you need
-  push to work in preview deploys.
+- VAPID env vars (`NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT`) are required for aircraft-alert delivery. Preview
+  deploys need their own values if you want alerts to work outside prod.
 - KV key construction: route through `lib/storage-keys.ts` (`trackKey()`,
   `spotKey()`, `flightsRecentCacheKey()`, etc.) instead of inlining
   string literals like `\`tracks:\${tail}:\${date}\``. The default-region
   shape is byte-for-byte identical to the prior literals; the
   formatter is the only knob for future regional namespacing.
-- ArmAlertsCallout returns null on iOS Safari (Notification API
-  absent) — that's correct behavior; the IOSInstallPrompt handles
-  riders in that path. The verify-prod assertion #9 was updated in
-  P16 to recognize either rendered surface as a pass.
+- iOS Web Push still requires an installed home-screen PWA and a granted
+  notification permission. Regular Safari tabs can show the UI, but
+  cannot receive closed-app alerts.
 
 ## Brand voice
 

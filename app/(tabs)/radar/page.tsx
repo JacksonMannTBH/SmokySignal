@@ -1,5 +1,5 @@
 import { RadarShell } from "@/components/RadarShell";
-import { getSnapshot } from "@/lib/snapshot";
+import { getSnapshotForRender } from "@/lib/snapshot";
 import { applyMockState, parseMockState } from "@/lib/mock-state";
 
 export const metadata = {
@@ -15,7 +15,7 @@ export default async function RadarPage({
 }: {
   searchParams: SP;
 }) {
-  const real = await getSnapshot();
+  const real = await getSnapshotForRender();
   const mockState = parseMockState(searchParams.mock);
   const mockOn = mockState !== null;
   const initial = applyMockState(real, mockState);

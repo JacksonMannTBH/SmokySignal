@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRecentActivity } from "@/lib/activity";
 import { getAppState } from "@/lib/app-regions";
-import { getSnapshot } from "@/lib/snapshot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +13,6 @@ export async function GET(req: Request) {
     : 50;
   const stateParam = url.searchParams.get("state_id");
   const stateId = stateParam ? getAppState(stateParam).id : undefined;
-  await getSnapshot();
   const entries = await getRecentActivity(limit, stateId);
   return NextResponse.json(
     { entries, fetched_at: Date.now() },

@@ -1,26 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SS_TOKENS } from "@/lib/tokens";
-import { isPushSupported } from "@/lib/push/client";
 
 const STORAGE_KEY = "ss_install_dismissed";
-const POST_INSTALL_DISMISS_KEY = "ss_post_install_dismissed";
-const FIRST_STANDALONE_KEY = "ss_first_standalone_visit";
-const PULSE_KEYFRAME_ID = "ss-arm-alerts-pulse";
 const DISMISS_DAYS = 30;
 const TABBAR_HEIGHT = 66;
 
-/**
- * True when the current pathname is rendered inside the (tabs) layout
- * (which always mounts the bottom TabBar). Without this offset the
- * install prompt overlapped the tab bar on /forecast, /activity,
- * /about, /legal, /plane/*, /settings/* — every tabbed route except
- * the original three. The literal list mirrors the directories under
- * `app/(tabs)/` so any new tab route lands here too.
- */
 function isTabbedPath(pathname: string | null): boolean {
   if (!pathname) return false;
   if (pathname === "/") return true;
@@ -30,12 +17,10 @@ function isTabbedPath(pathname: string | null): boolean {
 }
 
 type Standalone = Navigator & { standalone?: boolean };
-type Mode = "hidden" | "pre-install" | "post-install";
 
 function isIOSSafari(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  // iPad on iPadOS 13+ reports as Mac; check maxTouchPoints to disambiguate.
   const iPadOS =
     ua.includes("Macintosh") &&
     typeof navigator.maxTouchPoints === "number" &&
@@ -49,120 +34,51 @@ function isStandalone(): boolean {
   return Boolean((navigator as Standalone).standalone);
 }
 
-function isDismissed(key: string): boolean {
+function isDismissed(): boolean {
   if (typeof window === "undefined") return false;
-  const raw = window.localStorage.getItem(key);
+  const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return false;
   const ts = Number(raw);
   if (!Number.isFinite(ts)) return false;
-  const ageMs = Date.now() - ts;
-  return ageMs < DISMISS_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function ensurePulseKeyframes() {
-  if (typeof document === "undefined") return;
-  if (document.getElementById(PULSE_KEYFRAME_ID)) return;
-  const style = document.createElement("style");
-  style.id = PULSE_KEYFRAME_ID;
-  style.textContent = `@keyframes ss-arm-alerts-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,28,.55); }
-    50% { box-shadow: 0 0 0 6px rgba(255,159,28,0); }
-  }`;
-  document.head.appendChild(style);
+  return Date.now() - ts < DISMISS_DAYS * 24 * 60 * 60 * 1000;
 }
 
 export function IOSInstallPrompt() {
   const pathname = usePathname();
-  const [mode, setMode] = useState<Mode>("hidden");
-  const [pulse, setPulse] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (!isIOSSafari()) return;
-    const standalone = isStandalone();
-    if (!standalone) {
-      if (!isDismissed(STORAGE_KEY)) setMode("pre-install");
-      return;
-    }
-    // Standalone PWA — only show the step-3 prompt if we know push is
-    // supported and the rider hasn't armed yet, and they haven't already
-    // dismissed this branch.
-    if (!isPushSupported()) return;
-    if (isDismissed(POST_INSTALL_DISMISS_KEY)) return;
-    let cancelled = false;
-    navigator.serviceWorker.ready
-      .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => {
-        if (cancelled || sub) return;
-        // One-time pulse on the first standalone visit so the rider
-        // notices the deep-link, then never again.
-        const firstSeen = window.localStorage.getItem(FIRST_STANDALONE_KEY);
-        if (!firstSeen) {
-          window.localStorage.setItem(
-            FIRST_STANDALONE_KEY,
-            String(Date.now()),
-          );
-          setPulse(true);
-        }
-        setMode("post-install");
-      })
-      .catch(() => {
-        if (!cancelled) setMode("post-install");
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (isStandalone()) return;
+    if (!isDismissed()) setVisible(true);
   }, []);
 
   useEffect(() => {
-    if (pulse) ensurePulseKeyframes();
-  }, [pulse]);
-
-  // Publish prompt height as a CSS variable on <html> so other fixed-
-  // position components on /radar (layer controls, the trail status
-  // badge) can offset above the prompt
-  // and not be hidden by it. Empty / 0 when the prompt isn't rendering.
-  useEffect(() => {
     if (typeof document === "undefined") return;
-    const visible = mode !== "hidden";
-    // Approximate height — actual height varies slightly with safe-area
-    // inset and the post-install variant which is shorter. 80 px is the
-    // pre-install variant baseline post-PROMPT_23 compression.
-    const value = visible ? "80px" : "0px";
     document.documentElement.style.setProperty(
       "--ss-install-prompt-h",
-      value,
+      visible ? "80px" : "0px",
     );
     return () => {
-      document.documentElement.style.setProperty(
-        "--ss-install-prompt-h",
-        "0px",
-      );
+      document.documentElement.style.setProperty("--ss-install-prompt-h", "0px");
     };
-  }, [mode]);
+  }, [visible]);
 
-  if (mode === "hidden") return null;
+  if (!visible) return null;
 
   const onTabs = isTabbedPath(pathname);
   const bottomOffset = onTabs ? TABBAR_HEIGHT : 0;
-  const dismissKey =
-    mode === "pre-install" ? STORAGE_KEY : POST_INSTALL_DISMISS_KEY;
+
   const dismiss = () => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(dismissKey, String(Date.now()));
+      window.localStorage.setItem(STORAGE_KEY, String(Date.now()));
     }
-    setMode("hidden");
+    setVisible(false);
   };
 
   return (
     <div
       role="dialog"
-      // pointer-events: none on the wrapper so the prompt doesn't intercept
-      // taps meant for the map / filter button on /radar. Interactive children
-      // opt back in via pointerEvents: "auto". Instruction text stays
-      // visible (the wrapper is still painted) but isn't tappable — taps on
-      // text fall through to the radar layer underneath. The X button + the
-      // post-install "Arm alerts" link are the only tap targets inside the
-      // prompt.
       style={{
         position: "fixed",
         left: 0,
@@ -170,10 +86,6 @@ export function IOSInstallPrompt() {
         bottom: bottomOffset,
         zIndex: 40,
         pointerEvents: "none",
-        // Tighter vertical padding (was 12px → 8px) so the prompt
-        // takes less map / hero real estate on /radar and /. Also
-        // tighter horizontal padding on the X-button side because
-        // the button itself now carries 44 px hit area.
         padding: "8px 4px 8px 14px",
         paddingBottom: "calc(8px + env(safe-area-inset-bottom))",
         background: SS_TOKENS.bg1,
@@ -186,14 +98,15 @@ export function IOSInstallPrompt() {
       }}
     >
       <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.45, color: SS_TOKENS.fg0 }}>
-        {mode === "pre-install" ? (
-          <PreInstallCopy />
-        ) : (
-          <PostInstallCopy pulse={pulse} />
-        )}
+        <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 2 }}>
+          Add Out Of Sight to Home Screen
+        </div>
+        <div style={{ fontSize: 11.5, color: SS_TOKENS.fg1, lineHeight: 1.45 }}>
+          Tap <ShareIcon /> then{" "}
+          <span style={{ color: SS_TOKENS.alert }}>Add to Home Screen</span>
+          for the app-style launch icon.
+        </div>
       </div>
-      {/* 44×44 hit area (a11y minimum) wraps a 28×28 visual circle so
-          the rider hits the dismiss target even with gloves on. */}
       <button
         type="button"
         onClick={dismiss}
@@ -231,55 +144,6 @@ export function IOSInstallPrompt() {
         </span>
       </button>
     </div>
-  );
-}
-
-function PreInstallCopy() {
-  // Compressed two-line variant of the prior 5-line block — the prompt
-  // sat over ~40 % of /radar's vertical space and dominated /'s hero
-  // on first visit. Same 3-step intent (share → Add to Home Screen →
-  // Arm alerts), one tighter line.
-  return (
-    <>
-      <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 2 }}>
-        iOS push: 2 steps
-      </div>
-      <div style={{ fontSize: 11.5, color: SS_TOKENS.fg1, lineHeight: 1.45 }}>
-        Tap <ShareIcon /> →{" "}
-        <span style={{ color: SS_TOKENS.alert }}>Add to Home Screen</span>,
-        then open from your home screen and arm alerts.
-      </div>
-    </>
-  );
-}
-
-function PostInstallCopy({ pulse }: { pulse: boolean }) {
-  return (
-    <>
-      <div className="ss-eyebrow" style={{ marginBottom: 4 }}>
-        STEP 3 · ARM ALERTS
-      </div>
-      <div style={{ fontSize: 12.5, color: SS_TOKENS.fg1, marginBottom: 8 }}>
-        You&rsquo;re in the app. One more tap for push notifications.
-      </div>
-      <Link
-        href="/settings/alerts"
-        style={{
-          display: "inline-block",
-          background: SS_TOKENS.alert,
-          color: "#fffdf8",
-          padding: "6px 12px",
-          borderRadius: 999,
-          fontSize: 12.5,
-          fontWeight: 600,
-          textDecoration: "none",
-          animation: pulse ? "ss-arm-alerts-pulse 1.6s ease-out 3" : undefined,
-          pointerEvents: "auto",
-        }}
-      >
-        Arm alerts
-      </Link>
-    </>
   );
 }
 

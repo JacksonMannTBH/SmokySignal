@@ -2,9 +2,13 @@ import { buildSnapshot } from "./adsb";
 import { cacheGet, cacheSet, getRedis } from "./cache";
 import { getCurrentFlightDuration, logTracks } from "./tracks";
 import { recordActivity } from "./activity";
-import { dispatchProximitySnapshot } from "./push/dispatcher";
+import { dispatchAircraftProximityAlerts } from "./aircraft-alerts/dispatcher";
 import { DEFAULT_REGION, type RegionId } from "./regions";
 import type { Snapshot, SnapshotSource } from "./types";
+
+type GetSnapshotOptions = {
+  dispatchAlerts?: boolean;
+};
 
 const KEY = "ss:snapshot:v1";
 const TTL_SECONDS = 10;
@@ -48,8 +52,10 @@ export async function getLastAirborneTs(): Promise<number | null> {
 }
 
 /** Read-only access to the cached snapshot (no fresh fetch). */
-export async function peekSnapshot(): Promise<Snapshot | null> {
-  return await cacheGet<Snapshot>(snapshotKey(DEFAULT_REGION));
+export async function peekSnapshot(
+  regionId: RegionId = DEFAULT_REGION,
+): Promise<Snapshot | null> {
+  return await cacheGet<Snapshot>(snapshotKey(regionId));
 }
 
 /**
@@ -57,23 +63,50 @@ export async function peekSnapshot(): Promise<Snapshot | null> {
  * cache is current. /api/health uses this to discriminate "cron is dead"
  * (this returns null) from "cron just ran but the hot-path TTL expired".
  */
-export async function peekHealthSnapshot(): Promise<Snapshot | null> {
-  return await cacheGet<Snapshot>(HEALTH_KEY);
+export async function peekHealthSnapshot(
+  regionId: RegionId = DEFAULT_REGION,
+): Promise<Snapshot | null> {
+  return await cacheGet<Snapshot>(healthSnapshotKey(regionId));
+}
+
+/**
+ * Fast render path: return the hot cache, then the longer-lived stale mirror,
+ * and only perform a fresh upstream fetch on a fully cold cache.
+ */
+export async function getSnapshotForRender(
+  regionId: RegionId = DEFAULT_REGION,
+): Promise<Snapshot> {
+  const hot = await peekSnapshot(regionId);
+  if (hot) {
+    lastSource = hot.source;
+    return hot;
+  }
+
+  const stale = await peekHealthSnapshot(regionId);
+  if (stale) {
+    lastSource = stale.source;
+    return stale;
+  }
+
+  return await getSnapshot(regionId);
 }
 
 // Single-flight: collapse concurrent calls within the cache window into one
 // upstream fetch so 100 riders = 1 adsb.fi call.
-let inflight: Promise<Snapshot> | null = null;
-const inflightByRegion = new Map<RegionId, Promise<Snapshot>>();
+const inflightByRegion = new Map<string, Promise<Snapshot>>();
 
-export async function getSnapshot(regionId: RegionId = DEFAULT_REGION): Promise<Snapshot> {
+export async function getSnapshot(
+  regionId: RegionId = DEFAULT_REGION,
+  options: GetSnapshotOptions = {},
+): Promise<Snapshot> {
   const key = snapshotKey(regionId);
   const cached = await cacheGet<Snapshot>(key);
   if (cached) {
     lastSource = cached.source;
     return cached;
   }
-  const existing = inflightByRegion.get(regionId);
+  const inflightKey = snapshotInflightKey(regionId, options);
+  const existing = inflightByRegion.get(inflightKey);
   if (existing) return existing;
 
   const next = (async () => {
@@ -97,10 +130,12 @@ export async function getSnapshot(regionId: RegionId = DEFAULT_REGION): Promise<
       } catch (e) {
         console.warn("[snapshot] activity write failed:", e);
       }
-      try {
-        await dispatchProximitySnapshot(enrichedSnap);
-      } catch (e) {
-        console.warn("[snapshot] proximity dispatch failed:", e);
+      if (options.dispatchAlerts) {
+        try {
+          await dispatchAircraftProximityAlerts(enrichedSnap, regionId);
+        } catch (e) {
+          console.warn("[snapshot] aircraft-alert dispatch failed:", e);
+        }
       }
       // Stamp the canary if any tail is airborne.
       if (enrichedSnap.aircraft.some((a) => a.airborne)) {
@@ -118,23 +153,37 @@ export async function getSnapshot(regionId: RegionId = DEFAULT_REGION): Promise<
       // Health mirror gets a much longer TTL so the cron pipeline is
       // observable between hot-path cache expirations.
       try {
-        await cacheSet(HEALTH_KEY, enrichedSnap, HEALTH_TTL_SECONDS);
+        await cacheSet(
+          healthSnapshotKey(regionId),
+          enrichedSnap,
+          HEALTH_TTL_SECONDS,
+        );
       } catch (e) {
         console.warn("[snapshot] health-mirror write failed:", e);
       }
       lastSource = enrichedSnap.source;
       return enrichedSnap;
     } finally {
-      inflightByRegion.delete(regionId);
+      inflightByRegion.delete(inflightKey);
     }
   })();
-  inflightByRegion.set(regionId, next);
-  inflight = regionId === DEFAULT_REGION ? next : inflight;
+  inflightByRegion.set(inflightKey, next);
   return next;
 }
 
 function snapshotKey(regionId: RegionId): string {
   return regionId === DEFAULT_REGION ? KEY : `${KEY}:${regionId}`;
+}
+
+function healthSnapshotKey(regionId: RegionId): string {
+  return regionId === DEFAULT_REGION ? HEALTH_KEY : `${HEALTH_KEY}:${regionId}`;
+}
+
+function snapshotInflightKey(
+  regionId: RegionId,
+  options: GetSnapshotOptions,
+): string {
+  return `${regionId}:${options.dispatchAlerts ? "alerts" : "normal"}`;
 }
 
 async function hydrateCurrentFlightDurations(snap: Snapshot): Promise<Snapshot> {

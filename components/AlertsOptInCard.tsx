@@ -1,50 +1,34 @@
 "use client";
 
-// Dismissable opt-in card rendered at the bottom of the dashboard variant
-// (DashShell) for un-subscribed riders. Shows at most once per browser per
-// 14 days (key: ss_alerts_promo_dismissed_at). Tapping "Arm alerts" runs
-// subscribePush directly — no extra page navigation.
-
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { SS_TOKENS } from "@/lib/tokens";
 import {
-  getCurrentSubscriptionId,
-  isPushSupported,
-  pushAvailableInThisContext,
-  subscribePush,
-} from "@/lib/push/client";
+  enableAircraftProximityAlerts,
+  getStoredAircraftAlertRangeNm,
+  readAircraftAlertStatus,
+} from "@/lib/aircraft-alerts/client";
+import { getRegion } from "@/lib/region-pref";
 
 const DISMISS_KEY = "ss_alerts_promo_dismissed_at";
 const COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-
-type Phase = "checking" | "show" | "armed" | "hidden";
+type Phase = "checking" | "show" | "hidden";
 
 export function AlertsOptInCard() {
   const [phase, setPhase] = useState<Phase>("checking");
+  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (typeof window === "undefined") return;
-      // Guards: feature support, iOS-PWA context, cooldown, already subscribed.
-      if (!isPushSupported() || !pushAvailableInThisContext().available) {
-        if (!cancelled) setPhase("hidden");
-        return;
-      }
-      const dismissed = Number(window.localStorage.getItem(DISMISS_KEY) ?? 0);
-      if (Number.isFinite(dismissed) && Date.now() - dismissed < COOLDOWN_MS) {
-        if (!cancelled) setPhase("hidden");
-        return;
-      }
-      const id = await getCurrentSubscriptionId();
-      if (!cancelled) setPhase(id ? "hidden" : "show");
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (typeof window === "undefined") return;
+    const dismissed = Number(window.localStorage.getItem(DISMISS_KEY) ?? 0);
+    if (Number.isFinite(dismissed) && Date.now() - dismissed < COOLDOWN_MS) {
+      setPhase("hidden");
+      return;
+    }
+    readAircraftAlertStatus()
+      .then((status) => setPhase(status.enabled ? "hidden" : "show"))
+      .catch(() => setPhase("show"));
   }, []);
 
   const onDismiss = useCallback(() => {
@@ -56,45 +40,21 @@ export function AlertsOptInCard() {
 
   const onArm = useCallback(async () => {
     setBusy(true);
-    setError(null);
-    const r = await subscribePush();
-    setBusy(false);
-    if (r.ok) {
-      setPhase("armed");
-    } else if (r.reason === "denied") {
-      setError("Browser blocked alerts. Update permission in your settings.");
-    } else if (r.reason === "vapid_missing") {
-      setError("Push isn't configured on this build.");
-    } else {
-      setError("Couldn't subscribe. Try /settings/alerts.");
+    setMessage(null);
+    try {
+      await enableAircraftProximityAlerts({
+        regionId: getRegion(),
+        proximityRangeNm: getStoredAircraftAlertRangeNm(),
+      });
+      setMessage("Alerts armed.");
+    } catch (error) {
+      setMessage(messageForArmError(error));
+    } finally {
+      setBusy(false);
     }
   }, []);
 
   if (phase === "checking" || phase === "hidden") return null;
-
-  if (phase === "armed") {
-    return (
-      <Wrapper>
-        <p
-          style={{
-            fontSize: 14,
-            color: SS_TOKENS.fg0,
-            margin: 0,
-            lineHeight: 1.5,
-          }}
-        >
-          10-4. Alerts armed. Tweak in{" "}
-          <Link
-            href="/settings/alerts"
-            style={{ color: SS_TOKENS.alert, textDecoration: "underline" }}
-          >
-            /settings/alerts
-          </Link>
-          .
-        </p>
-      </Wrapper>
-    );
-  }
 
   return (
     <Wrapper>
@@ -127,19 +87,27 @@ export function AlertsOptInCard() {
           lineHeight: 1.45,
         }}
       >
-        We&rsquo;ll only ping when an alert-class bird goes up. Tweak later
-        in /settings/alerts.
+        Notification controls are staying in place while the delivery system is
+        rebuilt. Settings remain at{" "}
+        <Link
+          href="/settings/alerts"
+          style={{ color: SS_TOKENS.alert, textDecoration: "underline" }}
+        >
+          /settings/alerts
+        </Link>
+        .
       </p>
-      {error && (
+      {message && (
         <p
+          role="status"
           style={{
             fontSize: 12,
-            color: SS_TOKENS.danger,
+            color: SS_TOKENS.alert,
             margin: "10px 0 0",
             lineHeight: 1.45,
           }}
         >
-          {error}
+          {message}
         </p>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -158,12 +126,12 @@ export function AlertsOptInCard() {
             fontWeight: 700,
             letterSpacing: ".02em",
             cursor: busy ? "default" : "pointer",
-            opacity: busy ? 0.6 : 1,
+            opacity: busy ? 0.72 : 1,
             touchAction: "manipulation",
             WebkitTapHighlightColor: "transparent",
           }}
         >
-          Arm alerts
+          {busy ? "Arming" : "Arm alerts"}
         </button>
         <button
           type="button"
@@ -190,7 +158,15 @@ export function AlertsOptInCard() {
   );
 }
 
-function Wrapper({ children }: { children: React.ReactNode }) {
+function messageForArmError(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "permission_denied") return "Notification permission was not granted.";
+  if (message === "unsupported") return "This browser cannot receive web notifications.";
+  if (message === "not_configured") return "Notification keys are not configured yet.";
+  return "Could not arm alerts. Try again from Settings.";
+}
+
+function Wrapper({ children }: { children: ReactNode }) {
   return (
     <section
       style={{

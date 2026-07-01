@@ -9,7 +9,7 @@ import { useRiderPos } from "@/lib/hooks/useRiderPos";
 import { SS_TOKENS } from "@/lib/tokens";
 import { SMOKY_TAIL } from "@/lib/seed";
 import { haversineNm } from "@/lib/geo";
-import { proximityBandForDistance } from "@/lib/proximity-alert";
+import { proximityBandForDistance } from "@/lib/proximity-display";
 import { computeStatus } from "@/lib/status";
 import { Card } from "./Card";
 import { AlertsOptInCard } from "./AlertsOptInCard";

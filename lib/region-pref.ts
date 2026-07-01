@@ -5,6 +5,10 @@
 "use client";
 
 import { DEFAULT_REGION, REGIONS, type RegionId } from "./regions";
+import {
+  getStoredAircraftAlertRangeNm,
+  syncAircraftAlertPreferences,
+} from "./aircraft-alerts/client";
 
 const KEY = "ss_region_pref";
 export const REGION_CHANGE_EVENT = "ss-region-change";
@@ -60,24 +64,14 @@ export function setRegion(id: RegionId): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(KEY, id);
+    void syncAircraftAlertPreferences({
+      regionId: id,
+      proximityRangeNm: getStoredAircraftAlertRangeNm(),
+    });
     window.dispatchEvent(
       new CustomEvent(REGION_CHANGE_EVENT, { detail: { id } }),
     );
-    void syncPushRegionPreference(id);
   } catch {
     /* localStorage may be disabled in some contexts (private mode) */
-  }
-}
-
-async function syncPushRegionPreference(id: RegionId): Promise<void> {
-  try {
-    const { getCurrentSubscriptionId, updatePushPrefs } = await import(
-      "./push/client"
-    );
-    const subId = await getCurrentSubscriptionId();
-    if (!subId) return;
-    await updatePushPrefs(subId, { region_id: id });
-  } catch {
-    /* best-effort: local region changes should never fail because push sync did */
   }
 }

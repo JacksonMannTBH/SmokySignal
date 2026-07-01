@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAircraft } from "@/lib/hooks/useAircraft";
 import { useRiderPos } from "@/lib/hooks/useRiderPos";
@@ -11,18 +11,13 @@ import {
   getRideContacts,
   isSameCardinalTrack,
   rideStatusLabel,
-  rideStatusSeverity,
   type RideContact,
   type RideStatus,
   type RideStatusThresholds,
 } from "@/lib/ride-mode";
 import {
-  DEFAULT_RIDE_STATUS_NOTIFICATIONS,
-  getRideStatusNotificationPrefs,
   getRideStatusThresholds,
-  RIDE_STATUS_NOTIFICATIONS_KEY,
   RIDE_STATUS_THRESHOLDS_KEY,
-  type RideStatusNotificationPrefs,
 } from "@/lib/ride-settings";
 import {
   estimateFuelRemaining,
@@ -45,10 +40,6 @@ type WakeLockNavigator = Navigator & {
   wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinel> };
 };
 
-type ServiceWorkerNotificationOptions = NotificationOptions & {
-  renotify?: boolean;
-};
-
 const STATUS_COLORS: Record<RideStatus, string> = {
   clear: "#39d98a",
   watch: "#60a5fa",
@@ -58,7 +49,6 @@ const STATUS_COLORS: Record<RideStatus, string> = {
 
 const STALE_WARN_MS = 45_000;
 const STALE_DANGER_MS = 90_000;
-const NOTIFY_COOLDOWN_MS = 90_000;
 
 export function RideModeShell({ initial, mockOn = false }: Props) {
   const router = useRouter();
@@ -69,28 +59,16 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
   const [rideThresholds, setRideThresholds] = useState<RideStatusThresholds>(
     DEFAULT_RIDE_STATUS_THRESHOLDS,
   );
-  const [rideNotifications, setRideNotifications] =
-    useState<RideStatusNotificationPrefs>(DEFAULT_RIDE_STATUS_NOTIFICATIONS);
-  const notifyRef = useRef<{
-    status: RideStatus;
-    tail: string | null;
-    distanceNm: number | null;
-    ts: number;
-  } | null>(null);
 
   useRideChrome();
   useRideWakeLock();
 
   useEffect(() => {
     setRideThresholds(getRideStatusThresholds());
-    setRideNotifications(getRideStatusNotificationPrefs());
 
     const onStorage = (event: StorageEvent) => {
       if (!event.key || event.key === RIDE_STATUS_THRESHOLDS_KEY) {
         setRideThresholds(getRideStatusThresholds());
-      }
-      if (!event.key || event.key === RIDE_STATUS_NOTIFICATIONS_KEY) {
-        setRideNotifications(getRideStatusNotificationPrefs());
       }
     };
     window.addEventListener("storage", onStorage);
@@ -127,14 +105,6 @@ export function RideModeShell({ initial, mockOn = false }: Props) {
       : lastUpdateAgeMs >= STALE_WARN_MS
         ? "lagging"
         : "fresh";
-
-  useRideNotifications(
-    status,
-    nearest,
-    notifyRef,
-    rideNotifications,
-    rideThresholds,
-  );
 
   const aircraftLabel = nearest ? formatAircraftLabel(nearest.plane) : null;
   const nearestSpeedText = nearest
@@ -386,87 +356,6 @@ function useRideWakeLock() {
       void release();
     };
   }, []);
-}
-
-function useRideNotifications(
-  status: RideStatus,
-  nearest: RideContact | null,
-  ref: MutableRefObject<{
-    status: RideStatus;
-    tail: string | null;
-    distanceNm: number | null;
-    ts: number;
-  } | null>,
-  notificationPrefs: RideStatusNotificationPrefs,
-  thresholds: RideStatusThresholds,
-) {
-  useEffect(() => {
-    const now = Date.now();
-    const tail = nearest?.plane.tail ?? null;
-    const distanceNm = nearest?.distanceNm ?? null;
-    const prev = ref.current;
-    if (!prev) {
-      ref.current = { status, tail, distanceNm, ts: now };
-      return;
-    }
-
-    const cooldownMet = now - prev.ts >= NOTIFY_COOLDOWN_MS;
-    const severity = rideStatusSeverity(status);
-    const prevSeverity = rideStatusSeverity(prev.status);
-    const severityChanged = severity !== prevSeverity;
-    const tailChanged = severity > 0 && tail != null && tail !== prev.tail;
-    const distanceChanged =
-      severity >= 2 &&
-      distanceNm != null &&
-      prev.distanceNm != null &&
-      Math.abs(distanceNm - prev.distanceNm) >= 0.5;
-
-    if (
-      cooldownMet &&
-      (severityChanged || tailChanged || distanceChanged) &&
-      (severity > 0 || prevSeverity > 0)
-    ) {
-      if (notificationPrefs[status]) {
-        void postRideNotification(status, nearest, thresholds);
-      }
-      ref.current = { status, tail, distanceNm, ts: now };
-      return;
-    }
-
-    ref.current = { status, tail, distanceNm, ts: prev.ts };
-  }, [nearest, notificationPrefs, ref, status, thresholds]);
-}
-
-async function postRideNotification(
-  status: RideStatus,
-  nearest: RideContact | null,
-  thresholds: RideStatusThresholds,
-) {
-  if (typeof window === "undefined") return;
-  if (typeof Notification === "undefined") return;
-  if (Notification.permission !== "granted") return;
-  if (!("serviceWorker" in navigator)) return;
-  const reg = await navigator.serviceWorker.getRegistration();
-  if (!reg) return;
-
-  const label = rideStatusLabel(status).toUpperCase();
-  const title =
-    status === "clear" || !nearest
-      ? `Clear - No tracked aircraft within ${formatNm(thresholds.watchNm)} nm`
-      : `${label} - ${formatAircraftLabel(nearest.plane)} ${nearest.distanceNm.toFixed(1)} nm ${nearest.cardinal}`;
-  const options: ServiceWorkerNotificationOptions = {
-    body: "ADS-B awareness only.",
-    icon: "/icons/out-of-sight-icon-192.png",
-    badge: "/icons/out-of-sight-favicon-96.png",
-    tag: "ride-mode-status",
-    renotify: status === "warning" || status === "danger",
-    data: { url: "/ride", kind: "ride-mode", status },
-  };
-  try {
-    await reg.showNotification(title, options);
-  } catch {
-    /* best-effort */
-  }
 }
 
 function formatNm(value: number): string {
